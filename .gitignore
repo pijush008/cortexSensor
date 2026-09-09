@@ -18,7 +18,9 @@ logs/
 *.log
 
 # build output
-.next/
+# `.next*` (not just `.next/`) so quarantined copies such as a root-owned
+# .next left behind by a container build are ignored too.
+.next*
 out/
 dist/
 build/

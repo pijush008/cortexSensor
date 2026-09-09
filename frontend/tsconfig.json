@@ -34,8 +34,6 @@
     "**/*.tsx",
     ".next/dev/types/**/*.ts",
     ".next/types/**/*.ts",
-    "/tmp/claude-1000/-home-pijush-Downloads-SHM/e3d20b7d-d530-48bf-b17e-6f674cca420a/scratchpad/next-build/types/**/*.ts",
-    "/tmp/shm-next-build/types/**/*.ts",
     "next-env.d.ts",
     "/tmp/claude-1000/-home-pijush-Downloads-SHM/e3d20b7d-d530-48bf-b17e-6f674cca420a/scratchpad/next-build-2/types/**/*.ts"
   ],

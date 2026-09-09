@@ -7,6 +7,8 @@ import cookieParser from "cookie-parser";
 import path from "path";
 import { config } from "./config";
 import { notFoundHandler, errorHandler } from "./middleware/errorHandler";
+import { requestContext } from "./middleware/requestContext";
+import healthRoutes from "./modules/health/health.routes";
 
 import authRoutes from "./modules/auth/auth.routes";
 import usersRoutes from "./modules/users/users.routes";
@@ -28,6 +30,10 @@ import * as sensorsController from "./modules/sensors/sensors.controller";
 
 const app = express();
 
+// Correlation id first: everything downstream (including the rate limiter's
+// rejections and the error handler) should be traceable.
+app.use(requestContext);
+
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 
 app.use(
@@ -36,6 +42,12 @@ app.use(
     credentials: true,
   }),
 );
+
+// Probes are mounted ahead of the rate limiter on purpose. A load balancer
+// polling /health every second would otherwise consume the 500-per-15-minutes
+// budget and get itself throttled, which reads as an unhealthy instance and
+// pulls a perfectly good API out of rotation.
+app.use(healthRoutes);
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
