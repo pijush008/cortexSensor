@@ -58,6 +58,13 @@ services:
       # `npm install` writes straight into ./frontend/node_modules on the host,
       # which then breaks host-side `npm install` with EACCES.
       - /app/node_modules
+      # Same reasoning for .next. The container runs `next dev`, which keeps a
+      # development build here; a host-side `npm run build` writes a PRODUCTION
+      # build to the same path through the bind mount and the dev server then
+      # dies with "ENOENT .next/routes-manifest.json" on every request. An
+      # anonymous volume gives the container its own .next so the two cannot
+      # collide.
+      - /app/.next
     environment:
       NODE_ENV: development
       PORT: 3000
