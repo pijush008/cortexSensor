@@ -88,7 +88,7 @@ export default function HomePage() {
       {/* Hero */}
       <section
         id="platform"
-        className="bg-blueprint relative overflow-hidden bg-gradient-to-br from-shm-navy-900 via-shm-navy-800 to-shm-navy-700 pt-32 pb-20 lg:pt-40 lg:pb-24"
+        className="bg-blueprint relative overflow-hidden bg-gradient-to-br from-shm-lavender via-shm-lavender-soft to-shm-cyan-soft pt-32 pb-20 lg:pt-40 lg:pb-24"
       >
         {/* Real structure photo as backdrop — monochrome, heavily under-exposed */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -96,42 +96,42 @@ export default function HomePage() {
           src="/images/structures/hero-bridge.jpg"
           alt=""
           aria-hidden
-          className="absolute inset-0 h-full w-full object-cover opacity-25"
+          className="absolute inset-0 h-full w-full object-cover opacity-[0.14] mix-blend-multiply"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-shm-navy-900/95 via-shm-navy-900/80 to-shm-navy-800/60" />
+        <div className="absolute inset-0 bg-gradient-to-r from-shm-lavender/90 via-shm-lavender/60 to-transparent" />
         <div
           className="pointer-events-none absolute inset-0 opacity-50 mix-blend-overlay"
           style={{
             backgroundImage:
-              "radial-gradient(circle at 25px 25px, rgba(255,255,255,0.16) 1px, transparent 0)",
+              "radial-gradient(circle at 25px 25px, rgba(26,18,37,0.10) 1px, transparent 0)",
             backgroundSize: "44px 44px",
           }}
         />
-        <div className="absolute -top-24 right-0 h-[26rem] w-[26rem] rounded-full bg-shm-navy-500/20 blur-3xl" />
-        <div className="absolute bottom-0 -left-24 h-80 w-80 rounded-full bg-blue-400/10 blur-3xl" />
+        <div className="absolute -top-24 right-0 h-[26rem] w-[26rem] rounded-full bg-shm-cyan/30 blur-3xl" />
+        <div className="absolute bottom-0 -left-24 h-80 w-80 rounded-full bg-shm-mint/25 blur-3xl" />
 
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-16 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
             <div className="max-w-2xl">
               <Reveal>
-                <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3.5 py-1.5 backdrop-blur">
+                <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-shm-navy-900/12 bg-white/70 px-3.5 py-1.5 backdrop-blur">
                   <PulseDotLike />
-                  <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-shm-navy-100">
+                  <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-shm-navy-700">
                     Structural Monitoring as a Service
                   </span>
                 </div>
               </Reveal>
               <Reveal delay={80}>
-                <h1 className="mb-6 font-display text-[42px] font-semibold leading-[1.04] tracking-tight text-white sm:text-[56px] lg:text-[64px]">
+                <h1 className="mb-6 font-display text-[42px] font-semibold leading-[1.04] tracking-tight text-shm-navy-900 sm:text-[56px] lg:text-[64px]">
                   Structure,
                   <br />
                   instrumented.
                   <br />
-                  <span className="text-shm-navy-200">Risk, measured.</span>
+                  <span className="text-shm-navy-600">Risk, measured.</span>
                 </h1>
               </Reveal>
               <Reveal delay={160}>
-                <p className="mb-9 max-w-xl text-[17px] leading-relaxed text-slate-300">
+                <p className="mb-9 max-w-xl text-[17px] leading-relaxed text-slate-700">
                   IoT edge nodes feed continuous strain, vibration and
                   deflection data into a cloud platform that detects the
                   anomalies engineers need to know — before they become
@@ -143,7 +143,7 @@ export default function HomePage() {
                   <Link href="/login">
                     <Button
                       size="lg"
-                      className="w-full bg-white text-shm-navy-900 hover:bg-slate-100 sm:w-auto"
+                      className="w-full bg-shm-navy-900 text-white hover:bg-shm-navy-800 sm:w-auto"
                     >
                       Explore the console
                       <ChevronRight className="h-4 w-4" />
@@ -153,7 +153,7 @@ export default function HomePage() {
                     <Button
                       size="lg"
                       variant="ghost"
-                      className="w-full border border-white/25 text-white hover:border-white/40 hover:bg-white/5 sm:w-auto"
+                      className="w-full border border-shm-navy-900/25 text-shm-navy-900 hover:border-shm-navy-900/40 hover:bg-white/60 sm:w-auto"
                     >
                       <Layers className="h-4 w-4" />
                       Architecture
@@ -162,7 +162,7 @@ export default function HomePage() {
                 </div>
               </Reveal>
               <Reveal delay={320}>
-                <div className="mt-11 flex flex-col gap-x-8 gap-y-3 border-t border-white/10 pt-6 text-[13px] text-slate-400 sm:flex-row">
+                <div className="mt-11 flex flex-col gap-x-8 gap-y-3 border-t border-shm-navy-900/12 pt-6 text-[13px] text-slate-700 sm:flex-row">
                   {[
                     { icon: Lock, text: "SOC 2 · ISO 27001" },
                     { icon: Globe, text: "Multi-tenant SaaS" },
@@ -170,7 +170,7 @@ export default function HomePage() {
                   ].map((item) => (
                     <div key={item.text} className="flex items-center gap-2">
                       <item.icon
-                        className="h-4 w-4 text-shm-navy-300"
+                        className="h-4 w-4 text-shm-navy-600"
                         strokeWidth={1.75}
                       />
                       {item.text}
@@ -183,18 +183,18 @@ export default function HomePage() {
             {/* Live dashboard mock */}
             <Reveal delay={180} className="hidden lg:block">
               <div className="relative">
-                <div className="absolute -inset-5 rounded-2xl bg-shm-navy-500/15 blur-2xl" />
-                <div className="relative rounded-2xl border border-white/15 bg-shm-navy-800/70 p-5 shadow-2xl backdrop-blur">
+                <div className="absolute -inset-5 rounded-2xl bg-shm-cyan/25 blur-2xl" />
+                <div className="relative rounded-2xl border border-shm-navy-900/10 bg-white p-5 shadow-2xl backdrop-blur">
                   <div className="mb-4 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-md bg-white/10">
-                        <Activity className="h-3.5 w-3.5 text-shm-navy-200" />
+                      <span className="flex h-6 w-6 items-center justify-center rounded-md bg-shm-lavender">
+                        <Activity className="h-3.5 w-3.5 text-shm-navy-700" />
                       </span>
-                      <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">
+                      <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
                         Live telemetry
                       </span>
                     </div>
-                    <span className="flex items-center gap-1.5 text-[11px] text-shm-green">
+                    <span className="flex items-center gap-1.5 text-[11px] text-shm-green-text">
                       <LiveDot />
                       All systems nominal
                     </span>
@@ -218,13 +218,13 @@ export default function HomePage() {
                         label: "STRAIN",
                         value: "145",
                         unit: "με",
-                        dot: "bg-blue-300",
+                        dot: "bg-shm-chart-1",
                       },
                       {
                         label: "HUM",
                         value: "62",
                         unit: "%",
-                        dot: "bg-shm-navy-200",
+                        dot: "bg-shm-navy-500",
                       },
                       {
                         label: "DEFL",
@@ -241,19 +241,19 @@ export default function HomePage() {
                     ].map((s) => (
                       <div
                         key={s.label}
-                        className="rounded-lg border border-white/10 bg-shm-navy-900/50 px-3 py-2.5"
+                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5"
                       >
                         <div className="flex items-center justify-between">
-                          <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-slate-400">
+                          <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-slate-500">
                             {s.label}
                           </span>
                           <span
                             className={`h-1.5 w-1.5 rounded-full ${s.dot}`}
                           />
                         </div>
-                        <p className="mt-1 font-mono text-[15px] font-medium tabular-nums text-white">
+                        <p className="mt-1 font-mono text-[15px] font-medium tabular-nums text-shm-navy-900">
                           {s.value}
-                          <span className="ml-0.5 text-[10px] text-slate-400">
+                          <span className="ml-0.5 text-[10px] text-slate-500">
                             {s.unit}
                           </span>
                         </p>
@@ -261,10 +261,10 @@ export default function HomePage() {
                     ))}
                   </div>
 
-                  <div className="mt-3 rounded-lg border border-white/10 bg-shm-navy-900/50 p-3">
-                    <div className="mb-2 flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.14em] text-slate-400">
+                  <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <div className="mb-2 flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.14em] text-slate-500">
                       <span>FFT spectrum · bridge span 2</span>
-                      <span className="text-shm-navy-200">f₁ = 3.42 Hz</span>
+                      <span className="text-shm-navy-700">f₁ = 3.42 Hz</span>
                     </div>
                     <div className="flex h-14 items-end gap-px">
                       {[
@@ -273,7 +273,7 @@ export default function HomePage() {
                       ].map((h, i) => (
                         <div
                           key={i}
-                          className="anim-rise flex-1 origin-bottom rounded-t-sm bg-gradient-to-t from-shm-navy-500 to-blue-300"
+                          className="anim-rise flex-1 origin-bottom rounded-t-sm bg-gradient-to-t from-shm-chart-1 to-shm-cyan"
                           style={{
                             height: `${h}%`,
                             animationDelay: `${i * 18}ms`,
@@ -295,14 +295,14 @@ export default function HomePage() {
           </div>
 
           {/* ticker */}
-          <div className="relative mt-16 overflow-hidden border-t border-white/10 pt-4">
+          <div className="relative mt-16 overflow-hidden border-t border-shm-navy-900/12 pt-4">
             <div className="anim-marquee flex w-max gap-10">
               {[...TICKER, ...TICKER].map((t, i) => (
                 <span
                   key={i}
-                  className="flex items-center gap-2 whitespace-nowrap font-mono text-[11px] text-slate-400"
+                  className="flex items-center gap-2 whitespace-nowrap font-mono text-[11px] text-slate-600"
                 >
-                  <span className="h-1 w-1 rounded-full bg-shm-navy-300" />
+                  <span className="h-1 w-1 rounded-full bg-shm-cyan" />
                   {t}
                 </span>
               ))}
@@ -370,7 +370,7 @@ export default function HomePage() {
                 sub: "Analytics & intelligence",
                 icon: MonitorDot,
                 tone: "from-shm-navy-500 to-shm-navy-700",
-                accent: "text-blue-200",
+                accent: "text-shm-cyan",
                 items: [
                   "Signal processing, FFT & modal analysis",
                   "AI/ML anomaly detection",
@@ -491,7 +491,7 @@ export default function HomePage() {
                   {
                     label: "Dashboards",
                     icon: MonitorDot,
-                    color: "bg-shm-green/10 text-shm-green border-shm-green/20",
+                    color: "bg-shm-green/10 text-shm-green-text border-shm-green/20",
                   },
                 ].map((step, i) => (
                   <div key={step.label} className="flex items-center gap-2">
@@ -586,7 +586,7 @@ export default function HomePage() {
       {/* Modules */}
       <section
         id="modules"
-        className="bg-paper-grid border-y border-slate-200 bg-slate-50/70 py-20 lg:py-28"
+        className="bg-paper-grid border-y border-slate-200 bg-shm-cream py-20 lg:py-28"
       >
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Reveal>
@@ -692,7 +692,7 @@ export default function HomePage() {
               <Reveal key={m.title} delay={(i % 3) * 70}>
                 <div className="group h-full rounded-xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(17,17,17,0.04)] transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_10px_30px_-12px_rgba(17,17,17,0.2)]">
                   <div className="mb-4 flex items-center justify-between">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-shm-navy-50 text-shm-navy-600 transition-colors duration-300 group-hover:bg-shm-navy-800 group-hover:text-white">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-shm-cyan-soft text-shm-navy-800 transition-colors duration-300 group-hover:bg-shm-navy-800 group-hover:text-white">
                       <m.icon className="h-4.5 w-4.5" strokeWidth={1.75} />
                     </div>
                     <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-slate-400">
@@ -797,7 +797,7 @@ export default function HomePage() {
               <Reveal key={s.title} delay={(i % 3) * 70}>
                 <div className="group h-full rounded-xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur transition-colors duration-300 hover:border-white/20 hover:bg-white/[0.07]">
                   <div className="mb-4 flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.07]">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-shm-cyan/15">
                       <s.icon
                         className="h-4.5 w-4.5 text-shm-navy-200"
                         strokeWidth={1.75}
@@ -912,7 +912,7 @@ export default function HomePage() {
       </section>
 
       {/* Pricing */}
-      <section className="bg-paper-grid border-y border-slate-200 bg-slate-50/70 py-20 lg:py-28">
+      <section className="bg-paper-grid border-y border-slate-200 bg-shm-lavender-soft/45 py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Reveal>
             <div className="mb-12 max-w-2xl">
@@ -1036,7 +1036,7 @@ export default function HomePage() {
 
       {/* CTA */}
       <section className="bg-blueprint relative overflow-hidden bg-gradient-to-br from-shm-navy-800 to-shm-navy-900 py-20">
-        <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-shm-navy-500/20 blur-3xl" />
+        <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-shm-cyan/25 blur-3xl" />
         <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
           <Reveal>
             <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.24em] text-shm-navy-300">

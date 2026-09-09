@@ -122,16 +122,33 @@
   --color-shm-coral: #fb7f87;          /* card surface         7.33:1 */
   --color-shm-cream: #eeeee6;          /* section background  15.56:1 */
 
-  /* ── Chart series ───────────────────────────────────────────────────
-     Deepened palette hues, NOT the pastels: a 1px #39d3e3 line on white
-     is too faint to trace. All clear 4:1 on white. Red, amber and green
-     hues are deliberately absent so a series can never be misread as an
-     alert state. */
-  --color-shm-series-1: #0e8c9b;  /* 4.01:1 */
-  --color-shm-series-2: #7c5bc7;  /* 5.03:1 */
-  --color-shm-series-3: #24866a;  /* 4.47:1 */
-  --color-shm-series-4: #a87516;  /* 4.02:1 */
-  --color-shm-series-5: #a34e8f;  /* 5.19:1 */
+  /* ── Chart colours ──────────────────────────────────────────────────
+     Deepened hues, NOT the pastels: a 1px #39d3e3 line on white is too
+     faint to trace.
+
+     Three slots, not five. Every chart in this app plots a SINGLE series
+     (count, frequency, psd), so a five-hue categorical ramp would be five
+     invented colours serving nothing. Assign in fixed order; never cycle.
+
+     Validated with the dataviz palette validator under --pairs all: all
+     three clear the lightness band, the chroma floor, CVD separation
+     (worst 9.7 deutan), the normal-vision floor (worst 16.2) and 3:1
+     contrast, in both light and dark modes.
+
+     Each is also >= 15 dE from EVERY status colour, so a series can never
+     be misread as an alert state:
+       violet 31.7 · gold 15.2 · blue 19.2 (min, across green/amber/red)
+
+     Note green and cyan are absent by necessity, not taste — measured in
+     OKLab, both sit under 15 dE from status green #379745 and would be
+     confusable with a healthy reading. */
+  --color-shm-chart-1: #6b4fd8;  /* violet — on-brand, 5.62:1 */
+  --color-shm-chart-2: #a56d0f;  /* gold           4.38:1 */
+  --color-shm-chart-3: #1384b7;  /* blue           4.19:1 */
+
+  /* Chart furniture: recessive grid and axes, ink for labels. */
+  --color-shm-chart-grid: #e6e5df;
+  --color-shm-chart-axis: #a9a38d;
 
   /* Status colors (unchanged — semantic green/amber/red kept for alerts & health) */
   --color-shm-green: #379745;

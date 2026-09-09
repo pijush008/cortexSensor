@@ -47,10 +47,10 @@ const ACTION_ICON: Record<string, typeof UserCog> = {
 };
 
 const ACTION_TONE: Record<string, string> = {
-  create: "text-shm-green bg-shm-green/10",
+  create: "text-shm-green-text bg-shm-green/10",
   update: "text-shm-navy-700 bg-shm-navy-500/10",
   delete: "text-shm-red bg-shm-red/10",
-  verify: "text-shm-green bg-shm-green/10",
+  verify: "text-shm-green-text bg-shm-green/10",
   deactivate: "text-amber-700 bg-shm-yellow/15",
   assign: "text-shm-navy-700 bg-shm-navy-500/10",
   unassign: "text-amber-700 bg-shm-yellow/15",

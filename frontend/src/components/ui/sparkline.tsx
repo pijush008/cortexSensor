@@ -11,7 +11,7 @@ export function Sparkline({
   data,
   width = 96,
   height = 28,
-  stroke = "#333333",
+  stroke = "var(--color-shm-chart-1)",
   className,
   animate = true,
 }: SparklineProps) {

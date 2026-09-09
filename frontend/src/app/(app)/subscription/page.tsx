@@ -410,8 +410,8 @@ export default function SubscriptionPage() {
           </CardHeader>
           <CardContent className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-14 items-center justify-center rounded-lg bg-blue-50">
-                <Receipt className="h-5 w-5 text-blue-600" />
+              <div className="flex h-10 w-14 items-center justify-center rounded-lg bg-shm-cyan-soft">
+                <Receipt className="h-5 w-5 text-shm-navy-800" />
               </div>
               <div>
                 <p className="text-sm font-semibold text-slate-800">No card on file</p>

@@ -28,7 +28,7 @@ export function GraphCard({
   subtitle,
   data,
   type,
-  color = "#1f1f1f",
+  color = "var(--color-shm-chart-1)",
   variant = "area",
 }: GraphCardProps) {
   return (
@@ -52,27 +52,27 @@ export function GraphCard({
                     <stop offset="95%" stopColor={color} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#cfdde9" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-shm-chart-grid)" vertical={false} />
                 <XAxis
                   dataKey="label"
-                  tick={{ fontSize: 11, fill: "#667f97" }}
+                  tick={{ fontSize: 11, fill: "var(--color-shm-chart-axis)" }}
                   tickLine={false}
-                  axisLine={{ stroke: "#cfdde9" }}
+                  axisLine={{ stroke: "var(--color-shm-chart-grid)" }}
                   interval={type === "year" ? 1 : 0}
                 />
                 <YAxis
                   allowDecimals={false}
-                  tick={{ fontSize: 11, fill: "#667f97" }}
+                  tick={{ fontSize: 11, fill: "var(--color-shm-chart-axis)" }}
                   tickLine={false}
                   axisLine={false}
                 />
                 <Tooltip
                   contentStyle={{
                     borderRadius: 8,
-                    border: "1px solid #cfdde9",
+                    border: "1px solid var(--color-shm-chart-grid)",
                     fontSize: 13,
                   }}
-                  cursor={{ stroke: "#7e99b0" }}
+                  cursor={{ stroke: "var(--color-shm-chart-axis)" }}
                 />
                 <Area
                   type="monotone"
@@ -86,27 +86,27 @@ export function GraphCard({
               </AreaChart>
             ) : (
               <BarChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#cfdde9" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-shm-chart-grid)" vertical={false} />
                 <XAxis
                   dataKey="label"
-                  tick={{ fontSize: 11, fill: "#667f97" }}
+                  tick={{ fontSize: 11, fill: "var(--color-shm-chart-axis)" }}
                   tickLine={false}
-                  axisLine={{ stroke: "#cfdde9" }}
+                  axisLine={{ stroke: "var(--color-shm-chart-grid)" }}
                   interval={type === "year" ? 1 : 0}
                 />
                 <YAxis
                   allowDecimals={false}
-                  tick={{ fontSize: 11, fill: "#667f97" }}
+                  tick={{ fontSize: 11, fill: "var(--color-shm-chart-axis)" }}
                   tickLine={false}
                   axisLine={false}
                 />
                 <Tooltip
                   contentStyle={{
                     borderRadius: 8,
-                    border: "1px solid #cfdde9",
+                    border: "1px solid var(--color-shm-chart-grid)",
                     fontSize: 13,
                   }}
-                  cursor={{ fill: "#f2f3f7" }}
+                  cursor={{ fill: "var(--color-slate-100)" }}
                 />
                 <Bar dataKey="count" fill={color} radius={[6, 6, 0, 0]} maxBarSize={36} />
               </BarChart>

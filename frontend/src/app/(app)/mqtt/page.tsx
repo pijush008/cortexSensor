@@ -89,7 +89,7 @@ export default function LiveFeedPage() {
           icon={Wifi}
           label="Stream"
           value={STATE_LABEL[state]}
-          tone={state === "open" ? "text-shm-green" : "text-slate-700"}
+          tone={state === "open" ? "text-shm-green-text" : "text-slate-700"}
         />
         <Metric icon={Activity} label="Received this session" value={String(events.length)} />
         <Metric

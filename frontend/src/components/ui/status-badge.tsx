@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 export type StatusTone = "green" | "slate" | "yellow" | "red" | "blue";
 
 const TONES: Record<StatusTone, { pill: string; dot: string; pulse?: boolean }> = {
-  green: { pill: "bg-shm-green/10 text-shm-green", dot: "bg-shm-green", pulse: true },
+  green: { pill: "bg-shm-green/10 text-shm-green-text", dot: "bg-shm-green", pulse: true },
   slate: { pill: "bg-slate-100 text-slate-600", dot: "bg-slate-400" },
   yellow: { pill: "bg-shm-yellow/12 text-amber-700", dot: "bg-shm-yellow", pulse: true },
   red: { pill: "bg-shm-red/10 text-shm-red", dot: "bg-shm-red", pulse: true },

@@ -138,25 +138,25 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen bg-white">
       {/* Left editorial panel */}
-      <div className="bg-blueprint relative hidden w-1/2 flex-col justify-between overflow-hidden bg-shm-navy-900 p-12 lg:flex">
+      <div className="bg-blueprint relative hidden w-1/2 flex-col justify-between overflow-hidden bg-shm-lavender p-12 lg:flex">
         {/* Real civil-engineering structure photo, rendered monochrome */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/images/structures/cable-stayed.jpg"
           alt=""
           aria-hidden
-          className="absolute inset-0 h-full w-full object-cover opacity-90"
+          className="absolute inset-0 h-full w-full object-cover opacity-[0.22] mix-blend-multiply"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-shm-navy-950/95 via-shm-navy-900/80 to-shm-navy-900/40" />
+        <div className="absolute inset-0 bg-gradient-to-t from-shm-lavender/95 via-shm-lavender/70 to-shm-cyan-soft/50" />
         <div
-          className="pointer-events-none absolute inset-0 opacity-40 mix-blend-overlay"
+          className="pointer-events-none absolute inset-0 opacity-60"
           style={{
             backgroundImage:
-              "radial-gradient(circle at 25px 25px, rgba(255,255,255,0.25) 1px, transparent 0)",
+              "radial-gradient(circle at 25px 25px, rgba(26,18,37,0.12) 1px, transparent 0)",
             backgroundSize: "44px 44px",
           }}
         />
-        <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-shm-navy-500/20 blur-3xl" />
+        <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-shm-cyan/30 blur-3xl" />
 
         <div className="relative flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -165,28 +165,28 @@ export default function LoginPage() {
             alt="SHM Console"
             className="h-9 w-auto object-contain"
           />
-          <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-shm-navy-300">
+          <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-shm-navy-700">
             Console · v1.0
           </span>
         </div>
 
         <div className="relative max-w-lg">
-          <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.24em] text-shm-navy-300">
+          <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.24em] text-shm-navy-700">
             Structural monitoring
           </p>
-          <h2 className="font-display text-4xl font-semibold leading-[1.08] tracking-tight text-white">
+          <h2 className="font-display text-4xl font-semibold leading-[1.08] tracking-tight text-shm-navy-900">
             See damage before it becomes a defect.
           </h2>
-          <p className="mt-5 text-[15px] leading-relaxed text-slate-300">
+          <p className="mt-5 text-[15px] leading-relaxed text-slate-700">
             Continuous strain, vibration and deflection telemetry from every
             structure you manage — instrumented, analyzed, and acted upon.
           </p>
 
           {/* pipeline description — deliberately no values (see PIPELINE) */}
-          <div className="mt-10 rounded-xl border border-white/10 bg-black/20 p-4 font-mono backdrop-blur">
+          <div className="mt-10 rounded-xl border border-shm-navy-900/12 bg-white/75 p-4 font-mono backdrop-blur">
             <div className="mb-3 flex items-center gap-2">
-              <Radio className="h-3.5 w-3.5 text-shm-navy-300" />
-              <span className="text-[9px] uppercase tracking-[0.2em] text-slate-400">
+              <Radio className="h-3.5 w-3.5 text-shm-navy-700" />
+              <span className="text-[9px] uppercase tracking-[0.2em] text-slate-600">
                 Measurement pipeline · edge → cloud
               </span>
             </div>
@@ -194,15 +194,15 @@ export default function LoginPage() {
               {activePipeline.map((line) => (
                 <p
                   key={line}
-                  className="anim-tick-in truncate text-[11px] leading-relaxed text-shm-navy-200"
+                  className="anim-tick-in truncate text-[11px] leading-relaxed text-shm-navy-800"
                 >
-                  <span className="text-shm-green">➜</span> {line}
+                  <span className="text-shm-green-text">➜</span> {line}
                 </p>
               ))}
-              <p className="text-[11px] text-shm-navy-200">
-                <span className="text-shm-green">➜</span> engineer
+              <p className="text-[11px] text-shm-navy-800">
+                <span className="text-shm-green-text">➜</span> engineer
                 <span
-                  className={cursor ? "text-shm-green" : "text-transparent"}
+                  className={cursor ? "text-shm-green-text" : "text-transparent"}
                 >
                   _
                 </span>
@@ -218,19 +218,19 @@ export default function LoginPage() {
             ].map(({ icon: Icon, label }) => (
               <div
                 key={label}
-                className="flex items-center gap-2.5 rounded-lg border border-white/10 bg-white/[0.04] px-3.5 py-2.5"
+                className="flex items-center gap-2.5 rounded-lg border border-shm-navy-900/12 bg-white/60 px-3.5 py-2.5"
               >
                 <Icon
-                  className="h-4 w-4 text-shm-navy-200"
+                  className="h-4 w-4 text-shm-navy-700"
                   strokeWidth={1.75}
                 />
-                <span className="text-[12px] text-slate-200">{label}</span>
+                <span className="text-[12px] text-slate-700">{label}</span>
               </div>
             ))}
           </div>
         </div>
 
-        <p className="relative font-mono text-[11px] text-slate-500">
+        <p className="relative font-mono text-[11px] text-shm-navy-700">
           © {new Date().getFullYear()} Arctano Sensors · All rights reserved
         </p>
       </div>

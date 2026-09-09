@@ -402,7 +402,7 @@ function AlertDrawer({ id, onClose }: { id: number | null; onClose: () => void }
 
           {alert.resolutionNote && (
             <section className="rounded-lg border border-shm-green/25 bg-shm-green/5 px-3 py-2">
-              <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-shm-green">
+              <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-shm-green-text">
                 Resolution
               </p>
               <p className="mt-1 text-[13px] text-slate-700">{alert.resolutionNote}</p>

@@ -304,28 +304,28 @@ export default function AnalyticsPage() {
                     <div className="h-72 w-full">
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 28, left: 8 }}>
-                          <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
+                          <CartesianGrid stroke="var(--color-shm-chart-grid)" strokeDasharray="3 3" />
                           <XAxis
                             dataKey="frequency"
                             type="number"
                             domain={["dataMin", "dataMax"]}
-                            tick={{ fontSize: 11, fill: "#64748b" }}
+                            tick={{ fontSize: 11, fill: "var(--color-shm-chart-axis)" }}
                             tickFormatter={(v: number) => v.toFixed(1)}
                             label={{
                               value: "Frequency (Hz)",
                               position: "insideBottom",
                               offset: -14,
-                              style: { fontSize: 11, fill: "#64748b" },
+                              style: { fontSize: 11, fill: "var(--color-shm-chart-axis)" },
                             }}
                           />
                           <YAxis
-                            tick={{ fontSize: 11, fill: "#64748b" }}
+                            tick={{ fontSize: 11, fill: "var(--color-shm-chart-axis)" }}
                             tickFormatter={(v: number) => v.toExponential(0)}
                             label={{
                               value: "PSD (unit²/Hz)",
                               angle: -90,
                               position: "insideLeft",
-                              style: { fontSize: 11, fill: "#64748b" },
+                              style: { fontSize: 11, fill: "var(--color-shm-chart-axis)" },
                             }}
                           />
                           <Tooltip
@@ -338,7 +338,7 @@ export default function AnalyticsPage() {
                             <ReferenceLine
                               key={p.frequency_hz}
                               x={p.frequency_hz}
-                              stroke="#cc1c16"
+                              stroke="var(--color-shm-chart-2)"
                               strokeDasharray="4 3"
                               strokeOpacity={0.6}
                             />
@@ -346,7 +346,7 @@ export default function AnalyticsPage() {
                           <Line
                             type="monotone"
                             dataKey="psd"
-                            stroke="#1f2937"
+                            stroke="var(--color-shm-chart-1)"
                             strokeWidth={1.4}
                             dot={false}
                             isAnimationActive={false}

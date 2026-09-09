@@ -174,14 +174,14 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile }: SidebarProps) 
   return (
     <aside
       className={cn(
-        "fixed inset-y-0 left-0 z-40 flex h-full w-64 flex-col border-r border-shm-navy-700/60 bg-shm-navy-900 transition-[width,transform] duration-300 lg:static lg:w-64 lg:translate-x-0",
+        "fixed inset-y-0 left-0 z-40 flex h-full w-64 flex-col border-r border-shm-navy-900/12 bg-shm-lavender transition-[width,transform] duration-300 lg:static lg:w-64 lg:translate-x-0",
         collapsed && "lg:w-[68px]",
         mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       )}
     >
       <div className={cn("flex items-center gap-3 px-4 py-5", collapsed && "lg:justify-center lg:px-0")}>
         {collapsed ? (
-          <div className="hidden h-9 w-9 items-center justify-center rounded-lg bg-shm-navy-500 font-bold text-white lg:flex">
+          <div className="hidden h-9 w-9 items-center justify-center rounded-lg bg-shm-navy-900 font-bold text-white lg:flex">
             SH
           </div>
         ) : (
@@ -198,10 +198,10 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile }: SidebarProps) 
               className="h-8 w-auto max-w-[96px] shrink-0 object-contain"
             />
             <div className="min-w-0 leading-none">
-              <p className="truncate text-[13px] font-semibold tracking-tight text-white">
+              <p className="truncate text-[13px] font-semibold tracking-tight text-shm-navy-900">
                 SHM Console
               </p>
-              <p className="mt-1 truncate font-mono text-[9.5px] uppercase tracking-[0.24em] text-shm-navy-300">
+              <p className="mt-1 truncate font-mono text-[9.5px] uppercase tracking-[0.24em] text-shm-navy-700">
                 Structural Monitor
               </p>
             </div>
@@ -213,7 +213,7 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile }: SidebarProps) 
         {sections.map((section) => (
           <div key={section.label} className="space-y-0.5">
             {!collapsed && (
-              <p className="px-3 pb-1.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.24em] text-shm-navy-400">
+              <p className="px-3 pb-1.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.24em] text-shm-navy-600">
                 {section.label}
               </p>
             )}
@@ -229,8 +229,8 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile }: SidebarProps) 
                   className={cn(
                     "group relative flex items-center gap-3 rounded-md px-3 py-2.5 text-[13.5px] font-medium transition-colors duration-200",
                     isActive
-                      ? "bg-white/[0.07] text-white"
-                      : "text-shm-navy-200 hover:bg-white/[0.05] hover:text-white",
+                      ? "bg-white text-shm-navy-900 shadow-[0_1px_2px_rgba(26,18,37,0.10)]"
+                      : "text-shm-navy-800 hover:bg-white/60 hover:text-shm-navy-900",
                     collapsed && "lg:justify-center lg:px-0"
                   )}
                   title={collapsed ? item.label : undefined}
@@ -238,14 +238,14 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile }: SidebarProps) 
                   {/* active indicator */}
                   <span
                     className={cn(
-                      "absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-shm-navy-300 transition-opacity duration-300",
+                      "absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-shm-navy-900 transition-opacity duration-300",
                       isActive ? "opacity-100" : "opacity-0"
                     )}
                   />
                   <item.icon
                     className={cn(
                       "h-[18px] w-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110",
-                      isActive ? "text-white" : "text-shm-navy-300 group-hover:text-shm-navy-200"
+                      isActive ? "text-shm-navy-900" : "text-shm-navy-700 group-hover:text-shm-navy-900"
                     )}
                     strokeWidth={1.75}
                   />
@@ -257,17 +257,17 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile }: SidebarProps) 
         ))}
       </nav>
 
-      <div className="space-y-0.5 border-t border-white/10 bg-white/[0.03] p-3">
+      <div className="space-y-0.5 border-t border-shm-navy-900/12 bg-white/45 p-3">
         <Link
           href="/profile"
           onClick={onCloseMobile}
           className={cn(
-            "group flex items-center gap-3 rounded-md px-3 py-2.5 text-[13.5px] font-medium text-shm-navy-200 transition-colors duration-200 hover:bg-white/[0.05] hover:text-white",
+            "group flex items-center gap-3 rounded-md px-3 py-2.5 text-[13.5px] font-medium text-shm-navy-800 transition-colors duration-200 hover:bg-white/[0.05] hover:text-white",
             collapsed && "lg:justify-center lg:px-0"
           )}
           title={collapsed ? "Settings" : undefined}
         >
-          <Settings className="h-[18px] w-[18px] shrink-0 text-shm-navy-300 transition-transform duration-200 group-hover:rotate-45" strokeWidth={1.75} />
+          <Settings className="h-[18px] w-[18px] shrink-0 text-shm-navy-700 transition-transform duration-200 group-hover:rotate-45" strokeWidth={1.75} />
           {!collapsed && <span>Settings</span>}
         </Link>
         <button

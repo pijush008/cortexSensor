@@ -99,10 +99,10 @@ function batteryTone(pct: number | null): "green" | "yellow" | "red" | "slate" {
 }
 
 const BATTERY_BAR: Record<string, string> = {
-  green: "#379745",
-  yellow: "#f7a707",
-  red: "#cc1c16",
-  slate: "#a3a3a3",
+  green: "var(--color-shm-green)",
+  yellow: "var(--color-shm-yellow)",
+  red: "var(--color-shm-red)",
+  slate: "var(--color-slate-400)",
 };
 
 export default function DashboardPage() {
@@ -229,14 +229,14 @@ export default function DashboardPage() {
                         subtitle="Active monitoring load"
                         data={windowOf(projectSeries, period)}
                         type={period}
-                        color="#1f1f1f"
+                        color="var(--color-shm-chart-1)"
                       />
                       <GraphCard
                         title={isAdmin ? "Contractors" : "Administrators"}
                         subtitle="Platform users"
                         data={windowOf(peopleSeries, period)}
                         type={period}
-                        color="#737373"
+                        color="var(--color-shm-chart-3)"
                       />
                     </div>
                   </Reveal>

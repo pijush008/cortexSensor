@@ -21,7 +21,7 @@ interface StatCardProps {
 }
 
 const ACCENTS = {
-  green: { bar: "bg-shm-green", text: "text-shm-green", dot: "bg-shm-green" },
+  green: { bar: "bg-shm-green", text: "text-shm-green-text", dot: "bg-shm-green" },
   blue: { bar: "bg-shm-navy-500", text: "text-shm-navy-600", dot: "bg-shm-navy-500" },
   yellow: { bar: "bg-shm-yellow", text: "text-shm-yellow", dot: "bg-shm-yellow" },
   red: { bar: "bg-shm-red", text: "text-shm-red", dot: "bg-shm-red" },
@@ -84,7 +84,7 @@ export function StatCard({
             {delta && (
               <p className="text-xs font-medium" aria-live="polite">
                 {delta.startsWith("-") || delta.startsWith("+") ? (
-                  <span className={delta.startsWith("-") ? "text-shm-red" : "text-shm-green"}>
+                  <span className={delta.startsWith("-") ? "text-shm-red" : "text-shm-green-text"}>
                     {delta}
                   </span>
                 ) : (
