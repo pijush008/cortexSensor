@@ -47,4 +47,11 @@ export const config = {
     process.env.ALLOWED_ORIGINS || "http://localhost:3000"
   ).split(","),
   iotApiKey: process.env.IOT_API_KEY || "change-me",
+  /**
+   * Whether platform operators must enrol in MFA (§94). Configurable so a
+   * first-run deployment can create its initial operator before an
+   * authenticator app is available; it should be true everywhere else.
+   */
+  requireMfaForPlatformAdmins:
+    process.env.REQUIRE_MFA_FOR_PLATFORM_ADMINS !== "false",
 };

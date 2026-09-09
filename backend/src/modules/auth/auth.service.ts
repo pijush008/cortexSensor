@@ -19,10 +19,16 @@ import {
 } from "../../utils/jwt";
 import {
   BadRequestError,
+  MfaRequiredError,
   NotFoundError,
   ForbiddenError,
 } from "../../utils/AppError";
 import { assertWithinLimits } from "../subscription/subscription.service";
+import {
+  addMemberToAdminTenant,
+  provisionTenantForAdmin,
+} from "../rbac/tenant.provisioning";
+import { evaluateMfaGate, verifyToken } from "./mfa.service";
 import {
   LoginInput,
   RegisterInput,
@@ -57,12 +63,31 @@ export async function login(input: LoginInput) {
     throw new BadRequestError("User Not Verified");
   }
 
+  // Second factor, checked only after the password has been verified so a
+  // wrong password and a missing code are indistinguishable to an attacker
+  // probing which accounts have MFA enabled.
+  const gate = evaluateMfaGate({
+    isPlatformAdmin: user.isPlatformAdmin,
+    mfaEnabledAt: user.mfaEnabledAt,
+  });
+
+  if (gate.required) {
+    if (!input.mfaToken) {
+      throw new MfaRequiredError("A multi-factor authentication code is required");
+    }
+    if (!user.mfaSecret || !verifyToken(user.mfaSecret, input.mfaToken)) {
+      throw new BadRequestError("Invalid multi-factor code");
+    }
+  }
+
   return {
     status_code: 200,
     message: null,
     error: null,
     userID: user.id,
     type: user.userType,
+    // Signals the client to walk the operator through enrolment (§94).
+    mfaEnrolmentRequired: gate.enrolmentRequired,
   };
 }
 
@@ -264,6 +289,19 @@ export async function register(
       },
     });
     userId = newUser.id;
+  }
+
+  // Registering an organization admin and creating their organization are the
+  // same business event (§93). Doing it here means every row they create
+  // afterwards lands in a tenant, instead of relying on a backfill to repair
+  // rows that were created without one.
+  if (userType === "admin") {
+    const organizationName =
+      [input.firstName, input.lastName].filter(Boolean).join(" ").trim() ||
+      input.emailId;
+    await provisionTenantForAdmin(userId, organizationName);
+  } else if (input.admin_id) {
+    await addMemberToAdminTenant(userId, Number(input.admin_id));
   }
 
   const verificationToken = generateVerificationToken(userId);

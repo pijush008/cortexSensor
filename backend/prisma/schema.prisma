@@ -47,25 +47,144 @@ enum ActiveOneZero {
   zero
 }
 
+// ─── TENANCY & RBAC ──────────────────────────────────────────────────────────
+// The Tenant is the isolation root. Every tenant-owned table carries tenantId
+// so isolation is a column the database enforces, not a helper each route has
+// to remember to call. Prior to this the only tenant signal was User.parentId,
+// which meant a single forgotten check was a cross-tenant leak.
+
+enum TenantStatus {
+  active
+  suspended
+  closed
+}
+
+enum MembershipStatus {
+  active
+  invited
+  disabled
+}
+
+/// Tenant roles. SUPER_ADMIN is deliberately absent: a platform operator is
+/// not a member of any organization (§19), and is modelled by
+/// User.isPlatformAdmin instead. Giving it a Membership row would let a
+/// platform operator be silently scoped into one tenant.
+enum RoleKey {
+  ORGANIZATION_ADMIN
+  SHM_ENGINEER
+  TECHNICIAN
+  VIEWER
+}
+
+model Tenant {
+  /// Immutable external identifier. Names are editable; ids are not (§15).
+  publicId  String       @unique @db.VarChar(32)
+  id        Int          @id @default(autoincrement())
+  name      String       @db.VarChar(255)
+  slug      String       @unique @db.VarChar(64)
+  status    TenantStatus @default(active)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  memberships  Membership[]
+  projects     Project[]
+  devices      Device[]
+  sensors      Sensor[]
+  subscription Subscription?
+
+  @@index([status])
+  @@map("tenants")
+}
+
+model Role {
+  id          Int     @id @default(autoincrement())
+  key         RoleKey @unique
+  name        String  @db.VarChar(64)
+  description String? @db.Text
+
+  permissions RolePermission[]
+  memberships Membership[]
+
+  @@map("roles")
+}
+
+/// Permissions are rows, not hardcoded constants, so the grant matrix can be
+/// inspected, audited and changed without a deploy (§18).
+model Permission {
+  id          Int     @id @default(autoincrement())
+  key         String  @unique @db.VarChar(64)
+  description String? @db.Text
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       Int
+  permissionId Int
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+/// A user's association with one tenant, carrying exactly one role.
+/// A user may belong to several tenants; the active tenant is resolved per
+/// request from the session, never from a client-supplied tenant id (§17).
+model Membership {
+  id        Int              @id @default(autoincrement())
+  userId    Int
+  tenantId  Int
+  roleId    Int
+  status    MembershipStatus @default(active)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, tenantId])
+  @@index([tenantId, status])
+  @@index([userId])
+  @@map("memberships")
+}
+
 // ─── USERS ───────────────────────────────────────────────────────────────────
 
 model User {
-  id             Int        @id @default(autoincrement())
-  userType       UserRole
-  parentId       Int        @default(0)
-  firstName      String     @db.VarChar(255)
-  lastName       String     @db.VarChar(255)
-  emailId        String     @unique @db.VarChar(255)
-  phoneNo        String     @db.VarChar(255)
-  isMailVerified YesNo      @default(false_)
-  isUserVerified YesNo      @default(false_)
-  password       String     @db.VarChar(255)
-  profileImage   String?    @db.Text
-  status         UserStatus
-  csv            Int?       @default(0)
-  createdAt      DateTime?  @default(now())
-  updatedAt      DateTime?
-  isDelete       YesNo      @default(false_)
+  id              Int        @id @default(autoincrement())
+  /// DEPRECATED — superseded by Membership.role. Retained and kept in sync so
+  /// the existing frontend (which stores userType in localStorage) and the
+  /// not-yet-migrated service queries keep working during the RBAC migration.
+  /// Remove once every consumer reads permissions instead.
+  userType        UserRole
+  /// DEPRECATED — superseded by Membership.tenantId. Same rationale.
+  parentId        Int        @default(0)
+  /// Platform operator (SUPER_ADMIN). Holds no Membership: a platform operator
+  /// administers the SaaS, not an organization (§19).
+  isPlatformAdmin Boolean    @default(false)
+  /// TOTP shared secret, set at enrolment. Null until MFA is enrolled.
+  mfaSecret       String?    @db.VarChar(128)
+  /// Set when enrolment is confirmed by a valid code. MFA is only enforced
+  /// once this is non-null, so a half-finished enrolment cannot lock a user out.
+  mfaEnabledAt    DateTime?
+  firstName       String     @db.VarChar(255)
+  lastName        String     @db.VarChar(255)
+  emailId         String     @unique @db.VarChar(255)
+  phoneNo         String     @db.VarChar(255)
+  isMailVerified  YesNo      @default(false_)
+  isUserVerified  YesNo      @default(false_)
+  password        String     @db.VarChar(255)
+  profileImage    String?    @db.Text
+  status          UserStatus
+  csv             Int?       @default(0)
+  createdAt       DateTime?  @default(now())
+  updatedAt       DateTime?
+  isDelete        YesNo      @default(false_)
 
   // Relations
   createdProjects Project[]       @relation("ProjectCreator")
@@ -79,6 +198,7 @@ model User {
   auditLogs       AuditLog[]
   refreshTokens   RefreshToken[]
   subscription    Subscription?
+  memberships     Membership[]
 
   @@index([userType])
   @@index([parentId])
@@ -103,6 +223,9 @@ model DeviceType {
 
 model Device {
   id              Int           @id @default(autoincrement())
+  /// Isolation root. Null only while a device is in the unassigned pool held
+  /// by the platform operator, before it is allocated to a customer.
+  tenantId        Int?
   deviceName      String        @db.VarChar(255)
   deviceType      Int
   channelCount    Int
@@ -122,11 +245,13 @@ model Device {
   isOngoing       Boolean       @default(false)
 
   // Relations
+  tenant           Tenant?    @relation(fields: [tenantId], references: [id])
   deviceTypeRecord DeviceType @relation(fields: [deviceType], references: [id])
   admin            User?      @relation("DeviceAdmin", fields: [assignedAdmin], references: [id])
   updater          User?      @relation("DeviceUpdater", fields: [updatedBy], references: [id])
 
   @@index([assignedAdmin])
+  @@index([tenantId])
   @@map("devices")
 }
 
@@ -167,6 +292,8 @@ model SensorType {
 
 model Sensor {
   id               Int           @id @default(autoincrement())
+  /// Isolation root. Null while held in the platform's unassigned pool.
+  tenantId         Int?
   sensorName       String        @db.VarChar(255)
   sensorTypeID     Int
   assignedAdmin    Int?
@@ -175,10 +302,12 @@ model Sensor {
   status           ActiveOneZero @default(one)
   createdAt        DateTime      @default(now())
 
+  tenant     Tenant?    @relation(fields: [tenantId], references: [id])
   sensorType SensorType @relation(fields: [sensorTypeID], references: [id])
   admin      User?      @relation("SensorAdmin", fields: [assignedAdmin], references: [id])
 
   @@index([assignedAdmin])
+  @@index([tenantId])
   @@index([sensorTypeID])
   @@map("sensors")
 }
@@ -189,6 +318,8 @@ model Sensor {
 
 model Project {
   id              Int           @id @default(autoincrement())
+  /// Isolation root. Every query for a non-platform user is filtered on this.
+  tenantId        Int
   projectName     String        @db.VarChar(255)
   projectUniqueID String?       @db.VarChar(512)
   uniqueId        String?       @db.VarChar(50)
@@ -215,12 +346,15 @@ model Project {
   isRegistered    Boolean       @default(false)
 
   // Relations
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
   creator       User           @relation("ProjectCreator", fields: [createdBy], references: [id])
   contractor    User?          @relation("ProjectContractor", fields: [contractorId], references: [id])
   authority     User?          @relation("ProjectAuthority", fields: [authorityId], references: [id])
   projectEmails ProjectEmail[]
   sensorData    SensorData[]
 
+  @@index([tenantId])
+  @@index([tenantId, status])
   @@index([createdBy])
   @@index([contractorId])
   @@index([authorityId])
@@ -325,14 +459,14 @@ model TempOtp {
 // ─── REFRESH TOKENS (auth rotation & revocation) ────────────────────────────
 
 model RefreshToken {
-  id         Int      @id @default(autoincrement())
+  id         Int       @id @default(autoincrement())
   userId     Int
-  tokenHash  String   @unique @db.VarChar(128)
-  familyId   String   @db.VarChar(64)
+  tokenHash  String    @unique @db.VarChar(128)
+  familyId   String    @db.VarChar(64)
   expiresAt  DateTime
   revokedAt  DateTime?
   consumedAt DateTime?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id])
 
@@ -353,23 +487,23 @@ enum SubscriptionStatus {
 }
 
 model BillingPlan {
-  id               Int      @id @default(autoincrement())
-  code             String   @unique @db.VarChar(32) // complimentary | starter | professional | enterprise
-  name             String   @db.VarChar(64)
-  priceMonthly     Int      @default(0) // minor units (paise/INR); 0 = complimentary/unlimited
-  currency         String   @default("INR")
-  maxStructures    Int? // projects owned by the admin; null = unlimited
-  maxSensors       Int? // sensors assigned to the admin; null = unlimited
-  maxUsers         Int? // contractor + authority members under the admin; null = unlimited
+  id                Int      @id @default(autoincrement())
+  code              String   @unique @db.VarChar(32) // complimentary | starter | professional | enterprise
+  name              String   @db.VarChar(64)
+  priceMonthly      Int      @default(0) // minor units (paise/INR); 0 = complimentary/unlimited
+  currency          String   @default("INR")
+  maxStructures     Int? // projects owned by the admin; null = unlimited
+  maxSensors        Int? // sensors assigned to the admin; null = unlimited
+  maxUsers          Int? // contractor + authority members under the admin; null = unlimited
   dataRetentionDays Int?
-  apiAccess        Boolean  @default(false)
-  smsAlerts        Boolean  @default(false)
-  aiFeatures       Boolean  @default(false)
-  advancedReports  Boolean  @default(false)
-  femIntegration   Boolean  @default(false)
-  sso              Boolean  @default(false)
-  isActive         Boolean  @default(true)
-  createdAt        DateTime @default(now())
+  apiAccess         Boolean  @default(false)
+  smsAlerts         Boolean  @default(false)
+  aiFeatures        Boolean  @default(false)
+  advancedReports   Boolean  @default(false)
+  femIntegration    Boolean  @default(false)
+  sso               Boolean  @default(false)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
 
   subscriptions Subscription[]
 
@@ -378,6 +512,10 @@ model BillingPlan {
 
 model Subscription {
   id        Int                @id @default(autoincrement())
+  /// The tenant is the billing entity. adminId is retained during the
+  /// migration so existing billing queries keep working; it is removed once
+  /// the subscription module reads tenantId.
+  tenantId  Int?               @unique
   adminId   Int                @unique
   planId    Int
   status    SubscriptionStatus @default(trial)
@@ -388,6 +526,7 @@ model Subscription {
   updatedAt DateTime           @updatedAt
 
   plan     BillingPlan @relation(fields: [planId], references: [id])
+  tenant   Tenant?     @relation(fields: [tenantId], references: [id])
   admin    User        @relation(fields: [adminId], references: [id])
   invoices Invoice[]
 
@@ -396,16 +535,16 @@ model Subscription {
 }
 
 model Invoice {
-  id             Int      @id @default(autoincrement())
+  id             Int       @id @default(autoincrement())
   subscriptionId Int
-  invoiceNo      String   @unique @db.VarChar(32)
+  invoiceNo      String    @unique @db.VarChar(32)
   periodStart    DateTime
   periodEnd      DateTime
-  amountPaise    Int      @default(0)
-  currency       String   @default("INR")
-  status         String   @default("PAID") // PAID | OPEN
+  amountPaise    Int       @default(0)
+  currency       String    @default("INR")
+  status         String    @default("PAID") // PAID | OPEN
   paidAt         DateTime?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime  @default(now())
 
   subscription Subscription @relation(fields: [subscriptionId], references: [id])
 

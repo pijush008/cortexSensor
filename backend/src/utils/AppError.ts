@@ -36,6 +36,16 @@ export class BadRequestError extends AppError {
   }
 }
 
+/**
+ * Distinct from a plain 401 so the client can tell "wrong credentials" from
+ * "credentials fine, now supply your second factor" and prompt accordingly.
+ */
+export class MfaRequiredError extends AppError {
+  constructor(message = "Multi-factor authentication required") {
+    super(401, message);
+  }
+}
+
 export class PaymentRequiredError extends AppError {
   constructor(message = "Plan limit reached") {
     super(402, message);

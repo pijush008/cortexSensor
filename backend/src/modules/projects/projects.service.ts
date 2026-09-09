@@ -162,7 +162,15 @@ function getDateGroupFormat(frequency: string | null | undefined): string | null
   }
 }
 
-export async function createProject(input: ProjectAddInput) {
+/**
+ * Create or update a project.
+ *
+ * `tenantId` is a separate argument rather than a field on `input` on purpose:
+ * `input` is parsed from the request body, and a tenant id must never come from
+ * the client (§17). Making it a distinct parameter means the caller has to have
+ * obtained it from the authenticated session.
+ */
+export async function createProject(input: ProjectAddInput, tenantId: number) {
   const {
     projectId,
     projectName,
@@ -246,6 +254,7 @@ export async function createProject(input: ProjectAddInput) {
         deviceId: deviceId || null,
         sensorId: sensorIds,
         createdBy: createdBy ? Number(createdBy) : 0,
+        tenantId,
         uniqueId,
         status: "not_start",
         isDelete: false,

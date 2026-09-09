@@ -3,6 +3,11 @@ import { z } from "zod";
 export const loginSchema = z.object({
   username: z.string().email("Invalid email format"),
   password: z.string().min(1, "Password is required"),
+  // Only supplied on the second leg of an MFA login.
+  mfaToken: z
+    .string()
+    .regex(/^\d{6}$/, "Multi-factor code must be 6 digits")
+    .optional(),
 });
 
 export const forgotPasswordSchema = z.object({

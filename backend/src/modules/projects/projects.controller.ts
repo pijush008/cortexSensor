@@ -83,10 +83,18 @@ export async function createNewProject(req: AuthRequest, res: Response) {
       const errorMessage = result.error.errors[0].message.replace(/"/g, "");
       return res.status(400).json({ status_code: 400, message: errorMessage });
     }
+    // Tenant comes from the session, never the body (§17).
+    const tenantId = req.auth?.tenantId;
+    if (tenantId == null) {
+      return res.status(403).json({
+        status_code: 403,
+        message: "Your account is not an active member of any organization",
+      });
+    }
     // Enforce the tenant's billing plan before provisioning a new structure.
     const billingAdminId = await resolveSubscriptionAdminId(req.user!);
     await assertWithinLimits(billingAdminId, { structures: 1 });
-    const response = await projectsService.createProject(result.data);
+    const response = await projectsService.createProject(result.data, tenantId);
     const { ipAddress, userAgent } = auditLogger.requestContext(req);
     await auditLogger.audit({
       userId: req.user?.id,
@@ -113,10 +121,13 @@ export async function updateProject(req: AuthRequest, res: Response) {
     if (result.data.projectId) {
       await assertProjectAccess(Number(result.data.projectId), req.user);
     }
-    const response = await projectsService.createProject({
-      ...result.data,
-      projectId: result.data.projectId,
-    } as never);
+    // Update path: the project is located by id and its tenant is not
+    // reassigned, so the caller's tenant is passed only to satisfy the
+    // create-branch signature.
+    const response = await projectsService.createProject(
+      { ...result.data, projectId: result.data.projectId } as never,
+      req.auth?.tenantId ?? 0,
+    );
     const { ipAddress, userAgent } = auditLogger.requestContext(req);
     await auditLogger.audit({
       userId: req.user?.id,

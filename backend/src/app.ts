@@ -68,20 +68,33 @@ app.get("/", (_req, res) => {
   res.json({ status: "ok", service: "SHM API" });
 });
 
-app.use("/api", authRoutes);
-app.use("/api", usersRoutes);
-app.use("/api/device", devicesRoutes);
-app.use("/api/sensor", sensorsRoutes);
-app.use("/api/sensorType", sensorTypesRoutes);
-app.use("/api", assignRoutes);
-app.use("/api", projectsRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api", reportsRoutes);
-app.use("/api", exportsRoutes);
-app.use("/api", iotRoutes);
-app.use("/api", subscriptionRoutes);
+// API versioning (§98).
+//
+// Every route is mounted under BOTH /api/v1 (the versioned path all new
+// clients should use) and bare /api (which the current frontend calls).
+// Mounting the same routers twice, rather than redirecting, keeps cookies,
+// CORS preflight and request bodies identical on both paths.
+//
+// The unversioned alias is deprecated: it exists so this change does not
+// require a lockstep frontend deploy, and is removed once the client is moved.
+const API_MOUNTS = ["/api/v1", "/api"] as const;
 
-app.get("/api/deviceType", authenticate, async (req, res) => {
+for (const base of API_MOUNTS) {
+  app.use(base, authRoutes);
+  app.use(base, usersRoutes);
+  app.use(`${base}/device`, devicesRoutes);
+  app.use(`${base}/sensor`, sensorsRoutes);
+  app.use(`${base}/sensorType`, sensorTypesRoutes);
+  app.use(base, assignRoutes);
+  app.use(base, projectsRoutes);
+  app.use(`${base}/dashboard`, dashboardRoutes);
+  app.use(base, reportsRoutes);
+  app.use(base, exportsRoutes);
+  app.use(base, iotRoutes);
+  app.use(base, subscriptionRoutes);
+}
+
+const deviceTypeHandler = async (req: express.Request, res: express.Response) => {
   try {
     const searchTerm = req.query.searchTerm as string | undefined;
     const where: Record<string, unknown> = { status: "one" as never };
@@ -105,9 +118,12 @@ app.get("/api/deviceType", authenticate, async (req, res) => {
     const err = error as { message: string };
     return res.status(400).json({ status_code: 400, message: "Something Went Wrong", data: err.message });
   }
-});
+};
 
-app.post("/api/sensorDataFromDevice", requireApiKey, sensorsController.sensorDataFromDevice);
+for (const base of API_MOUNTS) {
+  app.get(`${base}/deviceType`, authenticate, deviceTypeHandler);
+  app.post(`${base}/sensorDataFromDevice`, requireApiKey, sensorsController.sensorDataFromDevice);
+}
 
 app.use(notFoundHandler);
 app.use(errorHandler);

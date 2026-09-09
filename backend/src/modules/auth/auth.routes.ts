@@ -3,6 +3,7 @@ import rateLimit from "express-rate-limit";
 import { rateLimitStore } from "../../config/redisStore";
 import { authenticate, optionalAuth, superAdminOnly } from "../../middleware/auth";
 import * as authController from "./auth.controller";
+import * as mfaController from "./mfa.controller";
 
 const router = Router();
 
@@ -30,6 +31,12 @@ router.post("/forgotPassword", otpLimiter, authController.forgotPassword);
 router.post("/validateOTP", otpLimiter, authController.validateOTP);
 router.post("/changePassword", optionalAuth, authController.changeUserPassword);
 router.post("/refresh", authController.refresh);
+
+// Multi-factor enrolment. Rate limited with the OTP limiter: these verify a
+// 6-digit code, so they are brute-forceable without one.
+router.post("/mfa/enrol", authenticate, otpLimiter, mfaController.beginEnrolment);
+router.post("/mfa/confirm", authenticate, otpLimiter, mfaController.confirmEnrolment);
+router.post("/mfa/disable", authenticate, otpLimiter, mfaController.disable);
 router.post("/logout", authController.logout);
 
 router.post("/register/:userType", authController.registerAll);

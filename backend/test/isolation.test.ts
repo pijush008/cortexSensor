@@ -45,7 +45,22 @@ async function registerAndLogin(
     .post("/api/commonLogin")
     .send({ username: email, password: PASSWORD });
   expect(login.status).toBe(200);
-  return { userId: user!.id, cookie: cookieHeader(login.headers["set-cookie"]) };
+
+  // Registration provisions the organization for an admin; assert it happened
+  // rather than creating one here, so the test exercises the real signup path.
+  const membership = await prisma.membership.findFirst({
+    where: { userId: user!.id },
+    select: { tenantId: true },
+  });
+  if (userType === "admin") {
+    expect(membership).toBeTruthy();
+  }
+
+  return {
+    userId: user!.id,
+    tenantId: membership?.tenantId ?? null,
+    cookie: cookieHeader(login.headers["set-cookie"]),
+  };
 }
 
 async function cleanupTestData() {
@@ -101,12 +116,30 @@ async function cleanupTestData() {
   await prisma.deviceType
     .deleteMany({ where: { deviceType: "ISO-Gateway" } })
     .catch(() => {});
+  // Capture this suite's tenants BEFORE deleting its memberships, so cleanup
+  // can target them by id. An earlier version deleted every tenant that had no
+  // memberships, which raced the billing suite running in parallel and deleted
+  // its fixtures out from under it.
+  const ownTenantIds = (
+    await prisma.membership
+      .findMany({ where: { userId: { in: ids } }, select: { tenantId: true } })
+      .catch(() => [] as { tenantId: number }[])
+  ).map((m) => m.tenantId);
+
+  await prisma.membership
+    .deleteMany({ where: { userId: { in: ids } } })
+    .catch(() => {});
   await prisma.user.deleteMany({ where: { id: { in: ids } } }).catch(() => {});
+  if (ownTenantIds.length) {
+    await prisma.tenant
+      .deleteMany({ where: { id: { in: ownTenantIds } } })
+      .catch(() => {});
+  }
 }
 
 describe("cross-tenant isolation (admin A vs admin B)", () => {
-  let adminA: { userId: number; cookie: string };
-  let adminB: { userId: number; cookie: string };
+  let adminA: { userId: number; tenantId: number | null; cookie: string };
+  let adminB: { userId: number; tenantId: number | null; cookie: string };
   let projectIdA: number;
 
   beforeAll(async () => {
@@ -130,6 +163,7 @@ describe("cross-tenant isolation (admin A vs admin B)", () => {
         gatewayDeviceId: "iso-gw-a-01",
         addedBy: adminA.userId,
         assignedAdmin: adminA.userId,
+        tenantId: adminA.tenantId,
         deviceStartDate: new Date(),
         createdAt: new Date(),
         status: "one",
@@ -156,6 +190,7 @@ describe("cross-tenant isolation (admin A vs admin B)", () => {
         sensorName: "ISO-Sensor-A",
         sensorTypeID: sensorType.id,
         assignedAdmin: adminA.userId,
+        tenantId: adminA.tenantId,
         calibrationValue: "1",
         unit: "C",
         status: "one",
@@ -192,6 +227,7 @@ describe("cross-tenant isolation (admin A vs admin B)", () => {
         isDelete: false,
         isRegistered: true,
         createdBy: adminA.userId,
+        tenantId: adminA.tenantId!,
         createdAt: new Date(),
         updatedAt: new Date(),
       },

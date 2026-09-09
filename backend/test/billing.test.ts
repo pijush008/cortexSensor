@@ -65,32 +65,57 @@ async function cleanupTestData() {
   });
   const ids = bills.map((u) => u.id);
 
-  wrap(() =>
+  // Capture tenants belonging to these users before their memberships cascade
+  // away with the user rows, so they can be removed by id afterwards.
+  const tenantIds = (
+    await prisma.membership
+      .findMany({ where: { userId: { in: ids } }, select: { tenantId: true } })
+      .catch(() => [] as { tenantId: number }[])
+  ).map((m) => m.tenantId);
+
+  await wrap(() =>
     prisma.invoice.deleteMany({
       where: { subscription: { adminId: { in: ids } } },
     }),
   );
-  wrap(() => prisma.subscription.deleteMany({ where: { adminId: { in: ids } } }));
-  wrap(() => prisma.refreshToken.deleteMany({ where: { userId: { in: ids } } }));
-  wrap(() => prisma.tempOtp.deleteMany({ where: { userId: { in: ids } } }));
-  wrap(() => prisma.firebaseToken.deleteMany({ where: { userId: { in: ids } } }));
-  wrap(() => prisma.auditLog.deleteMany({ where: { userId: { in: ids } } }));
-  wrap(() =>
+  await wrap(() => prisma.subscription.deleteMany({ where: { adminId: { in: ids } } }));
+  await wrap(() => prisma.refreshToken.deleteMany({ where: { userId: { in: ids } } }));
+  await wrap(() => prisma.tempOtp.deleteMany({ where: { userId: { in: ids } } }));
+  await wrap(() => prisma.firebaseToken.deleteMany({ where: { userId: { in: ids } } }));
+  await wrap(() => prisma.auditLog.deleteMany({ where: { userId: { in: ids } } }));
+  await wrap(() =>
     prisma.project.deleteMany({
       where: { createdBy: { in: ids } },
     }),
   );
-  wrap(() =>
+  await wrap(() =>
     prisma.sensor.deleteMany({ where: { assignedAdmin: { in: ids } } }),
   );
-  wrap(() =>
+  await wrap(() =>
     prisma.user.deleteMany({ where: { parentId: { in: ids } } }),
   );
-  wrap(() => prisma.user.deleteMany({ where: { id: { in: ids } } }));
+  await wrap(() => prisma.user.deleteMany({ where: { id: { in: ids } } }));
+  if (tenantIds.length) {
+    await wrap(() =>
+      prisma.tenant.deleteMany({ where: { id: { in: tenantIds } } }),
+    );
+  }
 }
 
-function wrap(task: () => Promise<unknown>) {
-  task().catch(() => {});
+/**
+ * Runs a cleanup step, tolerating "row does not exist" on a first run.
+ *
+ * This used to be fire-and-forget (`task().catch(...)` with no await), so
+ * cleanupTestData resolved before any delete had actually run and beforeAll
+ * raced it — intermittently failing with a unique-constraint error on the
+ * fixture emails. Awaiting makes cleanup deterministic.
+ */
+async function wrap(task: () => Promise<unknown>) {
+  try {
+    await task();
+  } catch {
+    // fixtures may not exist yet on a first run
+  }
 }
 
 async function createDirectly(
@@ -216,6 +241,11 @@ describe("billing (plan enrollment, enforcement, invoices)", () => {
           status: "not_start",
           isDelete: false,
           createdBy: adminP.userId,
+          // Projects are tenant-owned; resolve the tenant registration created.
+          tenantId: (await prisma.membership.findFirstOrThrow({
+            where: { userId: adminP.userId },
+            select: { tenantId: true },
+          })).tenantId,
           createdAt: new Date(),
           updatedAt: new Date(),
         },
