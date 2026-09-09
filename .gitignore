@@ -56,3 +56,6 @@ gateway-pi/.env
 # part of this repository's history. The archive itself is also ignored.
 flutter_version/
 legacy-backup-*.tar.gz
+
+# Visual brainstorming companion scratch files
+.superpowers/
