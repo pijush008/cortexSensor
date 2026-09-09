@@ -2,6 +2,7 @@ import { Queue, Worker, type JobsOptions } from "bullmq";
 import { config } from "../../config";
 import { logger } from "../../utils/logger";
 import { executeRun } from "./analysis.service";
+import { generateReport } from "../reports/report-generator.service";
 
 /**
  * Background execution for analysis runs (§57).
@@ -62,6 +63,21 @@ export async function enqueueRun(runId: number): Promise<boolean> {
 }
 
 /**
+ * Report generation shares this queue rather than getting its own.
+ *
+ * Both are the same kind of work — a long database read plus computation that
+ * must not run in a request — and a second queue would mean a second worker,
+ * a second set of Redis connections and a second failure mode to operate, for
+ * no separation that matters at this volume.
+ */
+export async function enqueueReport(reportId: number): Promise<boolean> {
+  const q = getAnalysisQueue();
+  if (!q) return false;
+  await q.add("report", { reportId }, { jobId: `report-${reportId}` });
+  return true;
+}
+
+/**
  * Starts the in-process worker.
  *
  * Deployed as a separate `worker` service in production (§74); running it in
@@ -80,8 +96,14 @@ export function startAnalysisWorker(): void {
   worker = new Worker(
     ANALYSIS_QUEUE,
     async (job) => {
+      if (job.name === "report") {
+        const reportId = Number((job.data as { reportId: number }).reportId);
+        logger.info(`Worker: generating report ${reportId}`);
+        await generateReport(reportId);
+        return;
+      }
       const runId = Number((job.data as { runId: number }).runId);
-      logger.info(`Analysis worker: executing run ${runId}`);
+      logger.info(`Worker: executing analysis run ${runId}`);
       await executeRun(runId);
     },
     {

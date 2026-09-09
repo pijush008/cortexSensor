@@ -28,6 +28,8 @@ import streamRoutes from "./modules/stream/stream.routes";
 import measurementsRoutes from "./modules/measurements/measurements.routes";
 import analysisRoutes from "./modules/analysis/analysis.routes";
 import alertsRoutes from "./modules/alerts/alerts.routes";
+import reportsV2Routes from "./modules/reports/reports-v2.routes";
+import meRoutes from "./modules/rbac/me.routes";
 import { authenticate } from "./middleware/auth";
 import { requireApiKey } from "./middleware/apiKey";
 import prisma from "./config/prisma";
@@ -108,6 +110,8 @@ for (const base of API_MOUNTS) {
   app.use(base, measurementsRoutes);
   app.use(base, analysisRoutes);
   app.use(base, alertsRoutes);
+  app.use(base, reportsV2Routes);
+  app.use(base, meRoutes);
   app.use(base, streamRoutes);
 }
 

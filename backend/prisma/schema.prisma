@@ -97,6 +97,8 @@ model Tenant {
   baselines    Baseline[]
   alertRules   AlertRule[]
   alerts       Alert[]
+  inspections  Inspection[]
+  reports      Report[]
   subscription Subscription?
 
   @@index([status])
@@ -674,6 +676,145 @@ model Location {
   @@index([tenantId])
   @@index([structureId])
   @@map("locations")
+}
+
+// ─── INSPECTIONS & REPORTS ───────────────────────────────────────────────────
+// The link between what the instruments measured and what a person actually
+// found on site (§53). An analytics platform that cannot record "we went and
+// looked, and here is what was there" produces findings nobody can close.
+
+enum InspectionType {
+  routine
+  triggered
+  post_event
+  commissioning
+  decommissioning
+}
+
+enum InspectionOutcome {
+  no_action_required
+  monitor
+  repair_recommended
+  urgent_action_required
+  inconclusive
+}
+
+model Inspection {
+  id       Int    @id @default(autoincrement())
+  publicId String @unique @db.VarChar(32)
+  tenantId Int
+
+  structureId Int
+  locationId  Int?
+  /// The alert that prompted this visit, when there was one. This is what
+  /// closes the loop from detection to field verification.
+  alertId     Int?
+
+  type    InspectionType    @default(routine)
+  outcome InspectionOutcome @default(monitor)
+
+  /// When the inspection happened, which is not when it was recorded — an
+  /// inspector often writes it up the next day.
+  performedAt   DateTime @db.Timestamptz()
+  /// Free text rather than a user FK: an inspection is frequently carried out
+  /// by a third-party engineer who has no account on this platform.
+  inspectorName String   @db.VarChar(160)
+  inspectorOrg  String?  @db.VarChar(160)
+
+  /// What was observed. Kept separate from the recommendation so a later
+  /// reader can tell what was SEEN from what was CONCLUDED.
+  observations   String    @db.Text
+  recommendation String?   @db.Text
+  /// Follow-up, filled in when the recommended action has been carried out.
+  resolutionNote String?   @db.Text
+  resolvedAt     DateTime?
+
+  /// Ambient conditions at the time, so a measurement anomaly can be correlated
+  /// with what the weather was doing (§37).
+  environmentalContext Json?
+
+  createdAt DateTime @default(now())
+  createdBy Int?
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  photos InspectionPhoto[]
+
+  @@index([tenantId, performedAt])
+  @@index([structureId, performedAt])
+  @@index([alertId])
+  @@map("inspections")
+}
+
+/// Photo metadata. The bytes live in object storage (§8), never in Postgres.
+///
+/// `storageKey` is recorded even before a storage backend is configured, so
+/// the platform can say "this photo was taken but storage is not configured"
+/// rather than silently accepting an upload it discarded.
+model InspectionPhoto {
+  id           Int @id @default(autoincrement())
+  inspectionId Int
+  tenantId     Int
+
+  storageKey  String    @db.VarChar(512)
+  caption     String?   @db.VarChar(500)
+  contentType String?   @db.VarChar(120)
+  byteSize    Int?
+  /// Null until the bytes are confirmed present in object storage.
+  uploadedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  inspection Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  @@index([inspectionId])
+  @@map("inspection_photos")
+}
+
+enum ReportStatus {
+  queued
+  generating
+  ready
+  failed
+}
+
+/// A monitoring report (§52).
+///
+/// Immutable once ready, and versioned. A report is a statement about a period
+/// that someone may act on or file with an authority; regenerating it in place
+/// when new data arrives would silently change a document that has already been
+/// read. A new period, or new data, produces a new version.
+model Report {
+  id       Int    @id @default(autoincrement())
+  publicId String @unique @db.VarChar(32)
+  tenantId Int
+
+  projectId   Int?
+  structureId Int?
+
+  title   String       @db.VarChar(200)
+  version Int          @default(1)
+  status  ReportStatus @default(queued)
+
+  periodFrom DateTime @db.Timestamptz()
+  periodTo   DateTime @db.Timestamptz()
+
+  /// The rendered document: measured content, data quality, analysis
+  /// references and limitations. Structured rather than a blob so it can be
+  /// re-rendered to PDF or HTML without regenerating the underlying figures.
+  content    Json?
+  /// Object storage key for a rendered PDF, once storage is configured.
+  storageKey String? @db.VarChar(512)
+  error      String? @db.Text
+
+  generatedAt DateTime?
+  createdAt   DateTime  @default(now())
+  createdBy   Int?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([structureId, periodFrom])
+  @@map("reports")
 }
 
 // ─── ALERTS ──────────────────────────────────────────────────────────────────

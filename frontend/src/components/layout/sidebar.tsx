@@ -106,6 +106,9 @@ const MENU_SECTION: Record<UserRole, { label: string; items: MenuItem[] }[]> = {
       label: "Administration",
       items: [
         { href: "/users", label: "Users", icon: Users },
+        // An ORGANIZATION_ADMIN holds AUDIT_VIEW, so the entry belongs here.
+        // It was previously superadmin-only, which contradicted the grant.
+        { href: "/audit", label: "Audit Log", icon: ShieldCheck },
         { href: "/subscription", label: "Subscription", icon: CreditCard },
       ],
     },
@@ -174,9 +177,12 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile }: SidebarProps) 
           </div>
         ) : (
           <>
-            {/* max-w and shrink-0 are load-bearing: the supplied logo is a
+            {/* A small, fixed-size local asset: next/image would add a loader
+                and layout machinery for no benefit at this size.
+                max-w and shrink-0 are load-bearing — the supplied logo is a
                 wide lockup, and at `w-auto` it grew past its share of the
                 sidebar and rendered underneath the wordmark. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/brand/company-logo.jpeg"
               alt=""

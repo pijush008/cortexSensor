@@ -11,6 +11,8 @@ export type AuditEntity =
   | "deviceChannel"
   | "gateway"
   | "alert"
+  | "report"
+  | "inspection"
   | "analysis"
   | "baseline"
   | "structure"

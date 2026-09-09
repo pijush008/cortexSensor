@@ -500,3 +500,23 @@ export interface AlertSummary {
   total: number;
   bySeverity: Partial<Record<AlertSeverity, number>>;
 }
+
+// ─── Audit ───────────────────────────────────────────────────────────────────
+
+export interface AuditEntry {
+  id: number;
+  action: string;
+  entity: string;
+  entityId: number | null;
+  /** Null only for platform-level rows with no attributable actor. */
+  actor: { id: number; name: string; email: string } | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  newValue: unknown;
+  createdAt: string;
+}
+
+export interface AuditPage {
+  items: AuditEntry[];
+  nextCursor: number | null;
+}
