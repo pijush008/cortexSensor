@@ -18,87 +18,127 @@
 }
 
 @theme {
-  /* Black & white monochrome theme.
-     Clean white/light-gray surfaces, graphite-neutral accents, black chrome.
-     Status colors (green/amber/red) are kept ONLY for semantic alert & health states. */
+  /* Equals-style palette: lavender / cyan / mint / yellow on cream and white.
 
-  /* Neutral ramp (monochrome grays) */
-  --color-slate-50: #fafafa;
-  --color-slate-100: #f5f5f5;
-  --color-slate-200: #e5e5e5;
-  --color-slate-300: #d4d4d4;
-  --color-slate-400: #a3a3a3;
-  --color-slate-500: #737373;
-  --color-slate-600: #525252;
-  --color-slate-700: #393939;
-  --color-slate-800: #262626;
-  --color-slate-900: #171717;
+     Two-tier by design. The landing page and login carry the palette at full
+     strength; inside the authenticated app, surfaces stay white and cream so
+     dense tables and charts read cleanly, and colour marks emphasis only.
+
+     Neutral and ink ramps below were derived by matching the LUMINANCE of the
+     previous monochrome ramp step for step and shifting only the hue, so no
+     text/background pair is less readable than it was before the reskin.
+
+     Status colors (green/amber/red) are kept ONLY for semantic alert & health
+     states. Never reuse them decoratively — on a platform that reports
+     structural failures, a red that means nothing is worse than no red. */
+
+  /* Neutral ramp (cream-tinted warm greys, hue 48deg) */
+  --color-slate-50: #fbfaf9;
+  --color-slate-100: #f6f5f3;
+  --color-slate-200: #e6e5df;
+  --color-slate-300: #d7d4ca;
+  --color-slate-400: #a9a38d;
+  --color-slate-500: #79745c;
+  --color-slate-600: #575241;
+  --color-slate-700: #3c3a2e;
+  --color-slate-800: #28261f;
+  --color-slate-900: #181712;
 
   /* Primary ramp (graphite) */
-  --color-blue-50: #fafafa;
-  --color-blue-100: #f5f5f5;
-  --color-blue-200: #e5e5e5;
-  --color-blue-300: #d4d4d4;
-  --color-blue-400: #a3a3a3;
-  --color-blue-500: #737373;
-  --color-blue-600: #525252;
-  --color-blue-700: #333333;
-  --color-blue-800: #1f1f1f;
-  --color-blue-900: #000000;
+  --color-blue-50: #fbfaf9;
+  --color-blue-100: #f6f5f3;
+  --color-blue-200: #e6e5df;
+  --color-blue-300: #d7d4ca;
+  --color-blue-400: #a9a38d;
+  --color-blue-500: #79745c;
+  --color-blue-600: #575241;
+  --color-blue-700: #3c3a2e;
+  --color-blue-800: #28261f;
+  --color-blue-900: #181712;
 
   /* teal/sky folded into the same monochrome ramp */
-  --color-teal-50: #fafafa;
-  --color-teal-100: #f5f5f5;
-  --color-teal-200: #e5e5e5;
-  --color-teal-300: #d4d4d4;
-  --color-teal-400: #a3a3a3;
-  --color-teal-500: #737373;
-  --color-teal-600: #525252;
-  --color-teal-700: #424242;
-  --color-teal-800: #2b2b2b;
+  --color-teal-50: #fbfaf9;
+  --color-teal-100: #f6f5f3;
+  --color-teal-200: #e6e5df;
+  --color-teal-300: #d7d4ca;
+  --color-teal-400: #a9a38d;
+  --color-teal-500: #79745c;
+  --color-teal-600: #575241;
+  --color-teal-700: #3c3a2e;
+  --color-teal-800: #28261f;
 
-  --color-sky-50: #fafafa;
-  --color-sky-100: #f5f5f5;
-  --color-sky-200: #e5e5e5;
-  --color-sky-300: #d4d4d4;
-  --color-sky-400: #a3a3a3;
-  --color-sky-500: #737373;
-  --color-sky-600: #525252;
-  --color-sky-700: #424242;
-  --color-sky-800: #2b2b2b;
+  --color-sky-50: #fbfaf9;
+  --color-sky-100: #f6f5f3;
+  --color-sky-200: #e6e5df;
+  --color-sky-300: #d7d4ca;
+  --color-sky-400: #a9a38d;
+  --color-sky-500: #79745c;
+  --color-sky-600: #575241;
+  --color-sky-700: #3c3a2e;
+  --color-sky-800: #28261f;
 
   /* Brand navy scale (now graphite/black chrome) */
-  --color-shm-navy-50: #fafafa;
-  --color-shm-navy-100: #f5f5f5;
-  --color-shm-navy-200: #e5e5e5;
-  --color-shm-navy-300: #d4d4d4;
-  --color-shm-navy-400: #a3a3a3;
-  --color-shm-navy-500: #737373;
-  --color-shm-navy-600: #525252;
-  --color-shm-navy-700: #333333;
-  --color-shm-navy-800: #1f1f1f;
-  --color-shm-navy-900: #000000;
+  --color-shm-navy-50: #faf9fa;
+  --color-shm-navy-100: #f6f4f7;
+  --color-shm-navy-200: #e7e3eb;
+  --color-shm-navy-300: #d8d2df;
+  --color-shm-navy-400: #ad9dbe;
+  --color-shm-navy-500: #8467a1;
+  --color-shm-navy-600: #60477a;
+  --color-shm-navy-700: #3d2b4e;
+  --color-shm-navy-800: #251a31;
+  --color-shm-navy-900: #1a1225;
 
   /* Alias namespace so utilities like border-navy-200 resolve too */
-  --color-navy-50: #fafafa;
-  --color-navy-100: #f5f5f5;
-  --color-navy-200: #e5e5e5;
-  --color-navy-300: #d4d4d4;
-  --color-navy-400: #a3a3a3;
-  --color-navy-500: #737373;
-  --color-navy-600: #525252;
-  --color-navy-700: #333333;
-  --color-navy-800: #1f1f1f;
-  --color-navy-900: #000000;
+  --color-navy-50: #faf9fa;
+  --color-navy-100: #f6f4f7;
+  --color-navy-200: #e7e3eb;
+  --color-navy-300: #d8d2df;
+  --color-navy-400: #ad9dbe;
+  --color-navy-500: #8467a1;
+  --color-navy-600: #60477a;
+  --color-navy-700: #3d2b4e;
+  --color-navy-800: #251a31;
+  --color-navy-900: #1a1225;
 
-  /* Brand accent / surface anchors (monochrome) */
+  /* Brand accent / surface anchors */
   --color-shm-teal: #ffffff;
-  --color-shm-sky: #737373;
-  --color-shm-sky-50: #f5f5f5;
-  --color-shm-sky-200: #e5e5e5;
+  --color-shm-sky: #79745c;
+  --color-shm-sky-50: #f6f5f3;
+  --color-shm-sky-200: #e6e5df;
+
+  /* ── Equals accent palette ──────────────────────────────────────────
+     Sampled by region from the reference image. BACKGROUNDS ONLY: every
+     one of these is too light to serve as text or as a 1px stroke on
+     white. Ink contrast (against --color-shm-navy-900 #1a1225) noted so
+     the AA margin is visible at the point of use. */
+  --color-shm-lavender: #dbc2f8;       /* hero surface        11.31:1 */
+  --color-shm-lavender-soft: #e8cbfd;  /* card surface        12.44:1 */
+  --color-shm-cyan: #39d3e3;           /* feature block       10.03:1 */
+  --color-shm-cyan-soft: #c4fefa;      /* card surface        16.34:1 */
+  --color-shm-mint: #86fac1;           /* feature block       14.22:1 */
+  --color-shm-yellow-pastel: #fafd9d;  /* feature block       16.94:1 */
+  --color-shm-gold: #f2c466;           /* card surface        11.12:1 */
+  --color-shm-coral: #fb7f87;          /* card surface         7.33:1 */
+  --color-shm-cream: #eeeee6;          /* section background  15.56:1 */
+
+  /* ── Chart series ───────────────────────────────────────────────────
+     Deepened palette hues, NOT the pastels: a 1px #39d3e3 line on white
+     is too faint to trace. All clear 4:1 on white. Red, amber and green
+     hues are deliberately absent so a series can never be misread as an
+     alert state. */
+  --color-shm-series-1: #0e8c9b;  /* 4.01:1 */
+  --color-shm-series-2: #7c5bc7;  /* 5.03:1 */
+  --color-shm-series-3: #24866a;  /* 4.47:1 */
+  --color-shm-series-4: #a87516;  /* 4.02:1 */
+  --color-shm-series-5: #a34e8f;  /* 5.19:1 */
 
   /* Status colors (unchanged — semantic green/amber/red kept for alerts & health) */
   --color-shm-green: #379745;
+  /* #379745 on its own 10% tint is 3.31:1 — below the 4.5:1 that 11px badge
+     text needs. This darker shade (4.78:1) is for TEXT on a tint; the value
+     above stays for dots and fills, where the 3:1 non-text threshold applies. */
+  --color-shm-green-text: #2a7a36;
   --color-shm-red: #cc1c16;
   --color-shm-peach: #ce514c;
   --color-shm-yellow: #f7a707;
@@ -109,16 +149,20 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #111111;
+  --foreground: #1a1225;
 
-  --shm-navy-500: #737373;
-  --shm-navy-600: #525252;
-  --shm-navy-700: #333333;
-  --shm-navy-800: #1f1f1f;
-  --shm-navy-900: #000000;
+  --shm-navy-500: #8467a1;
+  --shm-navy-600: #60477a;
+  --shm-navy-700: #3d2b4e;
+  --shm-navy-800: #251a31;
+  --shm-navy-900: #1a1225;
 
   --shm-teal: #ffffff;
-  --shm-blue: #737373;
+  --shm-blue: #8467a1;
+
+  --shm-lavender: #dbc2f8;
+  --shm-cyan: #39d3e3;
+  --shm-cream: #eeeee6;
   --shm-green: #379745;
   --shm-red: #cc1c16;
   --shm-peach: #ce514c;
@@ -145,12 +189,12 @@
   p { text-wrap: pretty; }
 
   ::selection {
-    background: #111;
+    background: #1a1225;
     color: #fff;
   }
 
   * {
-    border-color: #e5e5e5;
+    border-color: #e6e5df;
   }
 
   ::-webkit-scrollbar {
@@ -161,11 +205,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #d4d4d4;
+    background: #d7d4ca;
     border-radius: 8px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #a3a3a3;
+    background: #a9a38d;
   }
 
   /* Fine "engineering grid" texture for dark sections and data panels */
@@ -178,8 +222,8 @@
 
   .bg-paper-grid {
     background-image:
-      linear-gradient(to right, rgba(17, 17, 17, 0.06) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(17, 17, 17, 0.06) 1px, transparent 1px);
+      linear-gradient(to right, rgba(26, 18, 37, 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(26, 18, 37, 0.06) 1px, transparent 1px);
     background-size: 24px 24px;
   }
 }
@@ -203,9 +247,9 @@
   to   { transform: scaleY(1); }
 }
 @keyframes sonar {
-  0%   { box-shadow: 0 0 0 0 rgba(17, 17, 17, 0.25); }
-  70%  { box-shadow: 0 0 0 8px rgba(17, 17, 17, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(17, 17, 17, 0); }
+  0%   { box-shadow: 0 0 0 0 rgba(26, 18, 37, 0.25); }
+  70%  { box-shadow: 0 0 0 8px rgba(26, 18, 37, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(26, 18, 37, 0); }
 }
 @keyframes sonar-red {
   0%   { box-shadow: 0 0 0 0 rgba(204, 28, 22, 0.4); }
@@ -275,7 +319,7 @@
 .skel {
   position: relative;
   overflow: hidden;
-  background: #f5f5f5;
+  background: #f6f5f3;
 }
 .skel::after {
   content: "";
