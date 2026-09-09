@@ -1,0 +1,194 @@
+import express, { Response, Router } from "express";
+import { authenticate, AuthRequest } from "../../middleware/auth";
+import { requirePermission, requireTenant } from "../../middleware/authorize";
+import prisma from "../../config/prisma";
+import { logger } from "../../utils/logger";
+import { auditLogger } from "../../utils/audit";
+import { tenantScope } from "../rbac/rbac.service";
+import { paymentProvider } from "./provider";
+import {
+  evaluateEntitlement,
+  handleWebhook,
+  isBillingConfigured,
+} from "./billing.service";
+
+const router = Router();
+
+/**
+ * Payment provider webhook.
+ *
+ * Mounted with a RAW body parser, not the JSON one. Signatures are computed
+ * over the exact bytes the provider sent; verifying a re-serialized object
+ * compares against bytes nobody signed, and key ordering or whitespace would
+ * make it fail unpredictably.
+ *
+ * Deliberately unauthenticated in the session sense — the provider has no
+ * cookie. The signature IS the authentication, which is why it is checked
+ * before the body is even parsed.
+ */
+router.post(
+  "/billing/webhook",
+  express.raw({ type: "*/*", limit: "1mb" }),
+  async (req, res: Response) => {
+    const rawBody = Buffer.isBuffer(req.body)
+      ? req.body.toString("utf8")
+      : String(req.body ?? "");
+
+    const signature =
+      (req.header("x-signature") ||
+        req.header("x-webhook-signature") ||
+        req.header("stripe-signature")) ??
+      undefined;
+
+    if (!paymentProvider.isConfigured()) {
+      // Refusing rather than accepting silently: an unconfigured endpoint that
+      // returns 200 would let unsigned traffic look like it was accepted.
+      logger.warn("Billing webhook received but no webhook secret is configured");
+      return res.status(503).json({
+        status_code: 503,
+        message: "Billing is not configured on this deployment",
+      });
+    }
+
+    if (!paymentProvider.verifySignature(rawBody, signature)) {
+      logger.warn("Billing webhook rejected: signature verification failed");
+      return res
+        .status(401)
+        .json({ status_code: 401, message: "Invalid signature" });
+    }
+
+    let event;
+    try {
+      event = paymentProvider.parseEvent(rawBody);
+    } catch {
+      return res
+        .status(400)
+        .json({ status_code: 400, message: "Malformed webhook payload" });
+    }
+
+    try {
+      const result = await handleWebhook(event);
+      // 200 even for a duplicate: a 4xx would make the provider retry forever
+      // an event that has already been applied correctly.
+      return res.status(200).json({
+        status_code: 200,
+        received: true,
+        duplicate: result.duplicate,
+        message: result.message,
+      });
+    } catch (err) {
+      // 500 so the provider retries — the event is stored with its error, so
+      // the retry is idempotent and the failure is diagnosable.
+      logger.error(`Billing webhook handling failed: ${(err as Error).message}`);
+      return res.status(500).json({
+        status_code: 500,
+        message: "Event stored but could not be applied; it will be retried",
+      });
+    }
+  },
+);
+
+/** Current entitlement, computed from dates rather than read from a flag. */
+router.get(
+  "/billing/entitlement",
+  authenticate,
+  requireTenant,
+  requirePermission("BILLING_VIEW"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const ctx = req.auth!;
+      const subscription = await prisma.subscription.findFirst({
+        where: ctx.isPlatformAdmin ? {} : { ...tenantScope(ctx) },
+        include: { plan: true },
+      });
+
+      if (!subscription) {
+        return res.status(200).json({
+          status_code: 200,
+          message: null,
+          data: {
+            // Stated plainly rather than defaulting to "active": a tenant with
+            // no subscription record is a state someone should notice.
+            configured: isBillingConfigured(),
+            subscription: null,
+            entitlement: null,
+          },
+        });
+      }
+
+      const entitlement = evaluateEntitlement(subscription);
+
+      return res.status(200).json({
+        status_code: 200,
+        message: null,
+        data: {
+          configured: isBillingConfigured(),
+          subscription: {
+            status: subscription.status,
+            planCode: subscription.plan.code,
+            planName: subscription.plan.name,
+            currentPeriodEnd: subscription.currentPeriodEnd,
+            cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+            canceledAt: subscription.canceledAt,
+          },
+          entitlement,
+        },
+      });
+    } catch (error) {
+      const err = error as { statusCode?: number; message: string };
+      return res
+        .status(err.statusCode || 400)
+        .json({ status_code: err.statusCode || 400, message: err.message });
+    }
+  },
+);
+
+/**
+ * Begins a checkout. Returns the provider's redirect target.
+ *
+ * Note what this does NOT do: it never marks the subscription paid. The
+ * browser coming back from a checkout page proves nothing — it can be replayed
+ * or forged, and the charge may still fail afterwards. Only a verified webhook
+ * activates a subscription (§25).
+ */
+router.post(
+  "/billing/checkout",
+  authenticate,
+  requireTenant,
+  requirePermission("BILLING_MANAGE"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const ctx = req.auth!;
+      if (!isBillingConfigured()) {
+        return res.status(503).json({
+          status_code: 503,
+          message:
+            "No payment provider is configured on this deployment, so checkout cannot be started.",
+        });
+      }
+
+      const { ipAddress, userAgent } = auditLogger.requestContext(req);
+      await auditLogger.audit({
+        userId: ctx.userId,
+        action: "update",
+        entity: "subscription",
+        newValue: { checkoutRequested: true },
+        ipAddress,
+        userAgent,
+      });
+
+      return res.status(501).json({
+        status_code: 501,
+        message:
+          "Checkout requires a payment provider adapter. The webhook, entitlement and lifecycle handling are implemented; the provider client is not wired.",
+      });
+    } catch (error) {
+      const err = error as { statusCode?: number; message: string };
+      return res
+        .status(err.statusCode || 400)
+        .json({ status_code: err.statusCode || 400, message: err.message });
+    }
+  },
+);
+
+export default router;

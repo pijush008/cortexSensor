@@ -60,6 +60,12 @@ export const config = {
   /** Disable in the API process when a dedicated worker service runs it. */
   analysisWorkerEnabled: process.env.ANALYSIS_WORKER_ENABLED !== "false",
   analysisWorkerConcurrency: Number(process.env.ANALYSIS_WORKER_CONCURRENCY) || 2,
+  billing: {
+    /** Master switch; billing endpoints refuse rather than pretend when off. */
+    enabled: process.env.BILLING_ENABLED === "true",
+    /** HMAC secret the provider signs webhook bodies with. */
+    webhookSecret: process.env.BILLING_WEBHOOK_SECRET || "",
+  },
   /**
    * Whether platform operators must enrol in MFA (§94). Configurable so a
    * first-run deployment can create its initial operator before an

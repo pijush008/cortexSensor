@@ -30,6 +30,7 @@ import analysisRoutes from "./modules/analysis/analysis.routes";
 import alertsRoutes from "./modules/alerts/alerts.routes";
 import reportsV2Routes from "./modules/reports/reports-v2.routes";
 import meRoutes from "./modules/rbac/me.routes";
+import billingRoutes from "./modules/billing/billing.routes";
 import { authenticate } from "./middleware/auth";
 import { requireApiKey } from "./middleware/apiKey";
 import prisma from "./config/prisma";
@@ -70,6 +71,13 @@ const limiter = rateLimit({
   store: rateLimitStore(),
 });
 app.use(limiter);
+
+// Billing routes mount ahead of the JSON parser: the webhook verifies a
+// signature over the RAW request bytes, and a parsed-then-reserialized body
+// would not match what the provider signed.
+for (const base of ["/api/v1", "/api"]) {
+  app.use(base, billingRoutes);
+}
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));

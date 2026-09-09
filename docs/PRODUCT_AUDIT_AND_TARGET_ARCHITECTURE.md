@@ -386,7 +386,7 @@ tests passing.** No slice ships UI for data that does not yet exist.
 | **6** | **SHM analytics** ✅ **DONE** | Worker + queue; FFT/PSD with windowing and detrending; baseline; modal tracking; versioned results | `/analytics` replaced with real, reproducible analysis |
 | **7** | **Alerts** ✅ **DONE** | `Alert` lifecycle, severity rules, dedup, assignment, notifications | `/alerts` replaced with real data |
 | **8** | **Inspections + reports** ✅ **DONE** | `Inspection`, report generation to S3, audit UI on the real `AuditLog` | `/audit` replaced with real data |
-| **9** | **Billing** | Payment provider, webhooks with signature verification, grace periods, entitlement enforcement | Payment state never trusted from the client |
+| **9** | **Billing** ✅ **DONE** | Payment provider, webhooks with signature verification, grace periods, entitlement enforcement | Payment state never trusted from the client |
 
 Slices 0–1 are prerequisites for everything else and should not be parallelized.
 

@@ -1291,11 +1291,20 @@ model RefreshToken {
 // One subscription per admin (each admin is its own billing organization).
 // Superadmins are complimentary — they hold no subscription record.
 
+/// Subscription lifecycle (§25).
+///
+/// `past_due` and `expired` are deliberately distinct: past_due is a payment
+/// that failed but is still within its grace period, where access continues;
+/// expired is grace exhausted, where it does not. Collapsing them would mean
+/// either cutting a customer off on the first failed charge, or never cutting
+/// them off at all.
 enum SubscriptionStatus {
   trial
   active
   past_due
   canceled
+  expired
+  suspended
 }
 
 model BillingPlan {
@@ -1323,19 +1332,32 @@ model BillingPlan {
 }
 
 model Subscription {
-  id        Int                @id @default(autoincrement())
+  id                     Int                @id @default(autoincrement())
+  /// Identifiers at the payment provider. Null until checkout completes.
+  providerCustomerId     String?            @db.VarChar(128)
+  providerSubscriptionId String?            @unique @db.VarChar(128)
+  /// End of the paid period. Access is governed by this plus any grace, not by
+  /// the status column alone — a status can go stale if a webhook is missed.
+  currentPeriodEnd       DateTime?
+  /// When a failed payment stops being tolerated. Set on the first failure.
+  gracePeriodEndsAt      DateTime?
+  /// Set when cancellation is requested. The subscription runs to the end of
+  /// the paid period rather than terminating immediately — the customer paid
+  /// for it.
+  cancelAtPeriodEnd      Boolean            @default(false)
+  canceledAt             DateTime?
   /// The tenant is the billing entity. adminId is retained during the
   /// migration so existing billing queries keep working; it is removed once
   /// the subscription module reads tenantId.
-  tenantId  Int?               @unique
-  adminId   Int                @unique
-  planId    Int
-  status    SubscriptionStatus @default(trial)
-  startsOn  DateTime           @default(now())
-  renewsOn  DateTime?
-  autoRenew Boolean            @default(true)
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  tenantId               Int?               @unique
+  adminId                Int                @unique
+  planId                 Int
+  status                 SubscriptionStatus @default(trial)
+  startsOn               DateTime           @default(now())
+  renewsOn               DateTime?
+  autoRenew              Boolean            @default(true)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
 
   plan     BillingPlan @relation(fields: [planId], references: [id])
   tenant   Tenant?     @relation(fields: [tenantId], references: [id])
@@ -1347,21 +1369,62 @@ model Subscription {
 }
 
 model Invoice {
-  id             Int       @id @default(autoincrement())
-  subscriptionId Int
-  invoiceNo      String    @unique @db.VarChar(32)
-  periodStart    DateTime
-  periodEnd      DateTime
-  amountPaise    Int       @default(0)
-  currency       String    @default("INR")
-  status         String    @default("PAID") // PAID | OPEN
-  paidAt         DateTime?
-  createdAt      DateTime  @default(now())
+  id                Int       @id @default(autoincrement())
+  /// The provider's invoice id, when the invoice originated there. Unique, so
+  /// a redelivered payment webhook cannot create a second invoice for the same
+  /// charge.
+  providerInvoiceId String?   @unique @db.VarChar(128)
+  subscriptionId    Int
+  invoiceNo         String    @unique @db.VarChar(32)
+  periodStart       DateTime
+  periodEnd         DateTime
+  amountPaise       Int       @default(0)
+  currency          String    @default("INR")
+  status            String    @default("PAID") // PAID | OPEN
+  paidAt            DateTime?
+  createdAt         DateTime  @default(now())
 
   subscription Subscription @relation(fields: [subscriptionId], references: [id])
 
   @@index([subscriptionId])
   @@map("invoices")
+}
+
+// ─── PAYMENT EVENTS ──────────────────────────────────────────────────────────
+
+/// Every webhook received from the payment provider.
+///
+/// Two jobs. First, idempotency: providers retry aggressively and deliver
+/// duplicates, so processing an event twice must not double-extend a
+/// subscription or double-issue an invoice. The unique constraint on the
+/// provider's own event id is what makes replay safe.
+///
+/// Second, evidence. Billing disputes are settled by what the provider
+/// actually said and when, so the raw payload is kept rather than discarded
+/// once parsed.
+model PaymentEvent {
+  id              Int    @id @default(autoincrement())
+  provider        String @db.VarChar(32)
+  /// The provider's event id. Unique, so a redelivery is rejected by the
+  /// database rather than by application logic that could race.
+  providerEventId String @db.VarChar(191)
+  type            String @db.VarChar(120)
+
+  /// Raw body as received, for dispute evidence and replay.
+  payload Json
+
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+  /// Populated when handling failed, so a stuck event is diagnosable and can
+  /// be retried deliberately rather than lost.
+  error       String?   @db.Text
+
+  subscriptionId Int?
+
+  @@unique([provider, providerEventId])
+  @@index([type, receivedAt])
+  @@index([subscriptionId])
+  @@map("payment_events")
 }
 
 // ─── AUDIT LOGS ─────────────────────────────────────────────────────────────
