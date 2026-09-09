@@ -4,6 +4,7 @@ import prisma from "./config/prisma";
 import { logger } from "./utils/logger";
 import { startMqttIngest } from "./modules/iot/mqtt-ingest";
 import { initEventBus } from "./modules/stream/event-bus";
+import { startAnalysisWorker } from "./modules/analysis/analysis.queue";
 
 async function main() {
   try {
@@ -18,6 +19,10 @@ async function main() {
     initEventBus();
 
     startMqttIngest();
+
+    // Background analysis. In production this runs as its own `worker`
+    // service; in development it runs here for convenience.
+    startAnalysisWorker();
 
     app.listen(config.port, () => {
       logger.info(`SHM API running on port ${config.port} [${config.nodeEnv}]`);

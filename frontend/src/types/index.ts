@@ -346,3 +346,85 @@ export interface GatewayListResponse {
   total: number;
   totalPages: number;
 }
+
+// ─── Analysis ────────────────────────────────────────────────────────────────
+
+export type AnalysisStatus = "queued" | "running" | "succeeded" | "failed";
+
+export interface SpectrumPeak {
+  frequency_hz: number;
+  magnitude: number;
+  prominence: number;
+  bandwidth_hz: number | null;
+  /** Half-power estimate. Null when the peak is narrower than one bin. */
+  damping_ratio: number | null;
+  /** One FFT bin: no shift smaller than this is measurable. */
+  resolution_hz: number;
+}
+
+export interface BaselineMatch {
+  baseline_frequency_hz: number;
+  current_frequency_hz: number;
+  shift_hz: number;
+  shift_percent: number | null;
+  resolution_hz: number;
+  exceeds_resolution: boolean;
+}
+
+export interface SpectrumResult {
+  engine_version: string;
+  method: string;
+  sample_rate_hz: number;
+  window: string;
+  detrend: string;
+  segment_length: number;
+  frequency_resolution_hz: number;
+  sample_count: number;
+  duration_seconds: number;
+  frequencies_hz: number[];
+  psd: number[];
+  peaks: SpectrumPeak[];
+  limitations: string[];
+  warnings: string[];
+  excludedReadings?: number;
+  samplingJitterRatio?: number | null;
+  baselineComparison?: {
+    matched: BaselineMatch[];
+    unmatched_current_hz: number[];
+    unmatched_baseline_hz: number[];
+    interpretation: string;
+  } | null;
+}
+
+export interface AnalysisRun {
+  id: number;
+  publicId: string;
+  kind: string;
+  status: AnalysisStatus;
+  sensorId: number;
+  windowFrom: string;
+  windowTo: string;
+  sampleRateHz: number | null;
+  method: string | null;
+  engineVersion: string | null;
+  baselineId: number | null;
+  result: SpectrumResult | null;
+  error: string | null;
+  queuedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+export interface BaselineRecord {
+  id: number;
+  publicId: string;
+  sensorId: number;
+  version: number;
+  label: string;
+  windowFrom: string;
+  windowTo: string;
+  method: string | null;
+  engineVersion: string | null;
+  isRetired: boolean;
+  createdAt: string;
+}

@@ -10,6 +10,8 @@ export type AuditEntity =
   | "sensor"
   | "deviceChannel"
   | "gateway"
+  | "analysis"
+  | "baseline"
   | "structure"
   | "location"
   | "sensorData"

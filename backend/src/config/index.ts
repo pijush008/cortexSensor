@@ -53,6 +53,13 @@ export const config = {
    * deployed hardware relies on the shared key.
    */
   allowLegacyIngestKey: process.env.ALLOW_LEGACY_INGEST_KEY !== "false",
+  /** The Python SHM engine (§74): spectral estimation lives out of process. */
+  shmEngineUrl: process.env.SHM_ENGINE_URL || "http://localhost:8000",
+  shmEngineTimeoutMs: Number(process.env.SHM_ENGINE_TIMEOUT_MS) || 60_000,
+  analysisQueueEnabled: process.env.ANALYSIS_QUEUE_ENABLED !== "false",
+  /** Disable in the API process when a dedicated worker service runs it. */
+  analysisWorkerEnabled: process.env.ANALYSIS_WORKER_ENABLED !== "false",
+  analysisWorkerConcurrency: Number(process.env.ANALYSIS_WORKER_CONCURRENCY) || 2,
   /**
    * Whether platform operators must enrol in MFA (§94). Configurable so a
    * first-run deployment can create its initial operator before an

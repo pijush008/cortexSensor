@@ -48,9 +48,7 @@ module per domain (`auth`, `users`, `devices`, `sensors`, `projects`,
 | Edge | Arduino/ESP32 sketch, Python Pi gateway, Node simulator |
 | CI | GitHub Actions: backend tests w/ Postgres service; frontend `build \|\| true` |
 
-Notable stack gaps vs target: **no shadcn/ui**, **no React Hook Form usage**,
-**no job queue/workers**, **no object storage**, **no WebSocket/SSE server**,
-**no payment provider**.
+
 
 ## 3. Current frontend structure
 
@@ -385,7 +383,7 @@ tests passing.** No slice ships UI for data that does not yet exist.
 | **3** | **Gateway + device + sensor** ✅ **DONE** | `Gateway` entity, device lifecycle states, per-device credentials, `SensorAssignment`, `SensorCalibration` | `/gateways` replaced with real data |
 | **4** | **Ingest v2** ✅ **DONE** | `Measurement` + hypertable, sequence/event IDs, idempotent batch writes, quality flags, **Pi store-and-forward buffer** | Offline test: disconnect, reconnect, zero loss, zero duplicates |
 | **5** | **Live + history** ✅ **DONE** | SSE from `api` (kills SEC-1), downsampled history endpoints, engineering-grade charts | Browser never touches the broker |
-| **6** | **SHM analytics** | Worker + queue; FFT/PSD with windowing and detrending; baseline; modal tracking; versioned results | `/analytics` replaced with real, reproducible analysis |
+| **6** | **SHM analytics** ✅ **DONE** | Worker + queue; FFT/PSD with windowing and detrending; baseline; modal tracking; versioned results | `/analytics` replaced with real, reproducible analysis |
 | **7** | **Alerts** | `Alert` lifecycle, severity rules, dedup, assignment, notifications | `/alerts` replaced with real data |
 | **8** | **Inspections + reports** | `Inspection`, report generation to S3, audit UI on the real `AuditLog` | `/audit` replaced with real data |
 | **9** | **Billing** | Payment provider, webhooks with signature verification, grace periods, entitlement enforcement | Payment state never trusted from the client |

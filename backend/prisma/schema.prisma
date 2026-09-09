@@ -93,6 +93,8 @@ model Tenant {
   structures   Structure[]
   locations    Location[]
   gateways     Gateway[]
+  analysisRuns AnalysisRun[]
+  baselines    Baseline[]
   subscription Subscription?
 
   @@index([status])
@@ -670,6 +672,121 @@ model Location {
   @@index([tenantId])
   @@index([structureId])
   @@map("locations")
+}
+
+// ─── ANALYSIS (spectral, baselines) ──────────────────────────────────────────
+// Every analysis output is versioned and traceable (§103): the window it was
+// computed over, the method and parameters used, the engine version, and the
+// baseline it was compared against. An engineering number that cannot be
+// reproduced is not evidence, and reprocessing later must be able to explain
+// why a stored result differs from a fresh one.
+
+enum AnalysisStatus {
+  queued
+  running
+  succeeded
+  failed
+}
+
+enum AnalysisKind {
+  spectrum
+  baseline_compare
+}
+
+model AnalysisRun {
+  id       Int    @id @default(autoincrement())
+  publicId String @unique @db.VarChar(32)
+  tenantId Int
+
+  kind   AnalysisKind
+  status AnalysisStatus @default(queued)
+
+  sensorId    Int
+  structureId Int?
+
+  /// The exact window analysed. Stored rather than derived so a result stays
+  /// meaningful even after more data arrives for the same period.
+  windowFrom DateTime @db.Timestamptz()
+  windowTo   DateTime @db.Timestamptz()
+
+  /// Sampling rate used for the transform. Without it a frequency axis is
+  /// meaningless, so it is recorded with the result rather than assumed.
+  sampleRateHz Float?
+
+  /// Method identifier and its parameters (window, detrend, segment length...).
+  method     String? @db.VarChar(64)
+  parameters Json?
+
+  /// Version of the analysis engine that produced the result.
+  engineVersion String? @db.VarChar(32)
+
+  /// Baseline this run was compared against, when applicable.
+  baselineId Int?
+
+  /// Full result payload: spectrum, peaks, limitations, warnings.
+  result Json?
+  /// Populated when status is failed. Kept rather than discarded so a
+  /// recurring failure can be diagnosed.
+  error  String? @db.Text
+
+  requestedBy Int?
+  queuedAt    DateTime  @default(now())
+  startedAt   DateTime?
+  finishedAt  DateTime?
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  baseline Baseline? @relation(fields: [baselineId], references: [id])
+
+  @@index([tenantId, queuedAt])
+  @@index([sensorId, queuedAt])
+  @@index([status])
+  @@map("analysis_runs")
+}
+
+/// A reference spectrum for a sensor, captured from a period an engineer has
+/// accepted as representative of the healthy structure.
+///
+/// Versioned and never edited: comparing today against a baseline that has
+/// been quietly changed produces a shift that cannot be explained or defended.
+model Baseline {
+  id       Int    @id @default(autoincrement())
+  publicId String @unique @db.VarChar(32)
+  tenantId Int
+  sensorId Int
+
+  /// Increments per sensor. The active baseline is the highest version that is
+  /// not retired.
+  version Int     @default(1)
+  label   String  @db.VarChar(160)
+  notes   String? @db.Text
+
+  /// The period the baseline was captured from.
+  windowFrom DateTime @db.Timestamptz()
+  windowTo   DateTime @db.Timestamptz()
+
+  sampleRateHz  Float?
+  method        String? @db.VarChar(64)
+  parameters    Json?
+  engineVersion String? @db.VarChar(32)
+
+  /// Identified peaks that define this reference state.
+  peaks Json
+
+  /// Environmental conditions when captured, so a later comparison can account
+  /// for them rather than attributing a thermal shift to the structure (§37).
+  environmentalContext Json?
+
+  isRetired Boolean  @default(false)
+  createdAt DateTime @default(now())
+  createdBy Int?
+
+  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  runs   AnalysisRun[]
+
+  @@unique([sensorId, version])
+  @@index([tenantId])
+  @@index([sensorId, isRetired])
+  @@map("baselines")
 }
 
 // ─── MEASUREMENTS (time-series) ──────────────────────────────────────────────
