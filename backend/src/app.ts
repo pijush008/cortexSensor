@@ -22,6 +22,7 @@ import reportsRoutes from "./modules/reports/reports.routes";
 import exportsRoutes from "./modules/exports/exports.routes";
 import iotRoutes from "./modules/iot/iot.routes";
 import subscriptionRoutes from "./modules/subscription/subscription.routes";
+import structuresRoutes from "./modules/structures/structures.routes";
 import { authenticate } from "./middleware/auth";
 import { requireApiKey } from "./middleware/apiKey";
 import prisma from "./config/prisma";
@@ -92,6 +93,7 @@ for (const base of API_MOUNTS) {
   app.use(base, exportsRoutes);
   app.use(base, iotRoutes);
   app.use(base, subscriptionRoutes);
+  app.use(base, structuresRoutes);
 }
 
 const deviceTypeHandler = async (req: express.Request, res: express.Response) => {

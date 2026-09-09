@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Building2,
   LayoutDashboard,
   ProjectorIcon as Projector,
   Cpu,
@@ -59,6 +60,7 @@ const MENU_SECTION: Record<UserRole, { label: string; items: MenuItem[] }[]> = {
       label: "Workspace",
       items: [
         { href: "/projects", label: "Projects", icon: Projector },
+        { href: "/structures", label: "Structures", icon: Building2 },
         { href: "/reports", label: "Reports", icon: BarChart3 },
         { href: "/exports", label: "Exports", icon: FileDown },
         { href: "/data-download", label: "Data Download", icon: DownloadCloud },
@@ -95,6 +97,7 @@ const MENU_SECTION: Record<UserRole, { label: string; items: MenuItem[] }[]> = {
       label: "Workspace",
       items: [
         { href: "/projects", label: "Projects", icon: Projector },
+        { href: "/structures", label: "Structures", icon: Building2 },
         { href: "/reports", label: "Reports", icon: BarChart3 },
         { href: "/data-download", label: "Data Download", icon: DownloadCloud },
       ],
@@ -126,6 +129,7 @@ const MENU_SECTION: Record<UserRole, { label: string; items: MenuItem[] }[]> = {
       label: "Workspace",
       items: [
         { href: "/projects", label: "Projects", icon: Projector },
+        { href: "/structures", label: "Structures", icon: Building2 },
         { href: "/reports", label: "Reports", icon: BarChart3 },
       ],
     },

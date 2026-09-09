@@ -15,6 +15,7 @@ const PROTECTED_PREFIXES = [
   "/sensors",
   "/mqtt",
   "/projects",
+  "/structures",
   "/reports",
   "/exports",
   "/data-download",

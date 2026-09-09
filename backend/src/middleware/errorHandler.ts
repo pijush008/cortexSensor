@@ -18,12 +18,30 @@ export const errorHandler = (
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _next: NextFunction,
 ): void => {
-  const statusCode = err instanceof AppError ? err.statusCode : 500;
-  const message = err instanceof AppError ? err.message : "Internal Server Error";
+  // A malformed JSON body is the client's mistake, not the server's.
+  // body-parser raises a SyntaxError carrying the status it wants; without this
+  // it fell through to a 500, which tells the caller nothing and pollutes
+  // error dashboards with failures that are not ours.
+  const isBodyParseError =
+    err instanceof SyntaxError &&
+    "body" in err &&
+    typeof (err as { status?: number }).status === "number";
+
+  const statusCode = isBodyParseError
+    ? ((err as { status?: number }).status ?? 400)
+    : err instanceof AppError
+      ? err.statusCode
+      : 500;
+
+  const message = isBodyParseError
+    ? "Malformed JSON in request body"
+    : err instanceof AppError
+      ? err.message
+      : "Internal Server Error";
 
   const requestId = (req as { requestId?: string }).requestId;
 
-  if (!(err instanceof AppError)) {
+  if (!(err instanceof AppError) && !isBodyParseError) {
     logger.error({
       message: err.message,
       stack: err.stack,

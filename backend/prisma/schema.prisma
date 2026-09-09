@@ -90,6 +90,8 @@ model Tenant {
   projects     Project[]
   devices      Device[]
   sensors      Sensor[]
+  structures   Structure[]
+  locations    Location[]
   subscription Subscription?
 
   @@index([status])
@@ -352,6 +354,7 @@ model Project {
   authority     User?          @relation("ProjectAuthority", fields: [authorityId], references: [id])
   projectEmails ProjectEmail[]
   sensorData    SensorData[]
+  structures    Structure[]
 
   @@index([tenantId])
   @@index([tenantId, status])
@@ -359,6 +362,123 @@ model Project {
   @@index([contractorId])
   @@index([authorityId])
   @@map("projects")
+}
+
+// ─── STRUCTURES & LOCATIONS ──────────────────────────────────────────────────
+// The middle of the monitoring hierarchy (§14):
+//   Tenant → Project → Structure → Location → Gateway → Device → Sensor
+// A Structure is the physical asset under observation. A Location is a named
+// point ON that structure where instrumentation is installed — "Pier P-17 /
+// North Bearing". Measurements are meaningless without it: a strain reading
+// with no location cannot be compared, mapped or acted on.
+
+enum StructureType {
+  bridge
+  flyover
+  building
+  tower
+  dam
+  tunnel
+  railway
+  pier
+  industrial
+  other
+}
+
+enum StructureStatus {
+  planned
+  commissioning
+  monitoring
+  paused
+  decommissioned
+}
+
+model Structure {
+  id        Int    @id @default(autoincrement())
+  /// Immutable external identifier. Names and codes are editable (§15).
+  publicId  String @unique @db.VarChar(32)
+  tenantId  Int
+  projectId Int
+
+  /// Human label, editable.
+  name String        @db.VarChar(160)
+  /// Operator's own asset reference (e.g. "BR-NH48-017"). Unique per tenant so
+  /// two customers may use the same scheme without collision.
+  code String        @db.VarChar(64)
+  type StructureType @default(other)
+
+  description String? @db.Text
+
+  // Geography. Nullable because an asset may be registered before it is
+  // surveyed; the UI shows "not recorded" rather than a placeholder value.
+  latitude    Decimal? @db.Decimal(9, 6)
+  longitude   Decimal? @db.Decimal(9, 6)
+  /// Free-text site address or chainage reference.
+  siteAddress String?  @db.VarChar(255)
+
+  // Engineering metadata. Used for reporting context and, later, to align a
+  // structure with its FEM model (§54). All optional: recording a fact you do
+  // not have is worse than leaving it blank.
+  constructionYear Int?
+  spanCount        Int?
+  lengthMetres     Decimal?  @db.Decimal(10, 2)
+  material         String?   @db.VarChar(120)
+  designStandard   String?   @db.VarChar(120)
+  commissionedAt   DateTime?
+
+  status    StructureStatus @default(planned)
+  createdAt DateTime        @default(now())
+  createdBy Int?
+  updatedAt DateTime        @updatedAt
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  locations Location[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([projectId])
+  @@index([tenantId, status])
+  @@map("structures")
+}
+
+model Location {
+  id          Int    @id @default(autoincrement())
+  publicId    String @unique @db.VarChar(32)
+  tenantId    Int
+  structureId Int
+
+  name String @db.VarChar(160)
+  /// Operator's point reference (e.g. "P17-NB"). Unique within its structure.
+  code String @db.VarChar(64)
+
+  description String? @db.Text
+
+  // Where on the structure. `station` is chainage along the asset; the local
+  // offsets are structure-relative coordinates, which is what a schematic or a
+  // FEM node mapping needs later (§54). Nullable throughout — an unsurveyed
+  // point is recorded as unknown, not as zero.
+  stationMetres   Decimal? @db.Decimal(10, 3)
+  elevationMetres Decimal? @db.Decimal(10, 3)
+  offsetXMetres   Decimal? @db.Decimal(10, 3)
+  offsetYMetres   Decimal? @db.Decimal(10, 3)
+  offsetZMetres   Decimal? @db.Decimal(10, 3)
+
+  latitude  Decimal? @db.Decimal(9, 6)
+  longitude Decimal? @db.Decimal(9, 6)
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  createdBy Int?
+  updatedAt DateTime @updatedAt
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  structure Structure @relation(fields: [structureId], references: [id], onDelete: Cascade)
+
+  @@unique([structureId, code])
+  @@index([tenantId])
+  @@index([structureId])
+  @@map("locations")
 }
 
 // ─── SENSOR DATA ─────────────────────────────────────────────────────────────

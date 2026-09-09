@@ -9,6 +9,8 @@ export type AuditEntity =
   | "device"
   | "sensor"
   | "deviceChannel"
+  | "structure"
+  | "location"
   | "sensorData"
   | "subscription";
 

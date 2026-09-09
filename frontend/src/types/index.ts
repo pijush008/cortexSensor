@@ -220,3 +220,78 @@ export interface InvoiceRecord {
   status: string;
   createdAt: string;
 }
+// ─── Structures & locations ──────────────────────────────────────────────────
+
+export type StructureType =
+  | "bridge"
+  | "flyover"
+  | "building"
+  | "tower"
+  | "dam"
+  | "tunnel"
+  | "railway"
+  | "pier"
+  | "industrial"
+  | "other";
+
+export type StructureStatus =
+  | "planned"
+  | "commissioning"
+  | "monitoring"
+  | "paused"
+  | "decommissioned";
+
+export interface Structure {
+  id: number;
+  /** Immutable external identifier; the name and code are editable. */
+  publicId: string;
+  projectId: number;
+  projectName: string | null;
+  projectUniqueId: string | null;
+  name: string;
+  code: string;
+  type: StructureType;
+  status: StructureStatus;
+  description: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  siteAddress: string | null;
+  constructionYear: number | null;
+  spanCount: number | null;
+  lengthMetres: number | null;
+  material: string | null;
+  designStandard: string | null;
+  commissionedAt: string | null;
+  locationCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StructureListResponse {
+  status_code: number;
+  message: string | null;
+  items: Structure[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface Location {
+  id: number;
+  publicId: string;
+  structureId: number;
+  name: string;
+  code: string;
+  description: string | null;
+  stationMetres: number | null;
+  elevationMetres: number | null;
+  offsetXMetres: number | null;
+  offsetYMetres: number | null;
+  offsetZMetres: number | null;
+  latitude: number | null;
+  longitude: number | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
