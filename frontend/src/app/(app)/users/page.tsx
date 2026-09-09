@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, ShieldCheck, ShieldOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,6 +36,7 @@ type Tab = UserRole;
 
 export default function UsersPage() {
   const { userType, userId } = useAuthStore();
+  const router = useRouter();
   const isSuperAdmin = userType === "superadmin";
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>("admin");
@@ -183,7 +186,16 @@ export default function UsersPage() {
                   {users.map((u) => (
                     <tr
                       key={u.id}
-                      className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
+                      className={cn(
+                        "border-b border-slate-100 last:border-0 hover:bg-slate-50",
+                        // Only a platform operator has a detail page to open;
+                        // for anyone else the row stays inert rather than
+                        // offering a link that would come back 403.
+                        isSuperAdmin && "cursor-pointer",
+                      )}
+                      onClick={
+                        isSuperAdmin ? () => router.push(`/users/${u.id}`) : undefined
+                      }
                     >
                       <td className="py-3 pr-4 font-medium text-slate-800">
                         {u.firstName} {u.lastName}
@@ -199,7 +211,7 @@ export default function UsersPage() {
                         />
                       </td>
                       {isSuperAdmin && (
-                        <td className="py-3">
+                        <td className="py-3" onClick={(e) => e.stopPropagation()}>
                           <div className="flex gap-1">
                             <Button
                               variant="ghost"

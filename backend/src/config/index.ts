@@ -60,6 +60,12 @@ export const config = {
   /** Disable in the API process when a dedicated worker service runs it. */
   analysisWorkerEnabled: process.env.ANALYSIS_WORKER_ENABLED !== "false",
   analysisWorkerConcurrency: Number(process.env.ANALYSIS_WORKER_CONCURRENCY) || 2,
+  /**
+   * Number of reverse proxies in front of the API. 1 for the bundled nginx.
+   * Raise it only to the number of proxies you actually control — each extra
+   * hop is one more X-Forwarded-For entry taken on trust.
+   */
+  trustProxyHops: Number(process.env.TRUST_PROXY_HOPS ?? 1),
   billing: {
     /** Master switch; billing endpoints refuse rather than pretend when off. */
     enabled: process.env.BILLING_ENABLED === "true",

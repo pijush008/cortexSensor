@@ -22,6 +22,7 @@ import {
   MfaRequiredError,
   NotFoundError,
   ForbiddenError,
+  UnauthorizedError,
 } from "../../utils/AppError";
 import { assertWithinLimits } from "../subscription/subscription.service";
 import {
@@ -35,6 +36,15 @@ import {
   UpdateUserInput,
 } from "./auth.types";
 
+/**
+ * A bcrypt hash of a value no account uses, compared against when the email is
+ * unknown so that path does the same work as a real password check. The cost
+ * factor must match the one used at registration (10) or the timing difference
+ * it exists to erase simply reappears.
+ */
+const ABSENT_USER_HASH =
+  "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+
 export async function login(input: LoginInput) {
   const user = await prisma.user.findFirst({
     where: {
@@ -43,13 +53,28 @@ export async function login(input: LoginInput) {
     },
   });
 
-  if (!user) {
-    throw new BadRequestError("User not found");
-  }
+  // A failed sign-in answers with ONE message and ONE status, whichever half
+  // was wrong.
+  //
+  // Distinguishing "User not found" from "Invalid password" is a user
+  // enumeration oracle: anyone can discover which email addresses hold accounts
+  // on this platform by watching which of the two comes back, which is exactly
+  // the list an attacker wants before starting a credential-stuffing run. On a
+  // monitoring platform that list also reveals who operates which infrastructure.
+  //
+  // 401 rather than 400: the request was well formed, the credentials were not
+  // accepted. 400 told the client its payload was malformed, which sent the
+  // sign-in form down a generic "the request was rejected" path instead of
+  // saying the password was wrong.
+  const passwordMatch = user
+    ? await bcrypt.compare(input.password, user.password)
+    : // Compared against a throwaway hash so a missing account costs the same
+      // bcrypt work as a wrong password. Without this the message is uniform
+      // but the RESPONSE TIME still discloses which addresses exist.
+      await bcrypt.compare(input.password, ABSENT_USER_HASH);
 
-  const passwordMatch = await bcrypt.compare(input.password, user.password);
-  if (!passwordMatch) {
-    throw new BadRequestError("Invalid password");
+  if (!user || !passwordMatch) {
+    throw new UnauthorizedError("Incorrect email or password");
   }
 
   if (user.isMailVerified !== ("true_" as never)) {

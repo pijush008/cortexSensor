@@ -38,6 +38,30 @@ router.get("/me", authenticate, async (req: AuthRequest, res: Response) => {
       })
     : null;
 
+  // Reported by the server, not inferred by the client. The view-as banner is
+  // the only thing telling an operator that what they are looking at is someone
+  // else's console, so its truth must come from the same place the request's
+  // identity does — a client-side flag could go stale and leave an operator
+  // believing they had exited when the session was still open.
+  const impersonation = req.impersonation
+    ? await prisma.user
+        .findUnique({
+          where: { id: req.impersonation.operatorId },
+          select: { id: true, firstName: true, lastName: true, emailId: true },
+        })
+        .then((operator) => ({
+          active: true as const,
+          readOnly: true as const,
+          operator: operator
+            ? {
+                id: operator.id,
+                name: `${operator.firstName} ${operator.lastName}`.trim(),
+                email: operator.emailId,
+              }
+            : null,
+        }))
+    : null;
+
   return res.status(200).json({
     status_code: 200,
     message: null,
@@ -56,6 +80,8 @@ router.get("/me", authenticate, async (req: AuthRequest, res: Response) => {
       membershipCount: memberships,
       role: req.auth.role,
       permissions: [...req.auth.permissions].sort(),
+      /** Null in an ordinary session; set while a platform operator is viewing as this user. */
+      impersonation,
     },
   });
 });

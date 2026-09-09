@@ -411,3 +411,207 @@ Slices 0–1 are prerequisites for everything else and should not be parallelize
 | `/hero-demo` | **REMOVE** | Dead stub |
 | `backend/dist`, `frontend/tmp` | **REMOVE from git** | Build artifacts |
 | Legacy backup tarball | **KEEP** | Migration reference; never delete |
+
+## Post-slice defects found by running the deployed stack
+
+Two defects that the test suite could not see, because the suite was being run
+on the host while the product runs in containers.
+
+### SEC-2 — the rate limiter counted the proxy, not the client ✅ FIXED
+
+`express-rate-limit` keys on `req.ip`. Express resolves `req.ip` to the socket
+peer unless told how many proxies sit in front, and `trust proxy` was never set.
+Behind nginx the peer is always the nginx container, so **every user in the
+deployment shared one bucket**. Observed keys were `rl:::ffff:172.25.0.9` —
+nginx — rather than any client address.
+
+The consequence was not theoretical. The login limiter allows 20 attempts per
+15 minutes; with a single shared bucket, one person mistyping their password
+twenty times locks every customer out of the product. The global 500-per-15
+-minutes limit was likewise deployment-wide.
+
+Fixed by `app.set("trust proxy", config.trustProxyHops)`, a hop COUNT rather
+than `true`. Trusting the entire `X-Forwarded-For` chain would let any client
+prepend a forged address to escape its own limit, or to poison someone else's;
+a count believes only the proxies we actually operate. `TRUST_PROXY_HOPS`
+defaults to 1 for the bundled nginx.
+
+Verified: a request arriving with a forged `X-Forwarded-For: 203.0.113.9` is
+keyed to its real address, not the forged one; two distinct clients receive
+distinct buckets; and after one client exhausts the login limiter (`429`), a
+second client authenticates successfully in the same moment.
+
+### OPS-1 — the backend could not reach the analysis engine ✅ FIXED
+
+`SHM_ENGINE_URL` was not set for the backend service, so it fell back to
+`http://localhost:8000`. Inside the backend container nothing listens there,
+and every analysis run in the deployed stack would fail while a healthy engine
+sat one hop away.
+
+This survived because the analysis tests were run on the host, where port 8000
+is published and `localhost` happens to resolve to the engine. Running the same
+suite inside the container failed immediately — a reminder that a green suite
+is only evidence about the environment it ran in.
+
+Fixed by setting `SHM_ENGINE_URL: "http://python-shm:8000"` in compose and
+adding `python-shm` to the backend's `depends_on`.
+
+A related fragility was fixed alongside it: `test/setup.ts` defaulted the
+billing webhook secret with `?? "test-webhook-secret"`, deferring to whatever
+was in the ambient environment. In the container, compose sets a different
+secret, so the suite signed payloads with one key and verified them with
+another — eight billing tests failing with 401. The secret is now pinned,
+because it must match the literal the suite signs with.
+
+**The suite is now run inside the container** (`docker compose exec backend npx
+vitest run`): 154/154 passing there.
+
+### SEC-3 — a failed sign-in disclosed which accounts exist ✅ FIXED
+
+Found while diagnosing a login the user could not complete. The nginx access log
+showed the browser receiving `POST /api/commonLogin -> 400 48`, and the 48-byte
+body was `{"status_code":400,"message":"Invalid password"}`.
+
+Two defects, one visible and one not.
+
+**The visible one:** an unaccepted credential answered `400`. That status means
+the request was malformed, which was untrue, and it sent the sign-in form down
+`describeError`'s generic 4xx path — "Something about the request was rejected
+by the server." The person was told nothing about the actual problem, which was
+simply a wrong password.
+
+**The one behind it:** the endpoint answered `User not found` for an unknown
+address and `Invalid password` for a known one. That is an account enumeration
+oracle — anyone can learn which email addresses hold accounts by watching which
+reply comes back, which is the list a credential-stuffing run starts from. On a
+monitoring platform it also discloses who operates which infrastructure.
+
+Both failures now return `401` with the single message `Incorrect email or
+password`. Closing the message channel alone would have been half a fix: with
+no account, the code returned before reaching bcrypt, so the RESPONSE TIME still
+separated the two cases. The absent-user path now compares against a throwaway
+hash at the same cost factor. Measured over 8 requests each with the limiter
+cleared: 90 ms for a real address, 95 ms for an unknown one — indistinguishable.
+(An initial measurement appeared to show 111 ms vs 17 ms; that was the login
+limiter short-circuiting with 429s, not a timing leak.)
+
+On the client, `describeError` gained a `credentialAttempt` option, because a
+`401` means different things in different places: on a data screen the session
+lapsed, but on the sign-in form there was no session to lapse. Telling someone
+at the login screen that their "session has expired" and to "sign in again" is
+advice they are already following. The login form also now renders the error
+title, not only the description — the headline was being discarded, which is
+what made the underlying message invisible in the first place.
+
+Regression coverage: `backend/test/login-failure.test.ts` asserts identical
+status and body for both failure modes, that the status is 401, and that real
+credentials still succeed — the guard against "fixing" the oracle by rejecting
+everyone.
+
+**Not a defect:** the port. `NEXT_PUBLIC_API_URL` is the relative path `/api`,
+so the browser posts to whichever origin served the page. On `http://localhost`
+(nginx, port 80) that reaches the backend. Opening the app on `:3005` talks to
+the Next dev server directly, where `/api/*` matches no route and Next answers
+with its own 404 HTML. **Port 80 is the address to use.**
+
+## Slice 11 — platform operator: user detail and read-only "view as"
+
+Built after the question "if superadmin clicks on admins, contractors,
+authorities, can he see their page and what they are doing".
+
+Before this, `/users` listed the three role tabs but every row was inert; there
+was no per-user page anywhere in the product.
+
+### What a user's page shows, and what it deliberately does not
+
+`GET /api/v1/admin/users/:id` (platform operators only) answers three questions
+in the order an operator actually asks them:
+
+- **Who is this and what may they do** — organizations, role, effective
+  permissions, verification and MFA state.
+- **Are they getting in** — sign-in history derived from `refresh_tokens`, each
+  row resolved to `active`, `rotated`, `expired` or `revoked` from its own
+  timestamps.
+- **What have they done** — their `audit_logs` entries.
+
+There is deliberately no "currently viewing" or "last seen on page" panel. The
+platform records writes and session issuance; it does not record reads or
+navigation. A display of what someone is *looking at* would be invented
+operational evidence about a real person, which is the one thing this codebase
+does not do — and it would be evidence about an identifiable individual, which
+makes it worse than a fabricated sensor reading, not better. The page says so
+in as many words, so the absence reads as a boundary rather than an oversight.
+
+### View as — a read-only session
+
+`POST /api/v1/admin/impersonation` opens one; `DELETE` ends it. The rules, and
+why each exists:
+
+- **Read-only, enforced centrally.** `enforceImpersonationReadOnly` is mounted
+  globally in `app.ts`, ahead of every router. It was first written inside
+  `authenticate`, and two routes bypassed it: `/logout` declares no auth
+  middleware at all, and `optionalAuth` calls `authenticate` with a callback
+  that discards the error, so the refusal was silently dropped and the handler
+  ran anyway. Enforcement that lives in an auth middleware only protects the
+  routes that remember to use it. The rule is stated over METHODS, not routes,
+  so a new write endpoint is covered the day it is added.
+- **A separate cookie.** Overwriting the operator's own access cookie would
+  destroy their real session, leaving no way back and no identity to attribute
+  the exit to.
+- **Fifteen minutes.** A support session answers a question; it is not a
+  standing key to someone's account.
+- **No operator may view as another operator.** Otherwise the trail launders:
+  operator A views as operator B and every entry afterwards names B.
+- **The operator's authority is re-checked on every request**, not trusted from
+  the token, so revoking someone's platform-operator status ends their live
+  view-as sessions immediately rather than at token expiry.
+- **Both ends are audited against the OPERATOR**, with the viewed user as the
+  subject. A customer's own trail never gains an entry they did not cause.
+
+Verified against the real deployment: every endpoint tested returns an identical
+status for the technician's own session and for an operator viewing as them —
+which is the property that makes the feature worth having. Writes are refused
+with a clear message; the two bypasses above are covered by explicit test cases.
+
+### The shell had to follow the server, not localStorage
+
+The first working version showed the technician's data under the *superadmin's*
+sidebar and identity chip, because both read `userType` from `localStorage` —
+whoever last signed in. That is the same class of defect as the earlier
+role → routes drift: client-held identity disagreeing with the server's. Both
+now prefer the `userType` reported by `GET /me`, so the chrome describes
+whoever the API is actually answering as.
+
+`GET /me` reports the impersonation state, and the banner is driven from it
+rather than from client state, so the notice cannot disagree with the session it
+describes. It is not dismissible: an operator who forgets they are inside a
+view-as session reads a customer's dashboard as their own.
+
+Coverage: `backend/test/impersonation.test.ts`, 13 tests.
+
+### SEC-4 — every rate limiter shared one counter ✅ FIXED
+
+Found from a `ERR_ERL_DOUBLE_COUNT` warning while running the new tests, and it
+is the real cause of the sign-in lockouts reported during this session.
+
+`RedisRateLimitStore` keyed on `rl:<client>` with no per-limiter namespace, so
+the global limiter (500 per 15 min), the login limiter (20) and the OTP limiter
+(10) all incremented **the same counter**. Measured before the fix: one login
+request raised the counter to 2, and five ordinary page reads raised it to 7.
+
+The login limiter's allowance is 20. Ordinary browsing therefore consumed it —
+roughly two pages' worth of API calls — and the user was then locked out of
+signing in by nothing more than having used the product. That, rather than the
+proxy keying fixed as SEC-2, is what kept producing "You've hit the rate limit".
+
+Each limiter now takes a required `scope` argument (`global`, `login`, `otp`).
+Verified after the fix: one login request gives `rl:login:… = 1` and
+`rl:global:… = 1`; eight further page reads take global to 9 and leave the login
+counter at 1.
+
+### Flagged, not fixed
+
+`GET /api/v1/dashboard/overview` returns 400 for a technician — in their own
+session, not only under view-as, so it is pre-existing and unrelated to this
+slice. The dashboard is the landing page for that role, so it is worth its own
+look.

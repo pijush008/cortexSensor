@@ -28,7 +28,12 @@ export type AuditAction =
   | "verify"
   | "assign"
   | "unassign"
-  | "subscription-update";
+  | "subscription-update"
+  // Both ends of a platform operator's view-as session. Recorded against the
+  // OPERATOR, never the person viewed, so a customer's trail never gains an
+  // entry they did not cause.
+  | "impersonate-start"
+  | "impersonate-end";
 
 interface AuditInput {
   userId?: number;
@@ -74,9 +79,12 @@ async function audit(input: AuditInput): Promise<void> {
 function requestContext(req?: AuthRequest | Request) {
   if (!req) return { ipAddress: undefined, userAgent: undefined };
   return {
-    ipAddress:
-      (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ||
-      req.socket?.remoteAddress,
+    // req.ip, not the raw X-Forwarded-For header. Express resolves req.ip using
+    // the configured `trust proxy` hop count, so it reflects the proxies we
+    // actually operate. Reading the header directly accepted whatever a client
+    // chose to send, which let anyone write a false address into the audit log —
+    // the one record whose job is to say who did something.
+    ipAddress: req.ip ?? req.socket?.remoteAddress,
     userAgent: req.headers["user-agent"] as string | undefined,
   };
 }

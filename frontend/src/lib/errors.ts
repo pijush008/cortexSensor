@@ -46,7 +46,21 @@ function detailOf(error: AxiosError): string | undefined {
   return fromBody ?? error.message ?? undefined;
 }
 
-export function describeError(error: unknown): DescribedError {
+export interface DescribeOptions {
+  /**
+   * Set on a sign-in / credential submission. A 401 means two different things
+   * depending on where it arrives: on a data screen the session lapsed, but on
+   * the sign-in form there was no session to lapse — the credentials were
+   * simply wrong. Telling someone at the login screen that their "session has
+   * expired" and to "sign in again" is advice they are already following.
+   */
+  credentialAttempt?: boolean;
+}
+
+export function describeError(
+  error: unknown,
+  options: DescribeOptions = {},
+): DescribedError {
   if (error instanceof AxiosError) {
     const status = error.response?.status;
     const detail = detailOf(error);
@@ -77,14 +91,27 @@ export function describeError(error: unknown): DescribedError {
 
     switch (status) {
       case 401:
-        return {
-          kind: "unauthorized",
-          title: "Your session has expired",
-          description: "Sign in again to continue.",
-          detail,
-          status,
-          retryable: false,
-        };
+        return options.credentialAttempt
+          ? {
+              kind: "unauthorized",
+              // Deliberately does not say WHICH half was wrong; the API does not
+              // disclose it either, and repeating the distinction in the UI
+              // would hand back the enumeration oracle the API just closed.
+              title: "Incorrect email or password",
+              description:
+                "Check the address and password and try again. If you've forgotten it, use the reset link below.",
+              detail,
+              status,
+              retryable: false,
+            }
+          : {
+              kind: "unauthorized",
+              title: "Your session has expired",
+              description: "Sign in again to continue.",
+              detail,
+              status,
+              retryable: false,
+            };
       case 403:
         return {
           kind: "forbidden",

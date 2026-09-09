@@ -28,6 +28,17 @@ export interface SessionInfo {
   isPlatformAdmin: boolean;
   role: string | null;
   permissions: string[];
+  /**
+   * Null in an ordinary session. Set while a platform operator is viewing the
+   * console as this user — reported by the server, because the banner warning
+   * an operator that they are inside someone else's session must not depend on
+   * client state that can go stale.
+   */
+  impersonation: {
+    active: true;
+    readOnly: true;
+    operator: { id: number; name: string; email: string } | null;
+  } | null;
 }
 
 export function useMe() {

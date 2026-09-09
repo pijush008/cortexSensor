@@ -14,9 +14,14 @@ process.env.REDIS_ENABLED = process.env.REDIS_ENABLED ?? "false";
 
 // Billing is exercised end to end, so the webhook secret must exist before the
 // provider reads it.
+//
+// PINNED, not defaulted. The billing suite signs its payloads with this exact
+// literal, so deferring to an ambient BILLING_WEBHOOK_SECRET means the tests
+// verify a signature made with one key against another and every webhook comes
+// back 401 — which is what happened when the suite was first run inside the
+// backend container, where compose sets a different secret.
 process.env.BILLING_ENABLED = "true";
-process.env.BILLING_WEBHOOK_SECRET =
-  process.env.BILLING_WEBHOOK_SECRET ?? "test-webhook-secret";
+process.env.BILLING_WEBHOOK_SECRET = "test-webhook-secret";
 
 // Keep the ingest path on its documented default so the contract tests and the
 // legacy-key deprecation path behave predictably.

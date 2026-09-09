@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { Menu, Bell, ChevronRight } from "lucide-react";
+import { ImpersonationBanner } from "./impersonation-banner";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "./sidebar";
 import { Button } from "@/components/ui/button";
 import { PulseDot } from "@/components/ui/pulse-dot";
 import { useAuthStore } from "@/stores/auth-store";
+import { useMe } from "@/hooks/use-me";
 import { capitalize } from "@/lib/utils";
 
 const ROUTE_LABELS: Record<string, string> = {
@@ -39,7 +41,15 @@ function useUtcClock() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { userType, userId } = useAuthStore();
+  const { userType: storedUserType, userId: storedUserId } = useAuthStore();
+  const me = useMe();
+
+  // Same reasoning as the sidebar: the identity chip must name whoever the API
+  // is answering as, not whoever signed in. During a view-as session those are
+  // different people, and a chip naming the operator over the viewed user's
+  // data is a quiet invitation to misread it.
+  const userType = me.data?.user.userType ?? storedUserType;
+  const userId = me.data?.user.id ?? storedUserId;
   const pathname = usePathname();
   const utc = useUtcClock();
 
@@ -129,6 +139,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </header>
+
+        {/* Directly under the header and above the scroll region, so it stays
+            visible on every page rather than scrolling away with the content. */}
+        <ImpersonationBanner />
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-7">{children}</main>
       </div>

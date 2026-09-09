@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
+import { useMe } from "@/hooks/use-me";
 import type { UserRole } from "@/types";
 
 interface SidebarProps {
@@ -157,9 +158,17 @@ const MENU_SECTION: Record<UserRole, { label: string; items: MenuItem[] }[]> = {
 export function Sidebar({ collapsed, mobileOpen, onCloseMobile }: SidebarProps) {
   const pathname = usePathname();
   const { userType, logout } = useAuthStore();
+  const me = useMe();
   // Safe fallback: never over-privilege. An authenticated session always has a
   // userType, so this only triggers on an inconsistent/legacy client state.
-  const role = (userType as UserRole) || "authority";
+  //
+  // The SERVER's answer wins when it differs. localStorage holds whoever last
+  // signed in, which during a view-as session is the platform operator — so
+  // navigating by it would show an operator's menu on top of a technician's
+  // data, which is precisely the confusion the feature exists to avoid.
+  const role = ((me.data?.user.userType as UserRole) ||
+    (userType as UserRole) ||
+    "authority") as UserRole;
   const sections = MENU_SECTION[role] || MENU_SECTION.authority;
 
   return (

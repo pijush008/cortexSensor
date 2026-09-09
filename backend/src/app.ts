@@ -30,14 +30,35 @@ import analysisRoutes from "./modules/analysis/analysis.routes";
 import alertsRoutes from "./modules/alerts/alerts.routes";
 import reportsV2Routes from "./modules/reports/reports-v2.routes";
 import meRoutes from "./modules/rbac/me.routes";
+import platformRoutes from "./modules/platform/platform.routes";
 import billingRoutes from "./modules/billing/billing.routes";
-import { authenticate } from "./middleware/auth";
+import {
+  authenticate,
+  enforceImpersonationReadOnly,
+} from "./middleware/auth";
 import { requireApiKey } from "./middleware/apiKey";
 import prisma from "./config/prisma";
 import { formatImageUrl } from "./utils/helper";
 import * as sensorsController from "./modules/sensors/sensors.controller";
 
 const app = express();
+
+/**
+ * Trust the reverse proxy in front of us, so `req.ip` is the real client
+ * rather than the proxy.
+ *
+ * Without this, express resolves req.ip to the socket peer — which behind
+ * nginx is the nginx container. Every request in the deployment then shares
+ * ONE rate-limit bucket: the global 500-per-15-minutes is consumed by all
+ * users combined, and the 20-attempt login limiter means one person mistyping
+ * their password locks out every customer.
+ *
+ * A hop COUNT, never `true`. Trusting the whole X-Forwarded-For chain lets any
+ * client prepend a forged address to evade its own limit — or, worse, target
+ * someone else's bucket. The count says how many proxies we actually operate;
+ * only that many entries from the right are believed.
+ */
+app.set("trust proxy", config.trustProxyHops);
 
 // Correlation id first: everything downstream (including the rate limiter's
 // rejections and the error handler) should be traceable.
@@ -68,7 +89,9 @@ const limiter = rateLimit({
   max: 500,
   standardHeaders: true,
   legacyHeaders: false,
-  store: rateLimitStore(),
+  // Its own namespace. Sharing one with the auth limiters made every API call a
+  // charge against the sign-in allowance.
+  store: rateLimitStore("global"),
 });
 app.use(limiter);
 
@@ -82,6 +105,11 @@ for (const base of ["/api/v1", "/api"]) {
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(cookieParser());
+
+// Immediately after cookieParser, because it reads a cookie, and before every
+// router, because a view-as session must not be able to write through ANY
+// route — including one that declares no auth middleware of its own.
+app.use(enforceImpersonationReadOnly);
 
 app.use("/api/uploads", express.static(path.resolve("uploads")));
 
@@ -120,6 +148,7 @@ for (const base of API_MOUNTS) {
   app.use(base, alertsRoutes);
   app.use(base, reportsV2Routes);
   app.use(base, meRoutes);
+  app.use(base, platformRoutes);
   app.use(base, streamRoutes);
 }
 

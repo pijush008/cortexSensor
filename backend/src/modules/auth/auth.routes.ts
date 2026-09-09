@@ -14,7 +14,7 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
   message: { status_code: 429, message: "Too many login attempts. Please try again later." },
   skipSuccessfulRequests: true,
-  store: rateLimitStore(),
+  store: rateLimitStore("login"),
 });
 
 const otpLimiter = rateLimit({
@@ -23,7 +23,7 @@ const otpLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { status_code: 429, message: "Too many OTP requests. Please try again later." },
-  store: rateLimitStore(),
+  store: rateLimitStore("otp"),
 });
 
 router.post("/commonLogin", loginLimiter, authController.authLogin);

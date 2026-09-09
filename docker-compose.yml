@@ -35,6 +35,11 @@ services:
       MQTT_INGEST_TOPICS: "shm/ingest/#"
       MQTT_USERNAME: "shm-backend"
       MQTT_PASSWORD: "shm-backend-pass"
+      # The analysis engine, addressed by its compose service name. Without
+      # this the backend falls back to localhost:8000, which inside its own
+      # container is nothing — every analysis run fails while the engine sits
+      # healthy one hop away. Host-run tests hide it, because 8000 is published.
+      SHM_ENGINE_URL: "http://python-shm:8000"
       # Billing. The webhook verifies an HMAC over the raw body; with no secret
       # the endpoint refuses rather than accepting unsigned traffic.
       BILLING_ENABLED: "true"
@@ -46,6 +51,7 @@ services:
       - postgres
       - redis
       - mosquitto
+      - python-shm
 
   frontend:
     # Node 20+ is required, not optional: @tailwindcss/oxide-linux-x64-gnu (the

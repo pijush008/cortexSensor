@@ -13,8 +13,20 @@ const WINDOW_PREFIX = "rl:";
 export class RedisRateLimitStore implements Store {
   private fallback: MemoryStore;
   private options: Options | null = null;
+  private readonly scope: string;
 
-  constructor() {
+  /**
+   * @param scope Namespace for this limiter's counters.
+   *
+   * Required, not optional. Every limiter previously keyed on the client
+   * address alone, so the global limiter, the login limiter and the OTP limiter
+   * all incremented ONE counter per client. Two consequences, both observed:
+   * a single login request counted twice, and ordinary browsing consumed the
+   * login budget — roughly two page loads of API calls were enough to exhaust
+   * the 20-attempt sign-in allowance and lock the user out of their own account.
+   */
+  constructor(scope: string) {
+    this.scope = scope;
     this.fallback = new MemoryStore();
   }
 
@@ -24,7 +36,7 @@ export class RedisRateLimitStore implements Store {
   }
 
   private redisKey(key: string): string {
-    return `${WINDOW_PREFIX}${key}`;
+    return `${WINDOW_PREFIX}${this.scope}:${key}`;
   }
 
   async get(key: string) {
@@ -100,6 +112,6 @@ export class RedisRateLimitStore implements Store {
   }
 }
 
-export function rateLimitStore(): Store {
-  return new RedisRateLimitStore();
+export function rateLimitStore(scope: string): Store {
+  return new RedisRateLimitStore(scope);
 }

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Reveal } from "@/components/ui/reveal";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
-import { describeError } from "@/lib/errors";
+import { describeError, type DescribedError } from "@/lib/errors";
 import { Activity, Lock, Radio, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -42,7 +42,7 @@ export default function LoginPage() {
   const [otp, setOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [resetToken, setResetToken] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<DescribedError | null>(null);
   const [loading, setLoading] = useState(false);
   const [streamHead, setStreamHead] = useState(0);
   const [cursor, setCursor] = useState(true);
@@ -69,7 +69,11 @@ export default function LoginPage() {
       // try again shortly" rather than axios's raw "Request failed with
       // status code 429". Every other data surface already does this; the
       // sign-in form was the one that did not.
-      setError(describeError(err).description);
+      //
+      // Flagged as a credential attempt so a 401 reads "Incorrect email or
+      // password" instead of "Your session has expired" — advice that makes no
+      // sense on the page you sign in from.
+      setError(describeError(err, { credentialAttempt: true }));
     } finally {
       setLoading(false);
     }
@@ -84,7 +88,7 @@ export default function LoginPage() {
       setMode("otp");
       setError(null);
     } catch (err) {
-      setError(describeError(err).description);
+      setError(describeError(err));
     } finally {
       setLoading(false);
     }
@@ -103,7 +107,7 @@ export default function LoginPage() {
       setResetToken(data.resetToken || "");
       setError(null);
     } catch (err) {
-      setError(describeError(err).description);
+      setError(describeError(err));
     } finally {
       setLoading(false);
     }
@@ -121,7 +125,7 @@ export default function LoginPage() {
       setResetToken("");
       setError(null);
     } catch (err) {
-      setError(describeError(err).description);
+      setError(describeError(err));
     } finally {
       setLoading(false);
     }
@@ -279,7 +283,8 @@ export default function LoginPage() {
                   className="anim-tick-in mt-5 rounded-lg border border-shm-red/20 bg-shm-red/5 px-3.5 py-2.5 text-[13px] text-shm-red"
                   role="alert"
                 >
-                  {error}
+                  <p className="font-medium">{error.title}</p>
+                  <p className="mt-0.5 text-shm-red/85">{error.description}</p>
                 </div>
               )}
 
