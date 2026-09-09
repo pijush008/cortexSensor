@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import prisma from "../../config/prisma";
 import { logger } from "../../utils/logger";
 import { publishEvent } from "../stream/event-bus";
+import { evaluateReadings } from "../alerts/alerts.service";
 import { assessQuality, type QualityFlag } from "./quality";
 
 /**
@@ -259,6 +260,27 @@ export async function ingestMeasurements(
         qualityFlags: (row.qualityFlags as string[]) ?? [],
       });
     }
+  }
+
+  // Alert evaluation runs AFTER the measurements are persisted: an alert that
+  // cites a reading which failed to store is unverifiable. Failures here never
+  // fail the ingest — losing a reading is worse than missing an alert, and the
+  // condition will be re-evaluated on the next batch anyway.
+  if (inserted.count > 0) {
+    const observations = rows
+      .filter((r) => (r.value as number | null) !== null)
+      .map((r) => ({
+        sensorId: r.sensorId as number,
+        value: r.value as number,
+        ts: r.ts as Date,
+        qualityFlags: (r.qualityFlags as string[]) ?? [],
+        locationId: (r.locationId as number | null) ?? null,
+        structureId: (r.structureId as number | null) ?? null,
+        deviceId: (r.deviceId as number | null) ?? null,
+      }));
+    await evaluateReadings(ctx.tenantId, observations).catch((err) => {
+      logger.error("Alert evaluation failed", err as Error);
+    });
   }
 
   if (result.duplicates > 0) {

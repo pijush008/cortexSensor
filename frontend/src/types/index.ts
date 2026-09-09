@@ -428,3 +428,75 @@ export interface BaselineRecord {
   isRetired: boolean;
   createdAt: string;
 }
+
+// ─── Alerts ──────────────────────────────────────────────────────────────────
+
+export type AlertSeverity = "info" | "low" | "medium" | "high" | "critical";
+export type AlertStatus =
+  | "open"
+  | "acknowledged"
+  | "investigating"
+  | "resolved"
+  | "closed";
+/** What KIND of problem this is — kept distinct from how urgent it is. */
+export type AlertCategory =
+  | "structural"
+  | "sensor_health"
+  | "connectivity"
+  | "data_quality";
+
+export interface AlertEvidence {
+  rule?: string;
+  bound?: "min" | "max";
+  limit?: number;
+  observedValue?: number;
+  observedAt?: string;
+  consecutiveSamples?: number;
+  requiredSamples?: number;
+  exceedancePercent?: number;
+  qualityFlags?: string[];
+  /** How the severity was derived, so it can be audited rather than trusted. */
+  severityRationale?: string;
+}
+
+export interface AlertRecord {
+  id: number;
+  publicId: string;
+  sensorId: number | null;
+  structureId: number | null;
+  locationId: number | null;
+  category: AlertCategory;
+  severity: AlertSeverity;
+  status: AlertStatus;
+  title: string;
+  evidence: AlertEvidence;
+  /** Confidence in the DETECTION, not in a structural conclusion. */
+  confidence: number | null;
+  detectedAt: string;
+  lastObservedAt: string;
+  occurrenceCount: number;
+  assignedToId: number | null;
+  acknowledgedAt: string | null;
+  resolvedAt: string | null;
+  resolutionNote: string | null;
+}
+
+export interface AlertTimelineEvent {
+  id: number;
+  fromStatus: AlertStatus | null;
+  toStatus: AlertStatus;
+  note: string | null;
+  actorId: number | null;
+  isAutomatic: boolean;
+  createdAt: string;
+}
+
+export interface AlertDetail extends AlertRecord {
+  rule: { id: number; name: string } | null;
+  events: AlertTimelineEvent[];
+}
+
+export interface AlertSummary {
+  total: number;
+  bySeverity: Partial<Record<AlertSeverity, number>>;
+}

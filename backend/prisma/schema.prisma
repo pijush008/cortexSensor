@@ -95,6 +95,8 @@ model Tenant {
   gateways     Gateway[]
   analysisRuns AnalysisRun[]
   baselines    Baseline[]
+  alertRules   AlertRule[]
+  alerts       Alert[]
   subscription Subscription?
 
   @@index([status])
@@ -672,6 +674,170 @@ model Location {
   @@index([tenantId])
   @@index([structureId])
   @@map("locations")
+}
+
+// ─── ALERTS ──────────────────────────────────────────────────────────────────
+// An alert is a claim that something needs an engineer's attention. Three
+// things make that claim trustworthy rather than noise:
+//
+//   1. Severity is DERIVED from stated rules, never chosen ad hoc (§41).
+//   2. One continuous condition is ONE alert. Re-raising per reading buries
+//      the engineer and trains them to ignore the inbox (§40).
+//   3. A sensor fault is categorised as a SENSOR fault, never as a structural
+//      finding (§31). A dead channel is not a damaged bridge.
+
+enum AlertSeverity {
+  info
+  low
+  medium
+  high
+  critical
+}
+
+enum AlertStatus {
+  open
+  acknowledged
+  investigating
+  resolved
+  closed
+}
+
+/// What KIND of problem this is. Kept separate from severity because they
+/// answer different questions: category says what is wrong, severity says how
+/// urgently someone must look.
+enum AlertCategory {
+  /// The structure's measured response changed. The only category that may
+  /// ever imply a structural concern.
+  structural
+  /// The instrument is faulty: flatlined, saturated, out of range, drifting.
+  sensor_health
+  /// The data path is broken: gateway silent, packets lost, buffer draining.
+  connectivity
+  /// Traceability or configuration: calibration expired, no baseline.
+  data_quality
+}
+
+model AlertRule {
+  id       Int    @id @default(autoincrement())
+  publicId String @unique @db.VarChar(32)
+  tenantId Int
+
+  name        String @db.VarChar(160)
+  sensorId    Int?
+  /// Null means the rule applies to every sensor on the structure.
+  structureId Int?
+
+  category AlertCategory @default(structural)
+
+  /// Absolute bounds. Null disables that side of the test.
+  minValue Float?
+  maxValue Float?
+
+  /// Consecutive breaching samples before an alert is raised. A single
+  /// excursion is usually electrical noise; requiring persistence is what
+  /// separates a real event from a spike (§40).
+  consecutiveSamples Int @default(3)
+
+  /// Re-notification interval for an alert that remains open. Prevents one
+  /// ongoing condition from generating an unbounded stream of notifications.
+  renotifyAfterMinutes Int @default(60)
+
+  isEnabled Boolean  @default(true)
+  createdAt DateTime @default(now())
+  createdBy Int?
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  alerts Alert[]
+
+  @@index([tenantId, isEnabled])
+  @@index([sensorId])
+  @@map("alert_rules")
+}
+
+model Alert {
+  id       Int    @id @default(autoincrement())
+  publicId String @unique @db.VarChar(32)
+  tenantId Int
+
+  ruleId      Int?
+  sensorId    Int?
+  deviceId    Int?
+  gatewayId   Int?
+  locationId  Int?
+  structureId Int?
+  projectId   Int?
+
+  category AlertCategory
+  severity AlertSeverity
+  status   AlertStatus   @default(open)
+
+  title    String @db.VarChar(200)
+  /// What was measured and why it tripped: the numbers behind the claim.
+  /// An alert without evidence is an assertion an engineer cannot check.
+  evidence Json
+
+  /// How much the detector trusts this, 0..1. Reported, never invented: it is
+  /// computed from persistence and data quality, and stored alongside the
+  /// inputs that produced it.
+  confidence Float?
+
+  /// Stable identity of the CONDITION, not the reading. While an alert with
+  /// this key is open, further breaches update it instead of raising a new one.
+  dedupeKey String @db.VarChar(200)
+
+  /// First and most recent breach observed for this condition.
+  detectedAt      DateTime  @db.Timestamptz()
+  lastObservedAt  DateTime  @db.Timestamptz()
+  /// Number of breaching observations folded into this alert.
+  occurrenceCount Int       @default(1)
+  /// When a notification was last sent, so renotification can be rate limited.
+  lastNotifiedAt  DateTime?
+
+  assignedToId     Int?
+  acknowledgedAt   DateTime?
+  acknowledgedById Int?
+  resolvedAt       DateTime?
+  resolvedById     Int?
+  closedAt         DateTime?
+  /// Why it was resolved. Required on resolution: an alert closed without a
+  /// reason teaches nobody anything.
+  resolutionNote   String?   @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  rule   AlertRule?   @relation(fields: [ruleId], references: [id])
+  events AlertEvent[]
+
+  /// One open alert per condition. This is the deduplication guarantee, held
+  /// by the database rather than by application logic that could race.
+  @@unique([dedupeKey, status])
+  @@index([tenantId, status, severity])
+  @@index([tenantId, detectedAt])
+  @@index([sensorId, detectedAt])
+  @@map("alerts")
+}
+
+/// Every transition, appended. An alert's history is the record of who knew
+/// what and when — which is exactly what is asked for after an incident.
+model AlertEvent {
+  id      Int @id @default(autoincrement())
+  alertId Int
+
+  fromStatus  AlertStatus?
+  toStatus    AlertStatus
+  note        String?      @db.Text
+  actorId     Int?
+  /// Set when the transition was made by the detector rather than a person.
+  isAutomatic Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+
+  alert Alert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+
+  @@index([alertId, createdAt])
+  @@map("alert_events")
 }
 
 // ─── ANALYSIS (spectral, baselines) ──────────────────────────────────────────

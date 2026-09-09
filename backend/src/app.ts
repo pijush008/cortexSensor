@@ -27,6 +27,7 @@ import gatewaysRoutes from "./modules/gateways/gateways.routes";
 import streamRoutes from "./modules/stream/stream.routes";
 import measurementsRoutes from "./modules/measurements/measurements.routes";
 import analysisRoutes from "./modules/analysis/analysis.routes";
+import alertsRoutes from "./modules/alerts/alerts.routes";
 import { authenticate } from "./middleware/auth";
 import { requireApiKey } from "./middleware/apiKey";
 import prisma from "./config/prisma";
@@ -101,6 +102,7 @@ for (const base of API_MOUNTS) {
   app.use(base, gatewaysRoutes);
   app.use(base, measurementsRoutes);
   app.use(base, analysisRoutes);
+  app.use(base, alertsRoutes);
   app.use(base, streamRoutes);
 }
 
