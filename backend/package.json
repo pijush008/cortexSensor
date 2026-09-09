@@ -15,7 +15,8 @@
     "lint": "eslint src/ --ext .ts",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "seed:demo-users": "ts-node prisma/seed-demo-users.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.20.0",
