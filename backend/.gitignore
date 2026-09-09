@@ -3,5 +3,18 @@ dist/
 .env
 uploads/*
 !uploads/.gitkeep
+# Sensor-type icons are seed data, not runtime uploads: prisma/seed.ts stores
+# "uploads/sensors/<id>.png" in sensor_types.sensorIcon and app.ts serves them
+# from /api/uploads. They must survive a fresh clone or the icons 404.
+!uploads/sensors/
+!uploads/sensors/*.png
+# Keep the runtime upload targets present so multer/saveBase64Image can write.
+!uploads/projectImage/
+!uploads/project_logo/
+!uploads/users/
+uploads/projectImage/*
+uploads/project_logo/*
+uploads/users/*
+!uploads/*/.gitkeep
 *.log
 coverage/
