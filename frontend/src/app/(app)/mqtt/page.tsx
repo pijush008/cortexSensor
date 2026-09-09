@@ -1,258 +1,219 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Activity, Wifi, WifiOff, Plus, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Reveal } from "@/components/ui/reveal";
-import { SectionLabel } from "@/components/ui/section-label";
+import { Activity, AlertTriangle, Radio, Wifi, WifiOff } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
-import {
-  MQTT_BROKER_URL,
-  MQTT_USER,
-  MQTT_PASS,
-  MQTT_DEFAULT_TOPIC,
-  MQTT_MESSAGE_LIMIT,
-} from "@/config/mqtt";
-import type { MqttClient } from "mqtt";
+import { Breadcrumbs } from "@/components/layout/breadcrumbs";
+import { Button } from "@/components/ui/button";
+import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { useLiveStream, type ConnectionState } from "@/hooks/use-live-stream";
 
-interface MqttMessage {
-  id: number;
-  topic: string;
-  payload: string;
-  receivedAt: Date;
+/**
+ * Live measurement feed.
+ *
+ * Previously this page opened an MQTT connection from the browser using
+ * credentials compiled into the client bundle, subscribed to a topic wildcard
+ * covering every tenant. It now consumes the API's authenticated,
+ * tenant-filtered SSE stream; the browser never contacts the broker and holds
+ * no broker credential (audit finding SEC-1).
+ *
+ * Every value shown is a stored measurement. A reading the device could not
+ * express as a number renders as "not a number" rather than as 0, and quality
+ * flags are shown next to the value rather than being quietly dropped.
+ */
+
+const STATE_LABEL: Record<ConnectionState, string> = {
+  idle: "Disconnected",
+  connecting: "Connecting",
+  open: "Live",
+  reconnecting: "Reconnecting",
+  error: "Unavailable",
+};
+
+const STATE_TONE: Record<ConnectionState, StatusTone> = {
+  idle: "slate",
+  connecting: "blue",
+  open: "green",
+  reconnecting: "yellow",
+  error: "red",
+};
+
+function formatValue(value: number | null): string {
+  // A non-finite reading has no numeric value. Rendering 0 would be a lie.
+  if (value === null) return "not a number";
+  return value.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
-export default function MqttPage() {
-  const [connected, setConnected] = useState(false);
-  const [topics, setTopics] = useState<string[]>([MQTT_DEFAULT_TOPIC]);
-  const [topicInput, setTopicInput] = useState(MQTT_DEFAULT_TOPIC);
-  const [messages, setMessages] = useState<MqttMessage[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const clientRef = useRef<MqttClient | null>(null);
-  const msgIdRef = useRef(0);
-
-  const subscribe = async (topicList: string[]) => {
-    const mod = await import("mqtt");
-    const Mqtt = mod.default ?? mod;
-    if (clientRef.current) {
-      try { clientRef.current.end(); } catch {}
-    }
-    setError(null);
-    setConnected(false);
-
-    const client = Mqtt.connect(MQTT_BROKER_URL, {
-      username: MQTT_USER,
-      password: MQTT_PASS,
-      clientId: `web_${Date.now()}`,
-      protocolVersion: 5,
-    });
-
-    client.on("connect", () => {
-      setConnected(true);
-      for (const t of topicList) {
-        client.subscribe(t, (err: Error | null) => {
-          if (err) setError(`Failed to subscribe to ${t}`);
-        });
-      }
-    });
-
-    client.on("error", (err: Error) => {
-      setError(err.message);
-      setConnected(false);
-    });
-
-    client.on("close", () => setConnected(false));
-
-    client.on("message", (topic: string, buffer: Buffer) => {
-      const payload = buffer.toString();
-      setMessages((prev) => {
-        const next: MqttMessage = {
-          id: ++msgIdRef.current,
-          topic,
-          payload,
-          receivedAt: new Date(),
-        };
-        return [next, ...prev].slice(0, MQTT_MESSAGE_LIMIT);
-      });
-    });
-
-    clientRef.current = client;
-  };
-
-  useEffect(() => {
-    return () => {
-      if (clientRef.current) {
-        try { clientRef.current.end(); } catch {}
-      }
-    };
-  }, []);
-
-  const addTopic = (t: string) => {
-    if (!t.trim()) return;
-    const updated = [...new Set([...topics, t.trim()])];
-    setTopics(updated);
-    setTopicInput("");
-    subscribe(updated);
-  };
-
-  const removeTopic = (t: string) => {
-    const updated = topics.filter((x) => x !== t);
-    setTopics(updated);
-    if (updated.length === 0) {
-      if (clientRef.current) {
-        try { clientRef.current.end(); } catch {}
-      }
-      setConnected(false);
-    } else {
-      subscribe(updated);
-    }
-  };
-
-  const toggleConnection = () => {
-    if (connected) {
-      if (clientRef.current) {
-        try { clientRef.current.end(); } catch {}
-      }
-      setConnected(false);
-    } else {
-      subscribe(topics);
-    }
-  };
+export default function LiveFeedPage() {
+  const { events, state, lastEventAt, clear } = useLiveStream({ limit: 200 });
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="MQTT Data"
-        subtitle="Real-time sensor data streaming via MQTT WebSocket."
-        actions={
-          <Button onClick={toggleConnection} variant={connected ? "destructive" : "default"}>
-            {connected ? (
-              <><WifiOff className="h-4 w-4" /> Disconnect</>
-            ) : (
-              <><Wifi className="h-4 w-4" /> Connect</>
-            )}
-          </Button>
-        }
-      />
+      <div>
+        <Breadcrumbs items={[{ label: "Monitoring" }, { label: "Live Feed" }]} />
+        <PageHeader
+          eyebrow="Real-time"
+          title="Live Feed"
+          subtitle="Measurements arriving from the field, streamed from the platform."
+          actions={
+            <div className="flex items-center gap-2">
+              <StatusBadge label={STATE_LABEL[state]} tone={STATE_TONE[state]} />
+              <Button variant="outline" size="sm" onClick={clear}>
+                Clear
+              </Button>
+            </div>
+          }
+        />
+      </div>
 
-      {error && (
-        <div className="anim-tick-in rounded-lg border border-shm-red/20 bg-shm-red/5 px-3.5 py-2.5 text-sm text-shm-red">
-          {error}
+      {state === "error" && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-xl border border-shm-red/25 bg-shm-red/5 px-4 py-3"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-shm-red" />
+          <div>
+            <p className="text-[13px] font-medium text-shm-red">
+              Live stream unavailable
+            </p>
+            <p className="mt-0.5 text-[12.5px] text-slate-500">
+              The connection could not be established. Existing measurements are
+              unaffected — this only interrupts real-time updates.
+            </p>
+          </div>
         </div>
       )}
 
-      <Reveal>
-        <Card>
-          <CardHeader>
-            <SectionLabel index="14" label="Broker topics" className="mb-2" />
-            <CardTitle>Subscriptions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap items-center gap-2">
-              {topics.map((t) => (
-                <span
-                  key={t}
-                  className="inline-flex items-center gap-1 rounded-md border border-shm-navy-100 bg-shm-navy-50 px-3 py-1 font-mono text-xs font-medium text-shm-navy-700"
-                >
-                  {t}
-                  <button
-                    onClick={() => removeTopic(t)}
-                    className="rounded-full p-0.5 hover:bg-shm-navy-100"
-                    aria-label={`Remove topic ${t}`}
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              ))}
-              <form
-                className="inline-flex gap-1"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  addTopic(topicInput);
-                }}
-              >
-                <Input
-                  placeholder="Topic pattern"
-                  value={topicInput}
-                  onChange={(e) => setTopicInput(e.target.value)}
-                  className="h-8 w-56 font-mono text-xs"
-                />
-                <Button type="submit" size="sm" variant="secondary">
-                  <Plus className="h-3 w-3" />
-                </Button>
-              </form>
-            </div>
-            <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
-              {connected ? (
-                <>
-                  <span className="relative flex h-2 w-2">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-shm-green opacity-60" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-shm-green" />
-                  </span>
-                  <span className="font-medium text-shm-green">
-                    Connected · {MQTT_BROKER_URL}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="h-2 w-2 rounded-full bg-slate-300" />
-                  <span>Disconnected — ready to connect</span>
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </Reveal>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Metric
+          icon={Wifi}
+          label="Stream"
+          value={STATE_LABEL[state]}
+          tone={state === "open" ? "text-shm-green" : "text-slate-700"}
+        />
+        <Metric icon={Activity} label="Received this session" value={String(events.length)} />
+        <Metric
+          icon={Radio}
+          label="Last measurement"
+          value={lastEventAt ? lastEventAt.toLocaleTimeString() : "—"}
+        />
+      </div>
 
-      <Reveal delay={80}>
-        <Card className="overflow-hidden">
-          <CardHeader className="border-b border-white/10 bg-shm-navy-900">
-            <div className="flex items-center justify-between">
-              <SectionLabel index="15" label="Stream" light />
-              <CardTitle className="flex items-center gap-2 font-mono text-sm font-medium text-white">
-                <Activity className="h-4 w-4 text-shm-teal" />
-                Live Messages
-              </CardTitle>
-              <span className="font-mono text-[11px] text-shm-navy-300">
-                count={messages.length}
-              </span>
-            </div>
-          </CardHeader>
-          <CardContent className="bg-shm-navy-900 p-0">
-            {messages.length === 0 ? (
-              <div className="flex h-44 flex-col items-center justify-center">
-                <Activity className="mb-2 h-8 w-8 text-shm-navy-600" strokeWidth={1.25} />
-                <p className="font-mono text-xs text-shm-navy-400">
-                  {connected
-                    ? "waiting for telemetry…_"
-                    : "connect to broker to start streaming"}
-                </p>
-              </div>
-            ) : (
-              <div className="max-h-[480px] space-y-px overflow-y-auto p-3 font-mono text-xs">
-                {messages.map((m) => (
-                  <div
-                    key={m.id}
-                    className="anim-tick-in flex gap-3 rounded-md bg-white/[0.03] px-3 py-2 transition-colors hover:bg-white/[0.06]"
+      {events.length === 0 ? (
+        <EmptyState
+          icon={state === "open" ? Radio : WifiOff}
+          title={
+            state === "open"
+              ? "Connected — waiting for measurements"
+              : "No live measurements"
+          }
+          description={
+            state === "open"
+              ? "The stream is open. Readings appear here as devices report them."
+              : "Once the stream connects, readings appear here as they arrive."
+          }
+        />
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-slate-200/90 bg-white">
+          <table className="w-full min-w-[720px] border-collapse text-sm">
+            <caption className="sr-only">Live measurements</caption>
+            <thead>
+              <tr className="border-b border-slate-200 text-left">
+                <Th>Time</Th>
+                <Th>Sensor</Th>
+                <Th className="text-right">Value</Th>
+                <Th className="text-right">Raw</Th>
+                <Th>Quality</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {events.map((e, i) => (
+                <tr
+                  key={`${e.sensorId}-${e.ts}-${i}`}
+                  className="border-b border-slate-100 last:border-0"
+                >
+                  <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11.5px] text-slate-500">
+                    {new Date(e.ts).toLocaleTimeString()}
+                  </td>
+                  <td className="px-4 py-2.5 font-mono text-[12px] text-slate-700">
+                    #{e.sensorId}
+                  </td>
+                  <td
+                    className={`px-4 py-2.5 text-right font-mono text-[12px] tabular-nums ${
+                      e.value === null ? "italic text-slate-400" : "text-slate-800"
+                    }`}
                   >
-                    <span className="shrink-0 text-shm-navy-400">
-                      [{m.receivedAt.toLocaleTimeString()}]
-                    </span>
-                    <span className="shrink-0 text-shm-teal">
-                      {m.topic}
-                    </span>
-                    <span className="flex-1 break-all text-slate-300">
-                      {m.payload}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </Reveal>
+                    {formatValue(e.value)}
+                    {e.unit && e.value !== null ? ` ${e.unit}` : ""}
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-mono text-[12px] tabular-nums text-slate-500">
+                    {e.rawValue === null ? "—" : e.rawValue}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {e.qualityFlags.length === 0 ? (
+                      <span className="text-[12px] text-slate-400">OK</span>
+                    ) : (
+                      <span className="flex flex-wrap gap-1">
+                        {e.qualityFlags.map((f) => (
+                          <span
+                            key={f}
+                            className="rounded bg-shm-yellow/15 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-amber-700"
+                          >
+                            {f.replace(/_/g, " ")}
+                          </span>
+                        ))}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Th({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <th
+      scope="col"
+      className={`px-4 py-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400 ${className}`}
+    >
+      {children}
+    </th>
+  );
+}
+
+function Metric({
+  icon: Icon,
+  label,
+  value,
+  tone = "text-slate-700",
+}: {
+  icon: typeof Wifi;
+  label: string;
+  value: string;
+  tone?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200/90 bg-white px-4 py-3">
+      <div className="flex items-center gap-2">
+        <Icon className="h-3.5 w-3.5 text-slate-400" strokeWidth={1.75} />
+        <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+          {label}
+        </span>
+      </div>
+      <p className={`mt-1.5 text-[15px] font-semibold tracking-tight ${tone}`}>
+        {value}
+      </p>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { config } from "./config";
 import prisma from "./config/prisma";
 import { logger } from "./utils/logger";
 import { startMqttIngest } from "./modules/iot/mqtt-ingest";
+import { initEventBus } from "./modules/stream/event-bus";
 
 async function main() {
   try {
@@ -12,6 +13,10 @@ async function main() {
     // Live device-to-cloud ingestion: subscribes to the MQTT topics that
     // ESP32 nodes / Raspberry Pi gateways publish telemetry to. Non-fatal:
     // the API keeps serving even if the broker is temporarily unavailable.
+    // Cross-instance fan-out for the live SSE stream. Degrades to
+    // single-process delivery when Redis is unavailable.
+    initEventBus();
+
     startMqttIngest();
 
     app.listen(config.port, () => {

@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import prisma from "../../config/prisma";
 import { logger } from "../../utils/logger";
+import { publishEvent } from "../stream/event-bus";
 import { assessQuality, type QualityFlag } from "./quality";
 
 /**
@@ -239,6 +240,26 @@ export async function ingestMeasurements(
 
   result.accepted = inserted.count;
   result.duplicates = rows.length - inserted.count;
+
+  // Fan out to live subscribers. Only newly-accepted readings are published:
+  // republishing a suppressed duplicate would make a dashboard show a reading
+  // twice even though the database correctly stored it once.
+  if (inserted.count > 0) {
+    for (const row of rows) {
+      publishEvent({
+        type: "measurement",
+        tenantId: ctx.tenantId,
+        sensorId: row.sensorId,
+        structureId: row.structureId ?? null,
+        locationId: row.locationId ?? null,
+        deviceId: row.deviceId ?? null,
+        ts: (row.ts as Date).toISOString(),
+        value: (row.value as number | null) ?? null,
+        rawValue: (row.rawValue as number | null) ?? null,
+        qualityFlags: (row.qualityFlags as string[]) ?? [],
+      });
+    }
+  }
 
   if (result.duplicates > 0) {
     logger.info(

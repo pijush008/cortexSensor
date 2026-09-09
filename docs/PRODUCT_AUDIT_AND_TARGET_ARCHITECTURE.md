@@ -226,7 +226,7 @@ entirely: the browser connects **straight to Mosquitto** over WebSocket.
 
 | ID | Sev | Finding |
 |---|---|---|
-| **SEC-1** | **CRITICAL** | **Broker credentials shipped to every browser and subscribed cross-tenant.** `NEXT_PUBLIC_MQTT_USER`/`NEXT_PUBLIC_MQTT_PASS` are inlined into the client bundle by Next.js, so the `shm-web` password is readable in page source by anyone. The default topic is `shm/feed/#` — a wildcard across **all tenants**. Any user, or any visitor who reads the bundle, can subscribe to every tenant's live sensor stream. This defeats multi-tenant isolation completely and is not fixable with an ACL alone. |
+| **SEC-1** | ~~CRITICAL~~ ✅ **FIXED (slice 5)** | **Broker credentials shipped to every browser and subscribed cross-tenant.** `NEXT_PUBLIC_MQTT_USER`/`NEXT_PUBLIC_MQTT_PASS` are inlined into the client bundle by Next.js, so the `shm-web` password is readable in page source by anyone. The default topic is `shm/feed/#` — a wildcard across **all tenants**. Any user, or any visitor who reads the bundle, can subscribe to every tenant's live sensor stream. This defeats multi-tenant isolation completely and is not fixable with an ACL alone. |
 | SEC-2 | HIGH | No MFA, despite §24 and §94 requiring it for Super Admin. |
 | SEC-3 | HIGH | Tenant isolation is convention-based (per-route helper calls), not a structural invariant. One forgotten call is a cross-tenant leak; there is no `Tenant` row to scope against. |
 | SEC-4 | MEDIUM | `IOT_API_KEY` is a single shared static secret for the whole fleet, default `"change-me"`. No per-device identity, no rotation, no revocation (§58, §27). |
@@ -384,7 +384,7 @@ tests passing.** No slice ships UI for data that does not yet exist.
 | **2** | **Structure + location** ✅ **DONE** | `Structure`, `Location`, project→structure→location UI, breadcrumbs | Engineer can navigate the real hierarchy |
 | **3** | **Gateway + device + sensor** ✅ **DONE** | `Gateway` entity, device lifecycle states, per-device credentials, `SensorAssignment`, `SensorCalibration` | `/gateways` replaced with real data |
 | **4** | **Ingest v2** ✅ **DONE** | `Measurement` + hypertable, sequence/event IDs, idempotent batch writes, quality flags, **Pi store-and-forward buffer** | Offline test: disconnect, reconnect, zero loss, zero duplicates |
-| **5** | **Live + history** | SSE from `api` (kills SEC-1), downsampled history endpoints, engineering-grade charts | Browser never touches the broker |
+| **5** | **Live + history** ✅ **DONE** | SSE from `api` (kills SEC-1), downsampled history endpoints, engineering-grade charts | Browser never touches the broker |
 | **6** | **SHM analytics** | Worker + queue; FFT/PSD with windowing and detrending; baseline; modal tracking; versioned results | `/analytics` replaced with real, reproducible analysis |
 | **7** | **Alerts** | `Alert` lifecycle, severity rules, dedup, assignment, notifications | `/alerts` replaced with real data |
 | **8** | **Inspections + reports** | `Inspection`, report generation to S3, audit UI on the real `AuditLog` | `/audit` replaced with real data |

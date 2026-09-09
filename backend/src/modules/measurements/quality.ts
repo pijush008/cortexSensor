@@ -153,16 +153,36 @@ export function assessQuality(ctx: QualityContext): QualityFlag[] {
 }
 
 /**
- * Whether a set of flags means the reading should be excluded from analysis by
- * default. It is still stored and still visible — this only decides whether it
- * feeds a trend line unless an engineer explicitly includes it.
+ * Flags meaning the NUMBER ITSELF cannot be trusted, so the reading must not
+ * feed a statistic.
+ *
+ * Note what is deliberately absent. UNCALIBRATED and STALE_CALIBRATION are
+ * traceability problems, not numeric ones: the value is still a real
+ * measurement, it just cannot be traced to a certificate. Excluding those from
+ * aggregates would blank the chart for every sensor whose calibration
+ * paperwork is not yet on file — hiding data the operator has, to punish an
+ * administrative gap. They are surfaced as a separate count instead, so the UI
+ * can mark the series as traceability-incomplete while still drawing it.
+ *
+ * Likewise OUT_OF_ORDER and DELAYED_DELIVERY describe when a reading arrived,
+ * not whether it is correct; buffered data replayed after an outage is valid.
+ */
+export const NON_NUMERIC_FLAGS: string[] = [
+  QUALITY_FLAGS.NOT_FINITE,
+  QUALITY_FLAGS.OUT_OF_RANGE,
+  QUALITY_FLAGS.FLATLINE,
+];
+
+/** Flags meaning the value is real but not traceable to a certificate. */
+export const TRACEABILITY_FLAGS: string[] = [
+  QUALITY_FLAGS.UNCALIBRATED,
+  QUALITY_FLAGS.STALE_CALIBRATION,
+];
+
+/**
+ * Whether a reading may feed a statistic. It is stored and visible either way —
+ * this only decides whether it contributes to a trend line.
  */
 export function isAnalysisGrade(flags: readonly string[]): boolean {
-  const disqualifying: string[] = [
-    QUALITY_FLAGS.NOT_FINITE,
-    QUALITY_FLAGS.OUT_OF_RANGE,
-    QUALITY_FLAGS.FLATLINE,
-    QUALITY_FLAGS.UNCALIBRATED,
-  ];
-  return !flags.some((f) => disqualifying.includes(f));
+  return !flags.some((f) => NON_NUMERIC_FLAGS.includes(f));
 }

@@ -62,10 +62,12 @@ services:
       NODE_ENV: development
       PORT: 3000
       NEXT_PUBLIC_API_URL: "/api"
-      NEXT_PUBLIC_MQTT_BROKER_URL: "ws://localhost:9001"
-      NEXT_PUBLIC_MQTT_USER: "shm-web"
-      NEXT_PUBLIC_MQTT_PASS: "shm-web-pass"
-      NEXT_PUBLIC_MQTT_DEFAULT_TOPIC: "shm/feed/#"
+      # NOTE: broker credentials are deliberately NOT provided to the frontend.
+      # Next.js inlines every NEXT_PUBLIC_* value into the client bundle, so a
+      # broker password here would be readable in page source, and the old
+      # `shm/feed/#` subscription spanned every tenant (audit finding SEC-1).
+      # Live data now reaches the browser through the API's authenticated,
+      # tenant-filtered SSE stream at /api/v1/stream/measurements.
     ports:
       - "3005:3000"
     # `npm ci` (not `npm install`) so platform-specific optional deps such as

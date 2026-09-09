@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import {
   Activity,
   Wifi,
@@ -17,13 +17,7 @@ import { Reveal } from "@/components/ui/reveal";
 import { SectionLabel } from "@/components/ui/section-label";
 import { PulseDot } from "@/components/ui/pulse-dot";
 import { PageHeader } from "@/components/layout/page-header";
-import {
-  MQTT_BROKER_URL,
-  MQTT_USER,
-  MQTT_PASS,
-  MQTT_DEFAULT_TOPIC,
-} from "@/config/mqtt";
-import type { MqttClient } from "mqtt";
+import { useLiveStream } from "@/hooks/use-live-stream";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useDevices } from "@/hooks/use-data";
@@ -36,7 +30,6 @@ interface MqttMessage {
   receivedAt: Date;
 }
 
-const CAPTURE_LIMIT = 500;
 
 function parsePayload(payload: string): Record<string, unknown> {
   try {
@@ -91,11 +84,35 @@ function fmtTime(d: Date): string {
 }
 
 export default function DataDownloadPage() {
-  const [connected, setConnected] = useState(false);
-  const [messages, setMessages] = useState<MqttMessage[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const clientRef = useRef<MqttClient | null>(null);
-  const msgIdRef = useRef(0);
+  const [error] = useState<string | null>(null);
+
+  // Live capture comes from the API's authenticated, tenant-filtered SSE
+  // stream. This page previously opened its own MQTT connection from the
+  // browser using credentials compiled into the client bundle, subscribed to a
+  // topic wildcard spanning every tenant (audit finding SEC-1).
+  const live = useLiveStream({ limit: 500 });
+  const connected = live.state === "open";
+
+  // The capture table is a view over the stream, mapped into the shape the
+  // export code already expects. `receivedAt` uses the device's own timestamp
+  // rather than arrival time: exporting the moment the browser happened to see
+  // a reading would misrepresent when it was measured.
+  const messages: MqttMessage[] = useMemo(
+    () =>
+      live.events.map((e, index) => ({
+        id: index,
+        topic: `sensor/${e.sensorId}`,
+        payload: JSON.stringify({
+          sensorId: e.sensorId,
+          value: e.value,
+          rawValue: e.rawValue,
+          qualityFlags: e.qualityFlags,
+          ts: e.ts,
+        }),
+        receivedAt: new Date(e.ts),
+      })),
+    [live.events],
+  );
 
   const [fromDate, setFromDate] = useState("");
   const [fromTime, setFromTime] = useState("");
@@ -111,68 +128,6 @@ export default function DataDownloadPage() {
   const [cloudTo, setCloudTo] = useState("");
   const [cloudBusy, setCloudBusy] = useState(false);
   const [cloudNotice, setCloudNotice] = useState<string | null>(null);
-
-  const connect = async () => {
-    if (clientRef.current) {
-      try { clientRef.current.end(); } catch {}
-    }
-    setError(null);
-    setConnected(false);
-
-    const mod = await import("mqtt");
-    const Mqtt = mod.default ?? mod;
-    const client = Mqtt.connect(MQTT_BROKER_URL, {
-      username: MQTT_USER,
-      password: MQTT_PASS,
-      clientId: `dl_${Date.now()}`,
-      protocolVersion: 5,
-    });
-
-    client.on("connect", () => {
-      setConnected(true);
-      client.subscribe(MQTT_DEFAULT_TOPIC, (err: Error | null) => {
-        if (err) setError(`Failed to subscribe to ${MQTT_DEFAULT_TOPIC}`);
-      });
-    });
-
-    client.on("error", (err: Error) => {
-      setError(err.message);
-      setConnected(false);
-    });
-
-    client.on("close", () => setConnected(false));
-
-    client.on("message", (_topic: string, buffer: Buffer) => {
-      const payload = buffer.toString();
-      setMessages((prev) => {
-        const next: MqttMessage = {
-          id: ++msgIdRef.current,
-          topic: _topic,
-          payload,
-          receivedAt: new Date(),
-        };
-        return [next, ...prev].slice(0, CAPTURE_LIMIT);
-      });
-    });
-
-    clientRef.current = client;
-  };
-
-  const disconnect = () => {
-    if (clientRef.current) {
-      try { clientRef.current.end(); } catch {}
-    }
-    setConnected(false);
-  };
-
-  useEffect(() => {
-    connect();
-    return () => {
-      if (clientRef.current) {
-        try { clientRef.current.end(); } catch {}
-      }
-    };
-  }, []);
 
   const from = useMemo(
     () => boundary(fromDate, fromTime, false),
@@ -198,14 +153,8 @@ export default function DataDownloadPage() {
     [filtered],
   );
 
-  const toggleConnection = () => {
-    if (connected) disconnect();
-    else connect();
-  };
-
   const clearCaptured = () => {
-    setMessages([]);
-    msgIdRef.current = 0;
+    live.clear();
     setNotice(null);
   };
 
@@ -320,7 +269,7 @@ export default function DataDownloadPage() {
         title="Data Download"
         subtitle="Capture live MQTT telemetry, filter by date & time, and export to Excel."
         actions={
-          <Button onClick={toggleConnection} variant={connected ? "destructive" : "default"}>
+          <Button onClick={clearCaptured} variant="outline">
             {connected ? (
               <><WifiOff className="h-4 w-4" /> Disconnect</>
             ) : (
@@ -365,10 +314,10 @@ export default function DataDownloadPage() {
                 Listening
               </span>
               <code className="shrink-0 rounded bg-white/[0.06] px-2 py-1 font-mono text-[11px] text-shm-teal">
-                {MQTT_DEFAULT_TOPIC}
+                your organization&apos;s measurements
               </code>
               <span className="truncate font-mono text-[11px] text-shm-navy-300">
-                @ {MQTT_BROKER_URL}
+                via authenticated stream
               </span>
               <Button
                 variant="ghost"

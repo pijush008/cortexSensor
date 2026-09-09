@@ -440,15 +440,26 @@ describe("measurement ingestion", () => {
     expect(flags).toContain(QUALITY_FLAGS.UNCALIBRATED);
   });
 
-  test("analysis-grade classification excludes only disqualifying flags", () => {
+  test("only numerically untrustworthy readings are excluded from statistics", () => {
     expect(isAnalysisGrade([])).toBe(true);
-    // A late delivery is still a valid measurement.
+
+    // Timing flags describe WHEN a reading arrived, not whether it is correct.
+    // Buffered data replayed after an outage is a valid measurement.
     expect(isAnalysisGrade([QUALITY_FLAGS.DELAYED_DELIVERY])).toBe(true);
     expect(isAnalysisGrade([QUALITY_FLAGS.OUT_OF_ORDER])).toBe(true);
-    // These are not.
+
+    // Traceability flags are an administrative gap, not a numeric one. An
+    // earlier version excluded these too, which would have blanked the chart
+    // for every sensor whose calibration certificate is not yet on file —
+    // hiding data the operator actually has. They are counted separately so
+    // the series can be marked without being suppressed.
+    expect(isAnalysisGrade([QUALITY_FLAGS.UNCALIBRATED])).toBe(true);
+    expect(isAnalysisGrade([QUALITY_FLAGS.STALE_CALIBRATION])).toBe(true);
+
+    // These mean the number itself cannot be trusted.
     expect(isAnalysisGrade([QUALITY_FLAGS.FLATLINE])).toBe(false);
     expect(isAnalysisGrade([QUALITY_FLAGS.NOT_FINITE])).toBe(false);
-    expect(isAnalysisGrade([QUALITY_FLAGS.UNCALIBRATED])).toBe(false);
+    expect(isAnalysisGrade([QUALITY_FLAGS.OUT_OF_RANGE])).toBe(false);
   });
 
   // ── Storage ────────────────────────────────────────────────────────────────

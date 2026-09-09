@@ -311,7 +311,10 @@ model Sensor {
   sensorTypeID     Int
   assignedAdmin    Int?
   calibrationValue String?       @db.VarChar(255)
-  unit             String        @db.Char(255)
+  /// VarChar, not Char. As a fixed-width CHAR(255) Postgres padded every unit
+  /// with trailing spaces, so "uS" was stored and returned as "uS" plus 253
+  /// blanks — and rendered that way on every axis label and reading (§50).
+  unit             String        @db.VarChar(32)
   status           ActiveOneZero @default(one)
   createdAt        DateTime      @default(now())
 
