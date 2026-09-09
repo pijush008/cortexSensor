@@ -4,6 +4,7 @@ import { config } from "../../config";
 import { sendEmail } from "../../utils/email";
 import { logger } from "../../utils/logger";
 import { ForbiddenError } from "../../utils/AppError";
+import { recordHeartbeat } from "../gateways/gateways.service";
 import { BeamDeviceDataInput, TelemetryInput } from "./iot.types";
 
 function timestampToDateTime(timestamp: number): string {
@@ -461,6 +462,23 @@ export async function createNetworkDataFromDevice(input: BeamDeviceDataInput) {
   }
 
   const gatewayDeviceId = Telemetries[0].GatewayDeviceId;
+
+  // Gateway liveness is recorded FIRST, before the device and project lookups
+  // below can reject the payload.
+  //
+  // A gateway must be able to prove it is alive before it carries any project:
+  // that is exactly the moment an installer is standing at a roadside cabinet
+  // asking whether the unit is reaching the cloud. Gating liveness behind "is
+  // there a running project?" made a freshly commissioned gateway
+  // indistinguishable from a dead one.
+  if (gatewayDeviceId) {
+    await recordHeartbeat({
+      gatewayKey: gatewayDeviceId,
+      seenAt: new Date(Telemetries[0].Timestamp * 1000),
+    }).catch(() => {
+      // Never let gateway bookkeeping reject field telemetry.
+    });
+  }
 
   const device = await prisma.device.findFirst({
     where: {

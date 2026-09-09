@@ -295,3 +295,54 @@ export interface Location {
   createdAt: string;
   updatedAt: string;
 }
+
+// ─── Gateways ────────────────────────────────────────────────────────────────
+
+export type GatewayStatus =
+  | "provisioning"
+  | "active"
+  | "degraded"
+  | "offline"
+  | "maintenance"
+  | "decommissioned";
+
+/** Derived from the last heartbeat — never a stored opinion. */
+export type GatewayConnectivity =
+  | "never_reported"
+  | "online"
+  | "stale"
+  | "offline";
+
+export interface Gateway {
+  id: number;
+  publicId: string;
+  /** Identifier the hardware reports as GatewayDeviceId. */
+  gatewayKey: string;
+  name: string;
+  description: string | null;
+  status: GatewayStatus;
+  firmwareVersion: string | null;
+  hardwareModel: string | null;
+  projectId: number | null;
+  structureId: number | null;
+  locationId: number | null;
+  /** Null when the gateway has never reported. */
+  lastSeenAt: string | null;
+  /** Null when unknown — which is different from an empty buffer. */
+  bufferedCount: number | null;
+  deviceCount: number;
+  connectivity: GatewayConnectivity;
+  secondsSinceLastSeen: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GatewayListResponse {
+  status_code: number;
+  message: string | null;
+  items: Gateway[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}

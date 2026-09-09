@@ -48,6 +48,12 @@ export const config = {
   ).split(","),
   iotApiKey: process.env.IOT_API_KEY || "change-me",
   /**
+   * Whether the deprecated fleet-wide ingest key is still accepted. Devices
+   * should present a per-device credential instead; set to "false" once no
+   * deployed hardware relies on the shared key.
+   */
+  allowLegacyIngestKey: process.env.ALLOW_LEGACY_INGEST_KEY !== "false",
+  /**
    * Whether platform operators must enrol in MFA (§94). Configurable so a
    * first-run deployment can create its initial operator before an
    * authenticator app is available; it should be true everywhere else.

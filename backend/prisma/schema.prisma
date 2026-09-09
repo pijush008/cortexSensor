@@ -92,6 +92,7 @@ model Tenant {
   sensors      Sensor[]
   structures   Structure[]
   locations    Location[]
+  gateways     Gateway[]
   subscription Subscription?
 
   @@index([status])
@@ -224,36 +225,46 @@ model DeviceType {
 // ─── DEVICES ─────────────────────────────────────────────────────────────────
 
 model Device {
-  id              Int           @id @default(autoincrement())
+  id               Int             @id @default(autoincrement())
   /// Isolation root. Null only while a device is in the unassigned pool held
   /// by the platform operator, before it is allocated to a customer.
-  tenantId        Int?
-  deviceName      String        @db.VarChar(255)
-  deviceType      Int
-  channelCount    Int
-  deviceId        String?       @db.VarChar(255)
-  gatewayDeviceId String        @db.VarChar(255)
-  addedBy         Int           @default(0)
-  deviceStatus    DeviceStatus  @default(inactive)
-  deviceStartDate DateTime
-  assignedAdmin   Int?
-  assignSensor    String?       @db.VarChar(255) // JSON array e.g. "[28,29]"
-  createdAt       DateTime
-  status          ActiveOneZero @default(one)
-  updatedBy       Int?
-  updatedAt       DateTime?
-  isDelete        YesNo         @default(false_)
-  updateHeartBeat DateTime?     @default(now()) @db.Timestamptz()
-  isOngoing       Boolean       @default(false)
+  tenantId         Int?
+  deviceName       String          @db.VarChar(255)
+  deviceType       Int
+  channelCount     Int
+  deviceId         String?         @db.VarChar(255)
+  gatewayDeviceId  String          @db.VarChar(255)
+  addedBy          Int             @default(0)
+  deviceStatus     DeviceStatus    @default(inactive)
+  deviceStartDate  DateTime
+  assignedAdmin    Int?
+  assignSensor     String?         @db.VarChar(255) // JSON array e.g. "[28,29]"
+  createdAt        DateTime
+  status           ActiveOneZero   @default(one)
+  updatedBy        Int?
+  updatedAt        DateTime?
+  isDelete         YesNo           @default(false_)
+  updateHeartBeat  DateTime?       @default(now()) @db.Timestamptz()
+  isOngoing        Boolean         @default(false)
+  /// Real relation to the edge gateway. `gatewayDeviceId` (a string) is kept in
+  /// sync for the existing ingest path and retired once ingest is migrated.
+  gatewayId        Int?
+  /// Lifecycle state (§27), distinct from the legacy active/inactive flag.
+  lifecycle        DeviceLifecycle @default(unregistered)
+  decommissionedAt DateTime?
 
   // Relations
-  tenant           Tenant?    @relation(fields: [tenantId], references: [id])
-  deviceTypeRecord DeviceType @relation(fields: [deviceType], references: [id])
-  admin            User?      @relation("DeviceAdmin", fields: [assignedAdmin], references: [id])
-  updater          User?      @relation("DeviceUpdater", fields: [updatedBy], references: [id])
+  tenant           Tenant?            @relation(fields: [tenantId], references: [id])
+  gateway          Gateway?           @relation(fields: [gatewayId], references: [id])
+  credentials      DeviceCredential[]
+  deviceTypeRecord DeviceType         @relation(fields: [deviceType], references: [id])
+  admin            User?              @relation("DeviceAdmin", fields: [assignedAdmin], references: [id])
+  updater          User?              @relation("DeviceUpdater", fields: [updatedBy], references: [id])
 
   @@index([assignedAdmin])
   @@index([tenantId])
+  @@index([gatewayId])
+  @@index([tenantId, lifecycle])
   @@map("devices")
 }
 
@@ -304,9 +315,11 @@ model Sensor {
   status           ActiveOneZero @default(one)
   createdAt        DateTime      @default(now())
 
-  tenant     Tenant?    @relation(fields: [tenantId], references: [id])
-  sensorType SensorType @relation(fields: [sensorTypeID], references: [id])
-  admin      User?      @relation("SensorAdmin", fields: [assignedAdmin], references: [id])
+  tenant       Tenant?             @relation(fields: [tenantId], references: [id])
+  sensorType   SensorType          @relation(fields: [sensorTypeID], references: [id])
+  assignments  SensorAssignment[]
+  calibrations SensorCalibration[]
+  admin        User?               @relation("SensorAdmin", fields: [assignedAdmin], references: [id])
 
   @@index([assignedAdmin])
   @@index([tenantId])
@@ -362,6 +375,180 @@ model Project {
   @@index([contractorId])
   @@index([authorityId])
   @@map("projects")
+}
+
+// ─── GATEWAYS, DEVICE LIFECYCLE & CREDENTIALS ────────────────────────────────
+// A Gateway is the field edge node (Raspberry Pi) that aggregates ESP32/DAQ
+// devices and forwards to the cloud. It existed only as a `gatewayDeviceId`
+// string on Device, which is why gateway health had nowhere to live and the
+// gateways screen had to be invented. It is now a real, tenant-owned entity.
+
+enum GatewayStatus {
+  provisioning
+  active
+  degraded
+  offline
+  maintenance
+  decommissioned
+}
+
+/// Device lifecycle (§27). Distinct from `deviceStatus`, the legacy
+/// active/inactive flag, which is retained for the existing ingest path.
+enum DeviceLifecycle {
+  unregistered
+  provisioning
+  active
+  degraded
+  offline
+  maintenance
+  decommissioned
+}
+
+model Gateway {
+  id       Int    @id @default(autoincrement())
+  publicId String @unique @db.VarChar(32)
+  tenantId Int
+
+  /// The identifier the hardware reports as `GatewayDeviceId` in telemetry.
+  /// Unique globally because ingest resolves a gateway by this alone, before
+  /// any tenant context exists.
+  gatewayKey String @unique @db.VarChar(128)
+
+  name        String  @db.VarChar(160)
+  description String? @db.Text
+
+  /// Optional placement. A gateway is often mounted on the structure it serves,
+  /// but may sit in a cabinet covering several.
+  projectId   Int?
+  structureId Int?
+  locationId  Int?
+
+  status GatewayStatus @default(provisioning)
+
+  firmwareVersion String? @db.VarChar(64)
+  hardwareModel   String? @db.VarChar(120)
+
+  /// Last heartbeat. Null means the gateway has never reported — which the UI
+  /// states plainly rather than rendering as "offline for 0 minutes".
+  lastSeenAt    DateTime?
+  /// Store-and-forward depth reported by the edge buffer (§12).
+  bufferedCount Int?
+
+  createdAt DateTime @default(now())
+  createdBy Int?
+  updatedAt DateTime @updatedAt
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  devices Device[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("gateways")
+}
+
+/// Per-device ingest credential (§58, SEC-4).
+///
+/// Replaces a single fleet-wide shared secret, which could not be rotated or
+/// revoked for one device and exposed every tenant's ingestion if leaked.
+/// The secret is stored only as a SHA-256 hash; it is shown once at issue.
+model DeviceCredential {
+  id       Int @id @default(autoincrement())
+  tenantId Int
+  deviceId Int
+
+  /// Public, non-secret lookup handle sent alongside the secret. Indexing on
+  /// this means authentication is a single indexed read rather than a scan
+  /// with a hash comparison per row.
+  keyId      String @unique @db.VarChar(48)
+  secretHash String @db.VarChar(128)
+
+  label      String?   @db.VarChar(120)
+  createdAt  DateTime  @default(now())
+  createdBy  Int?
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId])
+  @@index([tenantId])
+  @@map("device_credentials")
+}
+
+// ─── SENSOR ASSIGNMENT & CALIBRATION HISTORY ─────────────────────────────────
+
+/// Where a sensor was installed, and when (§16).
+///
+/// Sensors move. Overwriting the sensor→location link would silently rewrite
+/// the meaning of every historical measurement, so placement is an append-only
+/// interval: `validTo` null means "currently installed here". A measurement
+/// resolves its location by its timestamp, not by where the sensor sits today.
+model SensorAssignment {
+  id       Int @id @default(autoincrement())
+  tenantId Int
+  sensorId Int
+
+  locationId    Int?
+  deviceId      Int?
+  /// Channel on the device this sensor is wired to, when applicable.
+  channelNumber String? @db.VarChar(32)
+
+  /// Physical orientation, which changes what an axis means (§32).
+  orientation String? @db.VarChar(64)
+
+  validFrom DateTime  @default(now())
+  validTo   DateTime?
+
+  notes     String?  @db.Text
+  createdAt DateTime @default(now())
+  createdBy Int?
+
+  sensor   Sensor    @relation(fields: [sensorId], references: [id], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [id])
+
+  @@index([sensorId, validFrom])
+  @@index([locationId])
+  @@index([tenantId])
+  @@map("sensor_assignments")
+}
+
+/// Calibration history (§32). Append-only: a superseded calibration is never
+/// edited, because reprocessing historical data requires the coefficient that
+/// was in force at the time of the reading.
+model SensorCalibration {
+  id       Int @id @default(autoincrement())
+  tenantId Int
+  sensorId Int
+
+  /// Multiplier applied to a raw reading, plus an optional zero offset.
+  calibrationValue String  @db.VarChar(64)
+  zeroOffset       String? @db.VarChar(64)
+  unit             String? @db.VarChar(32)
+
+  manufacturer String? @db.VarChar(120)
+  model        String? @db.VarChar(120)
+  serialNumber String? @db.VarChar(120)
+  rangeMin     String? @db.VarChar(64)
+  rangeMax     String? @db.VarChar(64)
+  accuracy     String? @db.VarChar(64)
+  resolution   String? @db.VarChar(64)
+
+  /// Traceability: who certified it, against what, and until when.
+  certificateRef String?   @db.VarChar(160)
+  performedBy    String?   @db.VarChar(160)
+  performedAt    DateTime
+  validUntil     DateTime?
+
+  notes     String?  @db.Text
+  createdAt DateTime @default(now())
+  createdBy Int?
+
+  sensor Sensor @relation(fields: [sensorId], references: [id], onDelete: Cascade)
+
+  @@index([sensorId, performedAt])
+  @@index([tenantId])
+  @@map("sensor_calibrations")
 }
 
 // ─── STRUCTURES & LOCATIONS ──────────────────────────────────────────────────
@@ -472,8 +659,9 @@ model Location {
   createdBy Int?
   updatedAt DateTime @updatedAt
 
-  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  structure Structure @relation(fields: [structureId], references: [id], onDelete: Cascade)
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  structure         Structure          @relation(fields: [structureId], references: [id], onDelete: Cascade)
+  sensorAssignments SensorAssignment[]
 
   @@unique([structureId, code])
   @@index([tenantId])
