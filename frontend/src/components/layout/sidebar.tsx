@@ -174,15 +174,19 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile }: SidebarProps) 
           </div>
         ) : (
           <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {/* max-w and shrink-0 are load-bearing: the supplied logo is a
+                wide lockup, and at `w-auto` it grew past its share of the
+                sidebar and rendered underneath the wordmark. */}
             <img
               src="/brand/company-logo.jpeg"
-              alt="SHM Console"
-              className="h-8 w-auto object-contain"
+              alt=""
+              className="h-8 w-auto max-w-[96px] shrink-0 object-contain"
             />
-            <div className="leading-none">
-              <p className="text-[13px] font-semibold tracking-tight text-white">SHM Console</p>
-              <p className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.24em] text-shm-navy-300">
+            <div className="min-w-0 leading-none">
+              <p className="truncate text-[13px] font-semibold tracking-tight text-white">
+                SHM Console
+              </p>
+              <p className="mt-1 truncate font-mono text-[9.5px] uppercase tracking-[0.24em] text-shm-navy-300">
                 Structural Monitor
               </p>
             </div>

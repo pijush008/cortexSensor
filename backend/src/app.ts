@@ -54,6 +54,11 @@ app.use(
 // budget and get itself throttled, which reads as an unhealthy instance and
 // pulls a perfectly good API out of rotation.
 app.use(healthRoutes);
+// Also reachable under the API prefix, because that is where anything in
+// front of the service (nginx, a load balancer, a uptime check) addresses it.
+// Mounted here, still ahead of the rate limiter, for the same reason.
+app.use("/api", healthRoutes);
+app.use("/api/v1", healthRoutes);
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,

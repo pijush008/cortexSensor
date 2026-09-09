@@ -392,8 +392,12 @@ describe("alerting", () => {
 
   test("the lifecycle is enforced and every transition is recorded", async () => {
     const ctx = await resolveAuthContext(userId);
+    // Targeted by sensor, not by findFirst on status. An earlier version took
+    // "any open alert", which became order-dependent as soon as another test
+    // added a second one — it could resolve the wrong alert and leave the
+    // recurrence test's dedupe key occupied.
     const alert = await prisma.alert.findFirstOrThrow({
-      where: { tenantId, status: AlertStatus.open },
+      where: { tenantId, sensorId, status: AlertStatus.open },
     });
 
     // open -> closed is not permitted: nobody has looked at it yet.
@@ -427,8 +431,15 @@ describe("alerting", () => {
   });
 
   test("a resolved condition can raise a new alert when it recurs", async () => {
-    // The previous alert is resolved, so the dedupe key is free again — a
-    // recurrence is genuinely new information and must not be suppressed.
+    // Asserted explicitly rather than assumed from test ordering: the alert
+    // for THIS sensor must be resolved before a recurrence can raise a new one.
+    const open = await prisma.alert.count({
+      where: { tenantId, sensorId, status: { in: [AlertStatus.open, AlertStatus.acknowledged, AlertStatus.investigating] } },
+    });
+    expect(open, "the prior alert for this sensor should be resolved").toBe(0);
+
+    // The dedupe key is free again, and a recurrence is genuinely new
+    // information that must not be suppressed.
     const base = new Date("2026-09-10T00:00:00.000Z").getTime();
     const result = await evaluateReadings(
       tenantId,
@@ -488,8 +499,9 @@ describe("alerting", () => {
   });
 
   test("resolving requires a note through the API too", async () => {
+    // Its own alert, so this cannot consume one another test depends on.
     const open = await prisma.alert.findFirst({
-      where: { tenantId, status: AlertStatus.open },
+      where: { tenantId, status: AlertStatus.open, sensorId: { not: sensorId } },
     });
     if (!open) return;
 

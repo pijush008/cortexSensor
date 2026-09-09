@@ -51,3 +51,8 @@ gateway-pi/.venv/
 gateway-pi/__pycache__/
 gateway-pi/.env
 *.pyc
+# Extracted legacy Flutter/PHP system (the platform being migrated FROM).
+# 276MB including its own embedded git repositories — reference material, not
+# part of this repository's history. The archive itself is also ignored.
+flutter_version/
+legacy-backup-*.tar.gz

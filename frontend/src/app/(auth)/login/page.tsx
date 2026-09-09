@@ -5,19 +5,31 @@ import { Input } from "@/components/ui/input";
 import { Reveal } from "@/components/ui/reveal";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
+import { describeError } from "@/lib/errors";
 import { Activity, Lock, Radio, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 type Mode = "login" | "forgot" | "otp";
 
-const STREAM = [
-  "[09:41:57Z] MQTT  · message_rate=412/s          status=nominal",
-  "[09:44:03Z] SEN-55 · strain_spike=38με          tolerance=ok",
-  "[09:47:12Z] GWH-02 · calib_window=closed        nodes=4 synced",
-  "[09:38:21Z] GWH-07 · battery=19%                action=charge",
-  "[09:35:44Z] SEN-12 · modal_drift=+0.42%         Δt=+2.4°C",
-  "[09:31:09Z] SYS   · agg_job=completed           samples=1.2M",
+/**
+ * The measurement pipeline, described.
+ *
+ * This panel previously animated invented telemetry — "message_rate=412/s",
+ * "strain_spike=38με", "battery=19%", "modal_drift=+0.42% Δt=+2.4°C". Those
+ * are readings, and they came from nowhere. On a product that monitors bridges
+ * and dams, a number that looks like a measurement but is not one is the most
+ * dangerous thing the interface can print, and a sign-in page is no exception.
+ *
+ * It now names the stages of the pipeline instead. No values, so nothing here
+ * can be mistaken for data.
+ */
+const PIPELINE = [
+  "sensor        strain, vibration, displacement, temperature",
+  "gateway       validate · timestamp · buffer when offline",
+  "ingest        deduplicate · calibrate · flag data quality",
+  "analysis      spectral estimation against a stored baseline",
+  "alert         severity by rule, with the evidence attached",
 ];
 
 export default function LoginPage() {
@@ -53,7 +65,11 @@ export default function LoginPage() {
       await login(username, password);
       router.push("/dashboard");
     } catch (err) {
-      setError((err as Error).message || "Login failed");
+      // Routed through describeError so the user sees "Too many attempts,
+      // try again shortly" rather than axios's raw "Request failed with
+      // status code 429". Every other data surface already does this; the
+      // sign-in form was the one that did not.
+      setError(describeError(err).description);
     } finally {
       setLoading(false);
     }
@@ -68,7 +84,7 @@ export default function LoginPage() {
       setMode("otp");
       setError(null);
     } catch (err) {
-      setError((err as Error).message || "Failed to send OTP");
+      setError(describeError(err).description);
     } finally {
       setLoading(false);
     }
@@ -87,7 +103,7 @@ export default function LoginPage() {
       setResetToken(data.resetToken || "");
       setError(null);
     } catch (err) {
-      setError((err as Error).message || "Invalid OTP");
+      setError(describeError(err).description);
     } finally {
       setLoading(false);
     }
@@ -105,14 +121,14 @@ export default function LoginPage() {
       setResetToken("");
       setError(null);
     } catch (err) {
-      setError((err as Error).message || "Failed to change password");
+      setError(describeError(err).description);
     } finally {
       setLoading(false);
     }
   };
 
-  const activeStream = [0, 1, 2].map(
-    (i) => STREAM[(streamHead - i + STREAM.length * 4) % STREAM.length],
+  const activePipeline = [0, 1, 2].map(
+    (i) => PIPELINE[(streamHead - i + PIPELINE.length * 4) % PIPELINE.length],
   );
 
   return (
@@ -162,16 +178,16 @@ export default function LoginPage() {
             structure you manage — instrumented, analyzed, and acted upon.
           </p>
 
-          {/* live telemetry stream */}
+          {/* pipeline description — deliberately no values (see PIPELINE) */}
           <div className="mt-10 rounded-xl border border-white/10 bg-black/20 p-4 font-mono backdrop-blur">
             <div className="mb-3 flex items-center gap-2">
               <Radio className="h-3.5 w-3.5 text-shm-navy-300" />
               <span className="text-[9px] uppercase tracking-[0.2em] text-slate-400">
-                Live stream · edge → cloud
+                Measurement pipeline · edge → cloud
               </span>
             </div>
             <div className="space-y-1.5">
-              {activeStream.map((line) => (
+              {activePipeline.map((line) => (
                 <p
                   key={line}
                   className="anim-tick-in truncate text-[11px] leading-relaxed text-shm-navy-200"
@@ -180,7 +196,7 @@ export default function LoginPage() {
                 </p>
               ))}
               <p className="text-[11px] text-shm-navy-200">
-                <span className="text-shm-green">➜</span> awaiting telemetry
+                <span className="text-shm-green">➜</span> engineer
                 <span
                   className={cursor ? "text-shm-green" : "text-transparent"}
                 >
