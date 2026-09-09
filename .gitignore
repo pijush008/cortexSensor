@@ -1,0 +1,51 @@
+# secrets - env reference file contains real credentials (JWT secret, Gmail)
+env.text
+
+# local env files
+.env
+.env.local
+backend/.env
+frontend/.env.local
+
+# OS
+.DS_Store
+
+# node
+node_modules/
+
+# logs
+logs/
+*.log
+
+# build output
+.next/
+out/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Next.js scratch build directory (distDir override used during debugging)
+frontend/tmp/
+
+# Compiled output of prisma/seed.ts — the .ts file is the source of truth.
+backend/prisma/seed.js
+backend/prisma/seed.js.map
+backend/prisma/seed.d.ts
+backend/prisma/seed.d.ts.map
+
+# Playwright MCP debugging artifacts (console logs / page snapshots)
+.playwright-mcp/
+
+# Mosquitto runtime credentials. `passwd` holds hashed broker logins and must
+# never be committed; `acl` is generated alongside it and is owned by the
+# broker's uid (1883), so it is not readable by the developer account either.
+# Regenerate both from docs/mosquitto-acl.example.
+mosquitto/passwd
+mosquitto/acl
+
+# python (raspberry pi gateway)
+gateway-pi/.venv/
+gateway-pi/__pycache__/
+gateway-pi/.env
+*.pyc

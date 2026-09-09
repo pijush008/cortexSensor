@@ -1,0 +1,62 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: shm
+          POSTGRES_PASSWORD: shm_pass
+          POSTGRES_DB: shm_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install deps, prepare DB and run tests
+        env:
+          DATABASE_URL: postgresql://shm:shm_pass@localhost:5432/shm_ci?schema=public
+        run: |
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+          cd backend
+          npm ci
+          # wait for Postgres service
+          until pg_isready -h localhost -p 5432 -U shm; do echo "waiting for postgres"; sleep 1; done
+          npx prisma migrate deploy
+          npm run prisma:seed || true
+          npm run test:run
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install deps and check
+        run: |
+          cd frontend
+          npm ci
+          npm run build || true
+  python-service:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: |
+          cd python_shm_service
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt

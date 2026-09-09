@@ -1,0 +1,138 @@
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    environment:
+      POSTGRES_USER: shm
+      POSTGRES_PASSWORD: shm_pass
+      POSTGRES_DB: shm_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker-init:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  backend:
+    image: node:18
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    environment:
+      NODE_ENV: development
+      NODE_OPTIONS: "--max-old-space-size=4096"
+      DATABASE_URL: "postgresql://shm:shm_pass@postgres:5432/shm_dev?schema=public"
+      REDIS_URL: "redis://redis:6379"
+      PORT: 3001
+      MQTT_BROKER_URL: "mqtt://mosquitto:1883"
+      MQTT_INGEST_ENABLED: "true"
+      MQTT_INGEST_TOPICS: "shm/ingest/#"
+      MQTT_USERNAME: "shm-backend"
+      MQTT_PASSWORD: "shm-backend-pass"
+    ports:
+      - "3001:3001"
+    command: sh -c "npm ci --silent || npm install --silent && ./docker-entrypoint.sh"
+    depends_on:
+      - postgres
+      - redis
+      - mosquitto
+
+  frontend:
+    # Node 20+ is required, not optional: @tailwindcss/oxide-linux-x64-gnu (the
+    # Tailwind v4 native binding) declares `engines: { node: ">= 20" }`, and npm
+    # SILENTLY SKIPS optional deps whose engines don't match the running Node.
+    # On node:18 it is omitted with no install error, and the dev server then
+    # fails every render with "Cannot find native binding" on globals.css.
+    image: node:22
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      # Keep the container's node_modules off the host bind mount, matching the
+      # backend and node-gateway services. Without this the container's root-owned
+      # `npm install` writes straight into ./frontend/node_modules on the host,
+      # which then breaks host-side `npm install` with EACCES.
+      - /app/node_modules
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: "/api"
+      NEXT_PUBLIC_MQTT_BROKER_URL: "ws://localhost:9001"
+      NEXT_PUBLIC_MQTT_USER: "shm-web"
+      NEXT_PUBLIC_MQTT_PASS: "shm-web-pass"
+      NEXT_PUBLIC_MQTT_DEFAULT_TOPIC: "shm/feed/#"
+    ports:
+      - "3005:3000"
+    # `npm ci` (not `npm install`) so platform-specific optional deps such as
+    # @tailwindcss/oxide-linux-x64-gnu resolve correctly from the lockfile —
+    # plain `npm install` hits npm/cli#4828 and silently omits them, which
+    # breaks the Tailwind postcss pass with "Cannot find native binding".
+    # Matches the backend and node-gateway services.
+    command: sh -c "npm ci --silent || npm install --silent && npm run dev"
+    depends_on:
+      - backend
+
+  python-shm:
+    build:
+      context: ./python_shm_service
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./python_shm_service:/app
+    depends_on:
+      - postgres
+
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - mosquitto_data:/mosquitto/data
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/passwd:/mosquitto/config/passwd:ro
+      - ./mosquitto/acl:/mosquitto/config/acl:ro
+
+  node-gateway:
+    image: node:18
+    working_dir: /app
+    volumes:
+      - ./gateway:/app
+      - /app/node_modules
+    environment:
+      REDIS_URL: "redis://redis:6379"
+      MQTT_BROKER: "mqtt://mosquitto:1883"
+      MQTT_USERNAME: "shm-gateway"
+      MQTT_PASSWORD: "shm-gateway-pass"
+      TOPIC: "shm/ingest/shm-gateway/data"
+    command: sh -c "npm ci --silent || npm install --silent && node index.js"
+    depends_on:
+      - mosquitto
+      - redis
+      - backend
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
+      - python-shm
+
+volumes:
+  postgres_data:
+  redis_data:
+  mosquitto_data:

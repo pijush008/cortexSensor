@@ -1,0 +1,436 @@
+// prisma/schema.prisma
+// SHM Database Schema - PostgreSQL
+// Source of truth: MySQL structualHealthMonitoring database
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ───────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  superadmin
+  admin
+  contractor
+  authority
+}
+
+enum UserStatus {
+  true_
+  false_
+}
+
+enum ProjectStatus {
+  not_start
+  start
+  pause
+  end
+}
+
+enum DeviceStatus {
+  active
+  inactive
+}
+
+enum YesNo {
+  true_
+  false_
+}
+
+enum ActiveOneZero {
+  one
+  zero
+}
+
+// ─── USERS ───────────────────────────────────────────────────────────────────
+
+model User {
+  id             Int        @id @default(autoincrement())
+  userType       UserRole
+  parentId       Int        @default(0)
+  firstName      String     @db.VarChar(255)
+  lastName       String     @db.VarChar(255)
+  emailId        String     @unique @db.VarChar(255)
+  phoneNo        String     @db.VarChar(255)
+  isMailVerified YesNo      @default(false_)
+  isUserVerified YesNo      @default(false_)
+  password       String     @db.VarChar(255)
+  profileImage   String?    @db.Text
+  status         UserStatus
+  csv            Int?       @default(0)
+  createdAt      DateTime?  @default(now())
+  updatedAt      DateTime?
+  isDelete       YesNo      @default(false_)
+
+  // Relations
+  createdProjects Project[]       @relation("ProjectCreator")
+  managedProjects Project[]       @relation("ProjectContractor")
+  auditedProjects Project[]       @relation("ProjectAuthority")
+  assignedDevices Device[]        @relation("DeviceAdmin")
+  updatedDevices  Device[]        @relation("DeviceUpdater")
+  assignedSensors Sensor[]        @relation("SensorAdmin")
+  firebaseTokens  FirebaseToken[]
+  tempOtps        TempOtp[]
+  auditLogs       AuditLog[]
+  refreshTokens   RefreshToken[]
+  subscription    Subscription?
+
+  @@index([userType])
+  @@index([parentId])
+  @@map("users")
+}
+
+// ─── DEVICE TYPES ────────────────────────────────────────────────────────────
+
+model DeviceType {
+  id          Int           @id @default(autoincrement())
+  deviceType  String        @db.VarChar(255)
+  deviceImage String?       @db.VarChar(255)
+  status      ActiveOneZero
+  createdAt   DateTime      @default(now())
+
+  devices Device[]
+
+  @@map("device_types")
+}
+
+// ─── DEVICES ─────────────────────────────────────────────────────────────────
+
+model Device {
+  id              Int           @id @default(autoincrement())
+  deviceName      String        @db.VarChar(255)
+  deviceType      Int
+  channelCount    Int
+  deviceId        String?       @db.VarChar(255)
+  gatewayDeviceId String        @db.VarChar(255)
+  addedBy         Int           @default(0)
+  deviceStatus    DeviceStatus  @default(inactive)
+  deviceStartDate DateTime
+  assignedAdmin   Int?
+  assignSensor    String?       @db.VarChar(255) // JSON array e.g. "[28,29]"
+  createdAt       DateTime
+  status          ActiveOneZero @default(one)
+  updatedBy       Int?
+  updatedAt       DateTime?
+  isDelete        YesNo         @default(false_)
+  updateHeartBeat DateTime?     @default(now()) @db.Timestamptz()
+  isOngoing       Boolean       @default(false)
+
+  // Relations
+  deviceTypeRecord DeviceType @relation(fields: [deviceType], references: [id])
+  admin            User?      @relation("DeviceAdmin", fields: [assignedAdmin], references: [id])
+  updater          User?      @relation("DeviceUpdater", fields: [updatedBy], references: [id])
+
+  @@index([assignedAdmin])
+  @@map("devices")
+}
+
+// ─── DEVICE CHANNELS ─────────────────────────────────────────────────────────
+// deviceId is a STRING reference to Device.id (e.g. "33"), NOT a real FK.
+// Stored as varchar; no relational constraint.
+
+model DeviceChannel {
+  id             Int           @id @default(autoincrement())
+  deviceId       String        @db.VarChar(255)
+  channelNumber  String        @db.VarChar(255)
+  channelName    String?       @db.VarChar(255)
+  triggerValue   String?       @db.VarChar(255)
+  thresholdValue String?       @db.VarChar(255)
+  assignSensor   String?       @db.VarChar(255) // Sensor ID as string
+  activeStatus   ActiveOneZero @default(zero)
+
+  @@index([deviceId])
+  @@map("device_channels")
+}
+
+// ─── SENSOR TYPES ────────────────────────────────────────────────────────────
+
+model SensorType {
+  id               Int           @id @default(autoincrement())
+  sensorType       String        @db.VarChar(255)
+  sensorIcon       String        @db.VarChar(255)
+  calibrationValue String        @db.VarChar(255)
+  status           ActiveOneZero
+  unit             String?       @db.VarChar(255)
+
+  sensors Sensor[]
+
+  @@map("sensor_types")
+}
+
+// ─── SENSORS ─────────────────────────────────────────────────────────────────
+
+model Sensor {
+  id               Int           @id @default(autoincrement())
+  sensorName       String        @db.VarChar(255)
+  sensorTypeID     Int
+  assignedAdmin    Int?
+  calibrationValue String?       @db.VarChar(255)
+  unit             String        @db.Char(255)
+  status           ActiveOneZero @default(one)
+  createdAt        DateTime      @default(now())
+
+  sensorType SensorType @relation(fields: [sensorTypeID], references: [id])
+  admin      User?      @relation("SensorAdmin", fields: [assignedAdmin], references: [id])
+
+  @@index([assignedAdmin])
+  @@index([sensorTypeID])
+  @@map("sensors")
+}
+
+// ─── PROJECTS ────────────────────────────────────────────────────────────────
+// deviceId is a STRING reference (may be NULL), sensorId is JSON text.
+// projectDevice is JSON text. No real FK to Device.
+
+model Project {
+  id              Int           @id @default(autoincrement())
+  projectName     String        @db.VarChar(255)
+  projectUniqueID String?       @db.VarChar(512)
+  uniqueId        String?       @db.VarChar(50)
+  projectLocation String        @db.VarChar(255)
+  startDate       DateTime      @db.Date()
+  actualStartDate DateTime?     @db.Date()
+  projectLogo     String?       @db.VarChar(255)
+  endDate         DateTime?     @db.Date()
+  contractorId    Int?
+  authorityId     Int?
+  deviceId        String?       @db.VarChar(255) // Device ID string (e.g. "33")
+  sensorId        String?       @db.Text // JSON array e.g. "[28,29]"
+  dashImage       String?       @db.VarChar(255)
+  dashImage2      String?       @db.VarChar(255)
+  status          ProjectStatus @default(not_start)
+  offset          Int           @default(0)
+  createdAt       DateTime      @default(now())
+  createdBy       Int
+  updatedAt       DateTime?     @default(now())
+  updatedBy       Int?
+  projectDevice   Json? // JSON blob with device snapshot
+  csvData         Boolean?      @default(false)
+  isDelete        Boolean?      @default(false)
+  isRegistered    Boolean       @default(false)
+
+  // Relations
+  creator       User           @relation("ProjectCreator", fields: [createdBy], references: [id])
+  contractor    User?          @relation("ProjectContractor", fields: [contractorId], references: [id])
+  authority     User?          @relation("ProjectAuthority", fields: [authorityId], references: [id])
+  projectEmails ProjectEmail[]
+  sensorData    SensorData[]
+
+  @@index([createdBy])
+  @@index([contractorId])
+  @@index([authorityId])
+  @@map("projects")
+}
+
+// ─── SENSOR DATA ─────────────────────────────────────────────────────────────
+
+model SensorData {
+  id         Int      @id @default(autoincrement())
+  projectId  Int?
+  deviceId   String   @db.VarChar(255)
+  sensorId   String   @db.VarChar(255)
+  sensorData Float    @db.Real()
+  createdAt  DateTime
+
+  project       Project?       @relation(fields: [projectId], references: [id])
+  notifications Notification[]
+
+  @@index([projectId, sensorId, createdAt])
+  @@index([deviceId, createdAt])
+  @@index([createdAt])
+  @@map("sensor_data")
+}
+
+// ─── NODE DATA ───────────────────────────────────────────────────────────────
+// DeviceId is the actual device id string (e.g. "fb8d"), not FK.
+
+model NodeData {
+  id              Int      @id @default(autoincrement())
+  battery         Int?
+  temperature     Float    @db.Real()
+  humidity        Float    @db.Real()
+  pressure        Float    @db.Real()
+  gatewayDeviceId String?  @db.VarChar(255)
+  deviceId        String?  @db.VarChar(255)
+  deviceName      String?  @db.VarChar(255)
+  projectName     String?  @db.VarChar(255)
+  deviceType      String?  @db.VarChar(255)
+  createdAt       DateTime @default(now())
+  deviceUpdatedAt DateTime
+
+  @@map("node_data")
+}
+
+// ─── NOTIFICATIONS ───────────────────────────────────────────────────────────
+
+model Notification {
+  id           Int      @id @default(autoincrement())
+  sensorDataId Int
+  min          String?  @db.Char(255)
+  max          String?  @db.Char(255)
+  createdAt    DateTime
+
+  sensorData SensorData @relation(fields: [sensorDataId], references: [id])
+
+  @@index([sensorDataId])
+  @@map("notifications")
+}
+
+// ─── PROJECT EMAILS ──────────────────────────────────────────────────────────
+
+model ProjectEmail {
+  id        Int     @id @default(autoincrement())
+  email     String  @db.VarChar(255)
+  isEnable  Boolean @default(true)
+  projectId Int
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+  @@map("project_emails")
+}
+
+// ─── FIREBASE TOKENS ────────────────────────────────────────────────────────
+
+model FirebaseToken {
+  id        Int           @id @default(autoincrement())
+  userId    Int
+  token     String        @db.Text
+  status    ActiveOneZero @default(one)
+  createdAt DateTime      @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("firebase_tokens")
+}
+
+// ─── TEMP OTPs ──────────────────────────────────────────────────────────────
+
+model TempOtp {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  otp       String   @db.VarChar(100)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("temp_otps")
+}
+
+// ─── REFRESH TOKENS (auth rotation & revocation) ────────────────────────────
+
+model RefreshToken {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  tokenHash  String   @unique @db.VarChar(128)
+  familyId   String   @db.VarChar(64)
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  consumedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+// ─── BILLING / SUBSCRIPTIONS ────────────────────────────────────────────────
+// One subscription per admin (each admin is its own billing organization).
+// Superadmins are complimentary — they hold no subscription record.
+
+enum SubscriptionStatus {
+  trial
+  active
+  past_due
+  canceled
+}
+
+model BillingPlan {
+  id               Int      @id @default(autoincrement())
+  code             String   @unique @db.VarChar(32) // complimentary | starter | professional | enterprise
+  name             String   @db.VarChar(64)
+  priceMonthly     Int      @default(0) // minor units (paise/INR); 0 = complimentary/unlimited
+  currency         String   @default("INR")
+  maxStructures    Int? // projects owned by the admin; null = unlimited
+  maxSensors       Int? // sensors assigned to the admin; null = unlimited
+  maxUsers         Int? // contractor + authority members under the admin; null = unlimited
+  dataRetentionDays Int?
+  apiAccess        Boolean  @default(false)
+  smsAlerts        Boolean  @default(false)
+  aiFeatures       Boolean  @default(false)
+  advancedReports  Boolean  @default(false)
+  femIntegration   Boolean  @default(false)
+  sso              Boolean  @default(false)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+
+  subscriptions Subscription[]
+
+  @@map("billing_plans")
+}
+
+model Subscription {
+  id        Int                @id @default(autoincrement())
+  adminId   Int                @unique
+  planId    Int
+  status    SubscriptionStatus @default(trial)
+  startsOn  DateTime           @default(now())
+  renewsOn  DateTime?
+  autoRenew Boolean            @default(true)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  plan     BillingPlan @relation(fields: [planId], references: [id])
+  admin    User        @relation(fields: [adminId], references: [id])
+  invoices Invoice[]
+
+  @@index([adminId])
+  @@map("subscriptions")
+}
+
+model Invoice {
+  id             Int      @id @default(autoincrement())
+  subscriptionId Int
+  invoiceNo      String   @unique @db.VarChar(32)
+  periodStart    DateTime
+  periodEnd      DateTime
+  amountPaise    Int      @default(0)
+  currency       String   @default("INR")
+  status         String   @default("PAID") // PAID | OPEN
+  paidAt         DateTime?
+  createdAt      DateTime @default(now())
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id])
+
+  @@index([subscriptionId])
+  @@map("invoices")
+}
+
+// ─── AUDIT LOGS ─────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  action    String   @db.VarChar(100)
+  entity    String   @db.VarChar(100)
+  entityId  Int?
+  oldValue  Json?
+  newValue  Json?
+  ipAddress String?  @db.VarChar(45)
+  userAgent String?  @db.Text
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

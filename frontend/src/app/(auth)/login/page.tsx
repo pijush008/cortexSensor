@@ -1,0 +1,390 @@
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Reveal } from "@/components/ui/reveal";
+import { api } from "@/lib/api";
+import { useAuthStore } from "@/stores/auth-store";
+import { Activity, Lock, Radio, ShieldCheck } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+
+type Mode = "login" | "forgot" | "otp";
+
+const STREAM = [
+  "[09:41:57Z] MQTT  · message_rate=412/s          status=nominal",
+  "[09:44:03Z] SEN-55 · strain_spike=38με          tolerance=ok",
+  "[09:47:12Z] GWH-02 · calib_window=closed        nodes=4 synced",
+  "[09:38:21Z] GWH-07 · battery=19%                action=charge",
+  "[09:35:44Z] SEN-12 · modal_drift=+0.42%         Δt=+2.4°C",
+  "[09:31:09Z] SYS   · agg_job=completed           samples=1.2M",
+];
+
+export default function LoginPage() {
+  const router = useRouter();
+  const { login } = useAuthStore();
+  const [mode, setMode] = useState<Mode>("login");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [userId, setUserId] = useState("");
+  const [otp, setOtp] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [resetToken, setResetToken] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [streamHead, setStreamHead] = useState(0);
+  const [cursor, setCursor] = useState(true);
+
+  useEffect(() => {
+    const id = setInterval(() => setStreamHead((h) => h + 1), 2200);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(() => setCursor((c) => !c), 900);
+    return () => clearInterval(id);
+  }, []);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      await login(username, password);
+      router.push("/dashboard");
+    } catch (err) {
+      setError((err as Error).message || "Login failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      await api.post("/forgotPassword", { username });
+      setMode("otp");
+      setError(null);
+    } catch (err) {
+      setError((err as Error).message || "Failed to send OTP");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      const { data } = await api.post<{
+        status_code: number;
+        message: string | null;
+        resetToken?: string;
+      }>("/validateOTP", { userId, inputOTP: otp });
+      setResetToken(data.resetToken || "");
+      setError(null);
+    } catch (err) {
+      setError((err as Error).message || "Invalid OTP");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      await api.post("/changePassword", { userId, newPassword, resetToken });
+      setMode("login");
+      setPassword("");
+      setOtp("");
+      setResetToken("");
+      setError(null);
+    } catch (err) {
+      setError((err as Error).message || "Failed to change password");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const activeStream = [0, 1, 2].map(
+    (i) => STREAM[(streamHead - i + STREAM.length * 4) % STREAM.length],
+  );
+
+  return (
+    <div className="flex min-h-screen bg-white">
+      {/* Left editorial panel */}
+      <div className="bg-blueprint relative hidden w-1/2 flex-col justify-between overflow-hidden bg-shm-navy-900 p-12 lg:flex">
+        {/* Real civil-engineering structure photo, rendered monochrome */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/structures/cable-stayed.jpg"
+          alt=""
+          aria-hidden
+          className="absolute inset-0 h-full w-full object-cover opacity-90"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-shm-navy-950/95 via-shm-navy-900/80 to-shm-navy-900/40" />
+        <div
+          className="pointer-events-none absolute inset-0 opacity-40 mix-blend-overlay"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 25px 25px, rgba(255,255,255,0.25) 1px, transparent 0)",
+            backgroundSize: "44px 44px",
+          }}
+        />
+        <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-shm-navy-500/20 blur-3xl" />
+
+        <div className="relative flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/brand/company-logo.jpeg"
+            alt="SHM Console"
+            className="h-9 w-auto object-contain"
+          />
+          <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-shm-navy-300">
+            Console · v1.0
+          </span>
+        </div>
+
+        <div className="relative max-w-lg">
+          <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.24em] text-shm-navy-300">
+            Structural monitoring
+          </p>
+          <h2 className="font-display text-4xl font-semibold leading-[1.08] tracking-tight text-white">
+            See damage before it becomes a defect.
+          </h2>
+          <p className="mt-5 text-[15px] leading-relaxed text-slate-300">
+            Continuous strain, vibration and deflection telemetry from every
+            structure you manage — instrumented, analyzed, and acted upon.
+          </p>
+
+          {/* live telemetry stream */}
+          <div className="mt-10 rounded-xl border border-white/10 bg-black/20 p-4 font-mono backdrop-blur">
+            <div className="mb-3 flex items-center gap-2">
+              <Radio className="h-3.5 w-3.5 text-shm-navy-300" />
+              <span className="text-[9px] uppercase tracking-[0.2em] text-slate-400">
+                Live stream · edge → cloud
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              {activeStream.map((line) => (
+                <p
+                  key={line}
+                  className="anim-tick-in truncate text-[11px] leading-relaxed text-shm-navy-200"
+                >
+                  <span className="text-shm-green">➜</span> {line}
+                </p>
+              ))}
+              <p className="text-[11px] text-shm-navy-200">
+                <span className="text-shm-green">➜</span> awaiting telemetry
+                <span
+                  className={cursor ? "text-shm-green" : "text-transparent"}
+                >
+                  _
+                </span>
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-10 flex gap-3">
+            {[
+              { icon: Activity, label: "Live telemetry" },
+              { icon: ShieldCheck, label: "RBAC + audit" },
+              { icon: Lock, label: "End-to-end TLS" },
+            ].map(({ icon: Icon, label }) => (
+              <div
+                key={label}
+                className="flex items-center gap-2.5 rounded-lg border border-white/10 bg-white/[0.04] px-3.5 py-2.5"
+              >
+                <Icon
+                  className="h-4 w-4 text-shm-navy-200"
+                  strokeWidth={1.75}
+                />
+                <span className="text-[12px] text-slate-200">{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p className="relative font-mono text-[11px] text-slate-500">
+          © {new Date().getFullYear()} Arctano Sensors · All rights reserved
+        </p>
+      </div>
+
+      {/* Right form panel */}
+      <div className="relative flex w-full items-center justify-center p-6 sm:p-8 lg:w-1/2">
+        <div
+          className="pointer-events-none absolute inset-0 hidden lg:block"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 1px 1px, rgba(17,17,17,0.08) 1px, transparent 0)",
+            backgroundSize: "26px 26px",
+          }}
+        />
+        <div className="relative w-full max-w-md">
+          <div className="mb-8 flex items-center gap-3 lg:hidden">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-shm-navy-800">
+              <Activity className="h-5 w-5 text-white" strokeWidth={1.75} />
+            </div>
+            <span className="text-lg font-bold tracking-tight text-shm-navy-900">
+              StructGuard
+            </span>
+          </div>
+
+          <Reveal>
+            <div className="rounded-2xl border border-slate-200 bg-white p-7 shadow-[0_20px_60px_-28px_rgba(17,17,17,0.35)] sm:p-8">
+              <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-shm-navy-500">
+                {mode === "login" ? "Access console" : "Account recovery"}
+              </p>
+              <h2 className="mt-2 text-[22px] font-semibold tracking-tight text-slate-900">
+                {mode === "login" && "Welcome back"}
+                {mode === "forgot" && "Reset your password"}
+                {mode === "otp" && !newPassword && "Verify OTP"}
+                {mode === "otp" && newPassword && "Set a new password"}
+              </h2>
+              <p className="mt-1 text-[13px] text-slate-500">
+                {mode === "login" && "Sign in to the monitoring console."}
+                {mode === "forgot" &&
+                  "We'll send a verification code to your email."}
+                {mode === "otp" &&
+                  !newPassword &&
+                  "Enter the code sent to your registered email."}
+                {mode === "otp" &&
+                  newPassword &&
+                  "Choose a new password for your account."}
+              </p>
+
+              {error && (
+                <div
+                  className="anim-tick-in mt-5 rounded-lg border border-shm-red/20 bg-shm-red/5 px-3.5 py-2.5 text-[13px] text-shm-red"
+                  role="alert"
+                >
+                  {error}
+                </div>
+              )}
+
+              <form
+                onSubmit={
+                  mode === "login"
+                    ? handleLogin
+                    : mode === "forgot"
+                      ? handleForgot
+                      : mode === "otp" && !newPassword
+                        ? handleOtp
+                        : handleChangePassword
+                }
+                className="mt-6 space-y-4"
+              >
+                {(mode === "login" || mode === "forgot") && (
+                  <Input
+                    type="email"
+                    label="Email"
+                    placeholder="you@company.com"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    required
+                  />
+                )}
+
+                {mode === "login" && (
+                  <Input
+                    type="password"
+                    label="Password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                )}
+
+                {mode === "forgot" && (
+                  <Input
+                    type="text"
+                    label="User ID"
+                    placeholder="Enter your user ID"
+                    value={userId}
+                    onChange={(e) => setUserId(e.target.value)}
+                    required
+                  />
+                )}
+
+                {mode === "otp" && !newPassword && (
+                  <Input
+                    type="text"
+                    label="OTP"
+                    placeholder="6-digit code"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    required
+                  />
+                )}
+
+                {mode === "otp" && newPassword && (
+                  <Input
+                    type="password"
+                    label="New Password"
+                    placeholder="Enter new password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                  />
+                )}
+
+                <Button
+                  type="submit"
+                  className="w-full"
+                  size="lg"
+                  disabled={loading}
+                >
+                  {loading
+                    ? "Please wait…"
+                    : mode === "login"
+                      ? "Sign in"
+                      : mode === "forgot"
+                        ? "Send OTP"
+                        : newPassword
+                          ? "Change password"
+                          : "Verify OTP"}
+                </Button>
+              </form>
+
+              <div className="mt-6 space-y-2 text-center text-[13px]">
+                {mode === "login" && (
+                  <button
+                    onClick={() => {
+                      setMode("forgot");
+                      setError(null);
+                    }}
+                    className="text-shm-navy-600 hover:underline cursor-pointer"
+                  >
+                    Forgot password?
+                  </button>
+                )}
+                {(mode === "otp" || mode === "forgot") && (
+                  <button
+                    onClick={() => {
+                      setMode("login");
+                      setError(null);
+                      setNewPassword("");
+                    }}
+                    className="text-slate-500 hover:underline cursor-pointer"
+                  >
+                    ← Back to login
+                  </button>
+                )}
+              </div>
+            </div>
+          </Reveal>
+
+          <p className="mt-6 text-center font-mono text-[10.5px] uppercase tracking-[0.18em] text-slate-400">
+            Secured by Arctano Sensors
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}

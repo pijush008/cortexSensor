@@ -1,0 +1,9 @@
+{
+  "name": "shm-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "mqtt": "^5.15.2",
+    "axios": "^1.4.0"
+  }
+}

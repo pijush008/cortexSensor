@@ -1,0 +1,45 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    }
+  },
+  "include": [
+    "**/*.mts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/dev/types/**/*.ts",
+    ".next/types/**/*.ts",
+    "/tmp/claude-1000/-home-pijush-Downloads-SHM/e3d20b7d-d530-48bf-b17e-6f674cca420a/scratchpad/next-build/types/**/*.ts",
+    "/tmp/shm-next-build/types/**/*.ts",
+    "next-env.d.ts",
+    "/tmp/claude-1000/-home-pijush-Downloads-SHM/e3d20b7d-d530-48bf-b17e-6f674cca420a/scratchpad/next-build-2/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
