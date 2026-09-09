@@ -379,7 +379,7 @@ tests passing.** No slice ships UI for data that does not yet exist.
 
 | # | Slice | Contents | Exit criteria |
 |---|---|---|---|
-| **0** | **Stabilize** | Git baseline commit; untrack `dist/`+`tmp/`; delete `/hero-demo`; fix Timescale init; add `/health`+`/ready`; request IDs; **quarantine the 4 fake pages behind a build-time flag so no fabricated data can ship** | Stack boots; tests green |
+| **0** | **Stabilize** ✅ **DONE** (`d37f660`) | Git baseline; untrack build artifacts; delete `/hero-demo`; fix Timescale init; `/health`+`/ready`; request IDs; **fabricated data removed outright** from the 4 pages (chosen over a build flag — a flag can be flipped) | ✅ tsc clean both apps; 23/23 tests; build 21 routes; probes exercised live |
 | **1** | **Tenant + identity** | `Tenant`, `Membership`, `Role`, `Permission`; migrate `parentId`→`Tenant`; 5 roles; granular permissions; `tenantScope()`; MFA for super admin; `/api/v1` | Isolation suite extended and green |
 | **2** | **Structure + location** | `Structure`, `Location`, project→structure→location UI, breadcrumbs | Engineer can navigate the real hierarchy |
 | **3** | **Gateway + device + sensor** | `Gateway` entity, device lifecycle states, per-device credentials, `SensorAssignment`, `SensorCalibration` | `/gateways` replaced with real data |
