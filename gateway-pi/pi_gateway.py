@@ -37,9 +37,12 @@ import logging
 import os
 import signal
 import sys
+import threading
 import time
 
 import paho.mqtt.client as mqtt
+
+from spool import Spool, stamp_event_ids
 
 try:
     import requests
@@ -58,6 +61,15 @@ class Config:
     CLOUD_USER = os.getenv("CLOUD_USER", "")
     CLOUD_PASS = os.getenv("CLOUD_PASS", "")
     CLOUD_TLS = os.getenv("CLOUD_TLS", "false").lower() == "true"
+
+    # Store-and-forward buffer (§12). Lives on local disk so it survives both a
+    # network outage and a power cut.
+    SPOOL_PATH = os.getenv("SPOOL_PATH", "/var/lib/shm-gateway/spool.db")
+    SPOOL_CAPACITY = int(os.getenv("SPOOL_CAPACITY", "100000"))
+    SPOOL_BATCH = int(os.getenv("SPOOL_BATCH", "50"))
+    # Exponential backoff bounds for drain attempts while the cloud is down.
+    DRAIN_MIN_INTERVAL = float(os.getenv("DRAIN_MIN_INTERVAL", "2"))
+    DRAIN_MAX_INTERVAL = float(os.getenv("DRAIN_MAX_INTERVAL", "60"))
     # Per-tenant ingest namespace: the mosquitto ACL confines each broker user
     # (pattern write shm/ingest/%u/#) to shm/ingest/<username>/#. Default the
     # publish topic to match, so the gateway can't cross tenants by mistyping.
@@ -123,11 +135,24 @@ def connect_cloud():
         return False
 
 
-def forward_to_cloud(payload: bytes) -> None:
-    """Publish to the cloud broker (best effort) and optionally REST-forward."""
-    global forwarded  # noqa: PLW0603
+spool: Spool | None = None
+_stop_draining = threading.Event()
+
+
+def deliver(payload: bytes) -> bool:
+    """
+    One delivery attempt. Returns True only when the cloud has actually taken
+    the message — that is what allows it to be removed from the buffer.
+
+    The REST path is authoritative for acknowledgement because it returns a
+    status code. An MQTT publish at QoS 1 is also attempted, but a local
+    publish success does not prove the backend stored anything, so it is never
+    used on its own to delete a buffered message.
+    """
+    published_ok = False
     if cfg.CLOUD_BROKER_HOST and cloud_client.is_connected():
-        cloud_client.publish(cfg.CLOUD_TOPIC, payload, qos=1)
+        info = cloud_client.publish(cfg.CLOUD_TOPIC, payload, qos=1)
+        published_ok = info.rc == mqtt.MQTT_ERR_SUCCESS
 
     if cfg.BACKEND_URL and session:
         try:
@@ -140,10 +165,77 @@ def forward_to_cloud(payload: bytes) -> None:
                 },
                 timeout=8,
             )
-            if not (200 <= resp.status_code < 300):
-                log.warning("REST forward status %s: %s", resp.status_code, resp.text[:200])
+            if 200 <= resp.status_code < 300:
+                return True
+            if 400 <= resp.status_code < 500 and resp.status_code not in (408, 429):
+                # The server rejected the payload itself. Retrying forever would
+                # block the queue behind a message that can never succeed, so it
+                # is dropped deliberately and loudly.
+                log.error(
+                    "Cloud rejected message (%s): %s — discarding, it will not "
+                    "succeed on retry.",
+                    resp.status_code,
+                    resp.text[:200],
+                )
+                return True
+            log.warning("REST forward status %s", resp.status_code)
+            return False
         except Exception as exc:  # noqa: BLE001
             log.warning("REST forward failed: %s", exc)
+            return False
+
+    # No REST endpoint configured: fall back to trusting the QoS 1 publish.
+    return published_ok
+
+
+def drain_worker() -> None:
+    """
+    Background drain. Runs continuously, replaying the buffer oldest-first
+    whenever the cloud is reachable and backing off exponentially when it is
+    not, so an extended outage does not turn into a request storm.
+    """
+    interval = cfg.DRAIN_MIN_INTERVAL
+    while not _stop_draining.is_set():
+        if spool is None:
+            _stop_draining.wait(interval)
+            continue
+
+        batch = spool.peek(cfg.SPOOL_BATCH)
+        if not batch:
+            interval = cfg.DRAIN_MIN_INTERVAL
+            _stop_draining.wait(interval)
+            continue
+
+        delivered, failed = [], []
+        for message in batch:
+            if _stop_draining.is_set():
+                break
+            if deliver(message.payload):
+                delivered.append(message.row_id)
+            else:
+                failed.append(message.row_id)
+                # Stop at the first failure: the cloud is down, and hammering
+                # it with the rest of the batch achieves nothing. Ordering is
+                # also preserved this way.
+                break
+
+        if delivered:
+            spool.acknowledge(delivered)
+            global forwarded
+            forwarded += len(delivered)
+        if failed:
+            spool.record_failure(failed)
+            interval = min(interval * 2, cfg.DRAIN_MAX_INTERVAL)
+            log.warning(
+                "Cloud unreachable; %d message(s) buffered locally, retrying in %.0fs",
+                spool.depth(),
+                interval,
+            )
+            _stop_draining.wait(interval)
+        else:
+            interval = cfg.DRAIN_MIN_INTERVAL
+
+
 # ---------------------------------------------------------------- local SUB
 def on_local_connect(client, _userdata, _flags, rc):
     log.info("Local broker connected rc=%s", rc)
@@ -152,16 +244,35 @@ def on_local_connect(client, _userdata, _flags, rc):
 
 
 def on_local_message(_client, _userdata, msg):
-    global forwarded, dropped, last_report  # noqa: PLW0603
+    """
+    Persist first, deliver later.
+
+    The message is written to the local buffer before any network call is
+    attempted. That ordering is the whole point: if the cloud is unreachable —
+    or this process is killed mid-send — the reading is already on disk and
+    will be replayed. The previous behaviour forwarded inline and discarded the
+    message on failure, losing exactly the data recorded during the storm that
+    took the link down.
+    """
+    global dropped, last_report  # noqa: PLW0603
     try:
-        forward_to_cloud(msg.payload)
-        forwarded += 1
+        payload, _ = stamp_event_ids(msg.payload)
+        assert spool is not None
+        spool.enqueue(payload)
     except Exception as exc:  # noqa: BLE001
         dropped += 1
-        log.exception("Failed to forward: %s", exc)
+        log.exception("Failed to buffer message: %s", exc)
 
     if time.monotonic() - last_report >= 30:
-        log.info("forwarded=%d dropped=%d", forwarded, dropped)
+        depth = spool.depth() if spool else 0
+        age = spool.oldest_age_seconds() if spool else None
+        log.info(
+            "forwarded=%d buffered=%d dropped=%d oldest_buffered=%s",
+            forwarded,
+            depth,
+            dropped,
+            f"{age:.0f}s" if age is not None else "-",
+        )
         last_report = time.monotonic()
 
 
@@ -184,6 +295,14 @@ def main():
         log.error("Nothing to forward to. Set CLOUD_BROKER_HOST and/or BACKEND_URL.")
         sys.exit(1)
 
+    global spool  # noqa: PLW0603
+    spool = Spool(cfg.SPOOL_PATH, capacity=cfg.SPOOL_CAPACITY)
+    backlog = spool.depth()
+    if backlog:
+        log.info("Resuming with %d message(s) buffered from a previous run", backlog)
+
+    threading.Thread(target=drain_worker, name="spool-drain", daemon=True).start()
+
     log.info("SHM Pi gateway starting")
     log.info(
         "Listening %s:%s topic=%s",
@@ -195,7 +314,12 @@ def main():
 
     def _stop(_sig, _frame):
         log.info("Shutting down")
+        _stop_draining.set()
         cloud_client.loop_stop()
+        if spool is not None:
+            # Buffered messages stay on disk and are replayed on next start.
+            log.info("%d message(s) remain buffered for replay", spool.depth())
+            spool.close()
         sys.exit(0)
 
     signal.signal(signal.SIGTERM, _stop)

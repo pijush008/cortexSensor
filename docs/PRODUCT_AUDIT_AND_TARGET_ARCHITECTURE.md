@@ -380,10 +380,10 @@ tests passing.** No slice ships UI for data that does not yet exist.
 | # | Slice | Contents | Exit criteria |
 |---|---|---|---|
 | **0** | **Stabilize** ✅ **DONE** (`d37f660`) | Git baseline; untrack build artifacts; delete `/hero-demo`; fix Timescale init; `/health`+`/ready`; request IDs; **fabricated data removed outright** from the 4 pages (chosen over a build flag — a flag can be flipped) | ✅ tsc clean both apps; 23/23 tests; build 21 routes; probes exercised live |
-| **1** | **Tenant + identity** | `Tenant`, `Membership`, `Role`, `Permission`; migrate `parentId`→`Tenant`; 5 roles; granular permissions; `tenantScope()`; MFA for super admin; `/api/v1` | Isolation suite extended and green |
-| **2** | **Structure + location** | `Structure`, `Location`, project→structure→location UI, breadcrumbs | Engineer can navigate the real hierarchy |
-| **3** | **Gateway + device + sensor** | `Gateway` entity, device lifecycle states, per-device credentials, `SensorAssignment`, `SensorCalibration` | `/gateways` replaced with real data |
-| **4** | **Ingest v2** | `Measurement` + hypertable, sequence/event IDs, idempotent batch writes, quality flags, **Pi store-and-forward buffer** | Offline test: disconnect, reconnect, zero loss, zero duplicates |
+| **1** | **Tenant + identity** ✅ **DONE** | `Tenant`, `Membership`, `Role`, `Permission`; migrate `parentId`→`Tenant`; 5 roles; granular permissions; `tenantScope()`; MFA for super admin; `/api/v1` | Isolation suite extended and green |
+| **2** | **Structure + location** ✅ **DONE** | `Structure`, `Location`, project→structure→location UI, breadcrumbs | Engineer can navigate the real hierarchy |
+| **3** | **Gateway + device + sensor** ✅ **DONE** | `Gateway` entity, device lifecycle states, per-device credentials, `SensorAssignment`, `SensorCalibration` | `/gateways` replaced with real data |
+| **4** | **Ingest v2** ✅ **DONE** | `Measurement` + hypertable, sequence/event IDs, idempotent batch writes, quality flags, **Pi store-and-forward buffer** | Offline test: disconnect, reconnect, zero loss, zero duplicates |
 | **5** | **Live + history** | SSE from `api` (kills SEC-1), downsampled history endpoints, engineering-grade charts | Browser never touches the broker |
 | **6** | **SHM analytics** | Worker + queue; FFT/PSD with windowing and detrending; baseline; modal tracking; versioned results | `/analytics` replaced with real, reproducible analysis |
 | **7** | **Alerts** | `Alert` lifecycle, severity rules, dedup, assignment, notifications | `/alerts` replaced with real data |

@@ -669,6 +669,83 @@ model Location {
   @@map("locations")
 }
 
+// ─── MEASUREMENTS (time-series) ──────────────────────────────────────────────
+//
+// Replaces `sensor_data`, which could not become a TimescaleDB hypertable:
+// Timescale requires the partitioning column to appear in EVERY unique index,
+// and `sensor_data` has PRIMARY KEY (id) alone. This table is designed for that
+// from the start — `ts` is part of the primary key and of the idempotency
+// constraint — so the hypertable conversion in the migration simply works.
+//
+// `sensor_data` continues to be written as a compatibility shim while reports
+// and exports still read it; that dual-write is removed once they migrate.
+
+model Measurement {
+  /// Surrogate id. Paired with `ts` in the primary key because Timescale
+  /// requires the partition column in every unique index.
+  id BigInt   @default(autoincrement())
+  /// Measurement time as reported by the device, in UTC. This is the partition
+  /// column and the axis every query uses — NOT ingestedAt, which is when the
+  /// cloud happened to receive it and can lag by hours after an outage.
+  ts DateTime @db.Timestamptz()
+
+  tenantId Int
+  sensorId Int
+
+  deviceId  Int?
+  gatewayId Int?
+
+  /// Resolved AT INGEST from the sensor's placement history, so a measurement
+  /// keeps the location it was actually taken at even after the sensor moves
+  /// (§16, §79). Null when the sensor had no placement at that time.
+  locationId  Int?
+  structureId Int?
+
+  /// Calibrated value, and the raw reading it came from. Keeping both means a
+  /// recalibration can be reapplied to history without the original being lost
+  /// (§47 raw vs derived).
+  ///
+  /// `value` is nullable on purpose. A device that sends NaN or Infinity has
+  /// reported at this instant but has NOT reported a number, and storing 0 for
+  /// it would invent a measurement — the one thing this platform must never do.
+  /// Such a row is stored with a null value and the NOT_FINITE quality flag,
+  /// which is itself the evidence of a failing channel (§30).
+  value         Float? @db.DoublePrecision
+  rawValue      Float? @db.DoublePrecision
+  /// Which calibration record produced `value`, so any number on a chart can be
+  /// traced back to the coefficient that made it.
+  calibrationId Int?
+
+  /// Per-sensor monotonic counter from the device. Gaps mean lost packets (§30).
+  sequenceNumber BigInt?
+  /// Device-generated idempotency key. A retried upload carries the same id, so
+  /// replay after an outage cannot double-count (§12).
+  eventId        String? @db.VarChar(64)
+
+  /// Data-quality findings, e.g. OUT_OF_RANGE, FLATLINE, SEQUENCE_GAP.
+  /// Flagged, never discarded: a suppressed bad reading hides a failing sensor
+  /// (§30).
+  qualityFlags String[] @default([])
+
+  /// When the platform received it. The difference from `ts` is the delivery
+  /// lag, which is how buffered-then-replayed data is recognised.
+  ingestedAt DateTime @default(now()) @db.Timestamptz()
+
+  @@id([ts, id])
+  /// Idempotency. NULL event ids do not collide in Postgres, so legacy devices
+  /// that send none are still accepted — they simply get no dedup protection.
+  @@unique([eventId, ts])
+  /// Declared explicitly because create_hypertable() also creates a `ts` index.
+  /// Without it in the schema, every subsequent `prisma migrate diff` proposes
+  /// dropping Timescale's own index.
+  @@index([ts])
+  @@index([sensorId, ts])
+  @@index([tenantId, ts])
+  @@index([structureId, ts])
+  @@index([locationId, ts])
+  @@map("measurements")
+}
+
 // ─── SENSOR DATA ─────────────────────────────────────────────────────────────
 
 model SensorData {

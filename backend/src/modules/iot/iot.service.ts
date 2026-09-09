@@ -5,6 +5,7 @@ import { sendEmail } from "../../utils/email";
 import { logger } from "../../utils/logger";
 import { ForbiddenError } from "../../utils/AppError";
 import { recordHeartbeat } from "../gateways/gateways.service";
+import { ingestMeasurements, type RawReading } from "../measurements/ingest.service";
 import { BeamDeviceDataInput, TelemetryInput } from "./iot.types";
 
 function timestampToDateTime(timestamp: number): string {
@@ -162,6 +163,8 @@ async function handleSensorData(
       where: { deviceId: String(device.id) },
     });
 
+    const pendingMeasurements: RawReading[] = [];
+
     let thresholdChannel: {
       assignSensor: string | null;
       triggerValue: string | null;
@@ -198,14 +201,37 @@ async function handleSensorData(
       const rawReading = Number(channelReading.RawReading);
       const calibrationValue = parseFloat(sensor.calibrationValue || "1");
       const actualReading = calibrationValue * rawReading;
+      const measuredAt = new Date(telemetry.Timestamp * 1000);
 
+      // Measurements v2: idempotent, quality-flagged, and placed at the
+      // location that was in force at `measuredAt`. Collected here and written
+      // as one batch after the channel loop.
+      pendingMeasurements.push({
+        sensorId: sensor.id,
+        ts: measuredAt,
+        rawValue: rawReading,
+        sequenceNumber:
+          channelReading.SequenceNumber !== undefined &&
+          channelReading.SequenceNumber !== null
+            ? BigInt(channelReading.SequenceNumber)
+            : null,
+        // Idempotency key. Preferred from the device; otherwise derived from
+        // the identity of the reading itself, so a retried payload still
+        // deduplicates instead of double-counting.
+        eventId:
+          channelReading.EventId ??
+          `${telemetry.DeviceId}:${sensor.id}:${telemetry.Timestamp}:${i}`,
+      });
+
+      // Compatibility shim: reports, exports and the dashboard still read
+      // sensor_data. Removed once those reads move to `measurements`.
       const sensorDataRow = await prisma.sensorData.create({
         data: {
           projectId: projectData.projectId,
           deviceId: telemetry.DeviceId,
           sensorId: String(sensor.id),
           sensorData: actualReading,
-          createdAt: new Date(telemetry.Timestamp * 1000),
+          createdAt: measuredAt,
         },
       });
 
@@ -242,6 +268,18 @@ async function handleSensorData(
         );
         thresholdChannel = null;
       }
+    }
+
+    if (pendingMeasurements.length > 0 && device.tenantId !== null) {
+      await ingestMeasurements(pendingMeasurements, {
+        tenantId: device.tenantId,
+        deviceId: device.id,
+        gatewayId: device.gatewayId,
+      }).catch((err) => {
+        // The compatibility write already succeeded; never lose a reading
+        // because the new path had a problem.
+        logger.error("Measurement ingest failed", err as Error);
+      });
     }
   }
 }

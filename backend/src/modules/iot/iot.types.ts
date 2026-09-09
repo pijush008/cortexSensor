@@ -16,7 +16,9 @@ const telemetrySchema = z.object({
       SensorType: z.string(),
       Channels: z.array(
         z.object({
-          RawReading: z.number(),
+          SequenceNumber: z.union([z.number(), z.string()]).optional(),
+      EventId: z.string().max(64).optional(),
+      RawReading: z.number(),
         }),
       ),
     })
