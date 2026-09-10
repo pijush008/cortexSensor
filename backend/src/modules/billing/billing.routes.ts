@@ -6,7 +6,7 @@ import { logger } from "../../utils/logger";
 import { auditLogger } from "../../utils/audit";
 import { tenantScope } from "../rbac/rbac.service";
 import { paymentProvider } from "./provider";
-import { startCheckoutForUser } from "./checkout.service";
+import { listSignupPlans, startCheckoutForUser } from "./checkout.service";
 import { verifyCheckoutToken } from "../../utils/jwt";
 import {
   evaluateEntitlement,
@@ -209,7 +209,13 @@ router.post(
   // its own parser rather than moving the router and breaking the webhook.
   express.json({ limit: "16kb" }),
   async (req: AuthRequest, res: Response) => {
-    const token = String((req.body ?? {}).checkoutToken ?? "");
+    const body = (req.body ?? {}) as {
+      checkoutToken?: unknown;
+      planCode?: unknown;
+    };
+    const token = String(body.checkoutToken ?? "");
+    const planCode =
+      typeof body.planCode === "string" && body.planCode ? body.planCode : undefined;
 
     let userId: number;
     try {
@@ -236,7 +242,10 @@ router.post(
     try {
       return res
         .status(200)
-        .json({ status_code: 200, ...(await startCheckoutForUser(userId)) });
+        .json({
+          status_code: 200,
+          ...(await startCheckoutForUser(userId, planCode)),
+        });
     } catch (error) {
       // A provider that cannot open an order is a 503, not a client error:
       // nothing the caller sent is wrong.
@@ -246,5 +255,23 @@ router.post(
     }
   },
 );
+
+/**
+ * Plans a new organization can choose between.
+ *
+ * Public: the sign-up page needs it before anyone has an account. It exposes
+ * only what a price list shows anyway — name, price, limits — and never the
+ * internal plans, which config filters out.
+ */
+router.get("/billing/plans", async (_req, res: Response) => {
+  try {
+    return res
+      .status(200)
+      .json({ status_code: 200, plans: await listSignupPlans() });
+  } catch (error) {
+    const err = error as { message: string };
+    return res.status(500).json({ status_code: 500, message: err.message });
+  }
+});
 
 export default router;

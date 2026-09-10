@@ -117,6 +117,18 @@ export const config = {
      * only chooses which row.
      */
     signupPlanCode: process.env.DEFAULT_SIGNUP_PLAN || "starter",
+    /**
+     * Plans offered on the sign-up page, in display order, BY CODE.
+     *
+     * Named explicitly rather than "every active plan": billing_plans also
+     * holds `complimentary` (the unlimited internal plan) and `enterprise`
+     * (priced on contact, 0 in the table). Listing active plans would put a
+     * free unlimited option on a public page.
+     */
+    signupPlanCodes: (process.env.SIGNUP_PLAN_CODES || "starter,professional")
+      .split(",")
+      .map((c) => c.trim())
+      .filter(Boolean),
     razorpay: {
       keyId: process.env.RAZORPAY_KEY_ID || "",
       /** Server-side only. Never sent to the browser. */

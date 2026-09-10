@@ -1,5 +1,7 @@
 import crypto from "crypto";
 import { config } from "../../config";
+import { RazorpayProvider } from "./razorpay.provider";
+import { verifyHmacSignature } from "./hmac";
 
 /**
  * Payment provider boundary.
@@ -84,32 +86,7 @@ export interface PaymentProvider {
   createOrder(input: CreateOrderInput): Promise<CreatedOrder>;
 }
 
-/**
- * HMAC-SHA256 over the raw request body, compared in constant time.
- *
- * The RAW body matters: verifying a re-serialized object would compare a
- * signature against bytes the provider never signed, and key ordering or
- * whitespace differences would break it non-deterministically. The route
- * therefore captures the body before JSON parsing.
- */
-export function verifyHmacSignature(
-  rawBody: string,
-  signature: string | undefined,
-  secret: string,
-): boolean {
-  if (!signature || !secret) return false;
-
-  const expected = crypto
-    .createHmac("sha256", secret)
-    .update(rawBody, "utf8")
-    .digest("hex");
-
-  const provided = signature.trim().toLowerCase();
-  const a = Buffer.from(expected);
-  const b = Buffer.from(provided);
-  if (a.length !== b.length) return false;
-  return crypto.timingSafeEqual(a, b);
-}
+export { verifyHmacSignature } from "./hmac";
 
 const TYPE_MAP: Record<string, BillingEventType> = {
   "checkout.completed": "checkout.completed",
@@ -202,10 +179,6 @@ export class GenericHmacProvider implements PaymentProvider {
  */
 function selectProvider(): PaymentProvider {
   if (config.billing.provider === "razorpay") {
-    // Imported lazily to keep this module free of a cycle: the Razorpay adapter
-    // imports verifyHmacSignature from here.
-     
-    const { RazorpayProvider } = require("./razorpay.provider") as typeof import("./razorpay.provider");
     return new RazorpayProvider();
   }
   return new GenericHmacProvider();

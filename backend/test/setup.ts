@@ -28,6 +28,15 @@ process.env.BILLING_WEBHOOK_SECRET = "test-webhook-secret";
 // environment would verify a signature made with one key against another.
 process.env.RAZORPAY_WEBHOOK_SECRET = "test-rzp-webhook-secret";
 
+// PINNED for the same reason, and because the suite's webhook payloads are
+// shaped for the generic envelope. Deferring to the ambient environment meant
+// that the moment a developer put BILLING_PROVIDER=razorpay in backend/.env,
+// every suite in the project failed at import time — the adapter selection
+// changed underneath tests that never mentioned billing. Tests must not depend
+// on a developer's .env. Razorpay-specific tests construct RazorpayProvider
+// directly rather than going through selection.
+process.env.BILLING_PROVIDER = "generic";
+
 // Effectively unlimited registrations during a test run.
 //
 // Every suite shares one process (vitest.config.ts sets fileParallelism: false)

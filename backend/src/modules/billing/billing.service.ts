@@ -3,6 +3,8 @@ import prisma from "../../config/prisma";
 import { config } from "../../config";
 import { logger } from "../../utils/logger";
 import { paymentProvider, type NormalizedEvent } from "./provider";
+import { renderWelcomeEmail, sendEmail } from "../../utils/email";
+import { getBaseUrl } from "../../utils/helper";
 
 /**
  * Subscription state, driven by the payment provider.
@@ -247,6 +249,7 @@ async function applyEvent(event: NormalizedEvent): Promise<string> {
       // closed before the charge settles; only the provider's signature is
       // evidence that money moved.
       await activateOwnerAfterPayment(subscription.adminId);
+      await sendWelcomeEmail(subscription.adminId, subscription, periodEnd, event.amountMinor);
 
       if (event.invoiceId && event.amountMinor !== undefined) {
         await prisma.invoice
@@ -365,9 +368,19 @@ async function activateOwnerAfterPayment(adminId: number): Promise<void> {
   if (!owner || owner.isDelete === ("true_" as never)) return;
   if (owner.isUserVerified === ("true_" as never)) return;
 
+  // Payment also settles the email address.
+  //
+  // The point of email verification is proving the person controls the address
+  // they typed. A completed card payment plus the receipt and welcome mail sent
+  // to that same address is stronger evidence than clicking a link in it, and
+  // requiring both would leave a paying customer locked out of the dashboard
+  // waiting for mail this deployment may not even be able to send.
   await prisma.user.update({
     where: { id: owner.id },
-    data: { isUserVerified: "true_" as never },
+    data: {
+      isUserVerified: "true_" as never,
+      isMailVerified: "true_" as never,
+    },
   });
 
   await prisma.auditLog.create({
@@ -385,4 +398,61 @@ async function activateOwnerAfterPayment(adminId: number): Promise<void> {
 
 export function isBillingConfigured(): boolean {
   return paymentProvider.isConfigured() && Boolean(config.billing.enabled);
+}
+
+/**
+ * "Your account is ready" — sent once, when a subscription becomes active.
+ *
+ * Never allowed to fail the webhook. Razorpay retries any non-2xx, and failing
+ * a delivered activation because SMTP hiccuped would replay an activation that
+ * already happened. A missing welcome mail is an annoyance; a re-run activation
+ * is a correctness problem.
+ */
+async function sendWelcomeEmail(
+  adminId: number,
+  subscription: { tenantId: number | null; planId: number },
+  validTill: Date,
+  paidAmountMinor?: number,
+): Promise<void> {
+  try {
+    const [admin, tenant, plan] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: adminId },
+        select: { firstName: true, emailId: true },
+      }),
+      subscription.tenantId
+        ? prisma.tenant.findUnique({
+            where: { id: subscription.tenantId },
+            select: { name: true },
+          })
+        : Promise.resolve(null),
+      prisma.billingPlan.findUnique({
+        where: { id: subscription.planId },
+        select: { name: true, priceMonthly: true, currency: true },
+      }),
+    ]);
+
+    if (!admin || !plan) return;
+
+    const mail = renderWelcomeEmail({
+      firstName: admin.firstName,
+      companyName: tenant?.name ?? admin.firstName,
+      planName: plan.name,
+      amountPaise: paidAmountMinor ?? plan.priceMonthly,
+      currency: plan.currency,
+      validTill,
+      signInUrl: `${getBaseUrl()}/dashboard`,
+    });
+
+    await sendEmail({
+      to: admin.emailId,
+      subject: mail.subject,
+      html: mail.html,
+      text: mail.text,
+    });
+  } catch (mailError) {
+    logger.warn(
+      `Welcome email could not be sent after activating admin ${adminId}: ${(mailError as Error).message}`,
+    );
+  }
 }

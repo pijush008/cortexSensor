@@ -85,3 +85,69 @@ export async function sendEmail({
     return false;
   }
 }
+export interface WelcomeEmailInput {
+  firstName: string;
+  companyName: string;
+  planName: string;
+  /** Integer minor units, as stored on the plan. */
+  amountPaise: number;
+  currency: string;
+  validTill: Date;
+  signInUrl: string;
+}
+
+/**
+ * The "your account is ready" mail, sent once payment has been confirmed.
+ *
+ * Rendering is separated from sending so the wording can be tested without
+ * SMTP, and so a send failure cannot be mistaken for a rendering failure.
+ */
+export function renderWelcomeEmail(input: WelcomeEmailInput): {
+  subject: string;
+  html: string;
+  text: string;
+} {
+  const amount = new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: input.currency,
+    minimumFractionDigits: 0,
+  }).format(input.amountPaise / 100);
+
+  const validTill = new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(input.validTill);
+
+  const subject = `${input.companyName} is ready — ${input.planName} plan active`;
+
+  const html = `
+    <p>Hello ${input.firstName},</p>
+    <p>Your account has been created successfully and
+       <strong>${input.companyName}</strong> is now active on the Cloudglance
+       structural health monitoring platform.</p>
+    <table cellpadding="6" style="border-collapse:collapse">
+      <tr><td>Plan</td><td><strong>${input.planName}</strong></td></tr>
+      <tr><td>Amount paid</td><td>${amount}</td></tr>
+      <tr><td>Valid till</td><td>${validTill}</td></tr>
+    </table>
+    <p><a href="${input.signInUrl}">Open your dashboard</a></p>
+    <p>You can now create projects, and add contractor and authority users to
+       them.</p>
+  `.trim();
+
+  const text = [
+    `Hello ${input.firstName},`,
+    ``,
+    `Your account has been created successfully and ${input.companyName} is now active on the Cloudglance structural health monitoring platform.`,
+    ``,
+    `Plan: ${input.planName}`,
+    `Amount paid: ${amount}`,
+    `Valid till: ${validTill}`,
+    ``,
+    `Open your dashboard: ${input.signInUrl}`,
+  ].join("\n");
+
+  return { subject, html, text };
+}

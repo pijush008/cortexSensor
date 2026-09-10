@@ -1,13 +1,12 @@
 import crypto from "crypto";
 import { config } from "../../config";
-import {
-  verifyHmacSignature,
-  type BillingEventType,
+import { type BillingEventType,
   type CreateOrderInput,
   type CreatedOrder,
   type NormalizedEvent,
   type PaymentProvider,
-} from "./provider";
+ } from "./provider";
+import { verifyHmacSignature } from "./hmac";
 
 /**
  * Razorpay adapter.
