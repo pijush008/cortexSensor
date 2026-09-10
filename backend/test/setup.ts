@@ -37,6 +37,23 @@ process.env.RAZORPAY_WEBHOOK_SECRET = "test-rzp-webhook-secret";
 // directly rather than going through selection.
 process.env.BILLING_PROVIDER = "generic";
 
+// PINNED EMPTY, for two reasons.
+//
+// Correctness: outbound mail decides behaviour now — a platform admin is sent
+// a sign-in code only when mail is configured — so leaving this ambient means
+// the suite takes a different path on a machine that happens to have SMTP
+// credentials in .env. That is exactly what happened: adding real Gmail
+// credentials turned every platform-admin sign-in into a two-step flow and
+// broke suites that never mentioned email.
+//
+// And restraint: with real credentials present, a test run SENDS REAL MAIL to
+// whatever address a fixture invents. A test suite must not be able to email
+// strangers.
+process.env.GMAIL_ACCOUNT = "";
+process.env.GMAIL_PASSWORD = "";
+process.env.SMTP_USER = "";
+process.env.SMTP_PASSWORD = "";
+
 // Effectively unlimited registrations during a test run.
 //
 // Every suite shares one process (vitest.config.ts sets fileParallelism: false)

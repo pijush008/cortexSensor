@@ -34,6 +34,11 @@ import {
 } from "../rbac/tenant.provisioning";
 import { evaluateMfaGate, verifyToken } from "./mfa.service";
 import {
+  consumeLoginOtp,
+  issueLoginOtp,
+  loginOtpRequired,
+} from "./login-otp.service";
+import {
   LoginInput,
   RegisterAdminInput,
   RegisterInput,
@@ -115,6 +120,27 @@ export async function login(input: LoginInput) {
     }
   }
 
+  // A platform operator can act across every tenant, so the password alone is
+  // a single point of failure for the whole deployment. Mail a code and issue
+  // NO session until it comes back.
+  if (loginOtpRequired(user)) {
+    await issueLoginOtp({
+      id: user.id,
+      emailId: user.emailId,
+      firstName: user.firstName,
+    });
+    return {
+      status_code: 200,
+      message: null,
+      error: null,
+      userID: user.id,
+      type: user.userType,
+      mfaEnrolmentRequired: gate.enrolmentRequired,
+      // The caller must call verifyLoginOtp before it has a session.
+      otpRequired: true as const,
+    };
+  }
+
   return {
     status_code: 200,
     message: null,
@@ -123,6 +149,32 @@ export async function login(input: LoginInput) {
     type: user.userType,
     // Signals the client to walk the operator through enrolment (§94).
     mfaEnrolmentRequired: gate.enrolmentRequired,
+    otpRequired: false as const,
+  };
+}
+
+/**
+ * Second step of a platform operator's sign-in: check the emailed code.
+ *
+ * Re-reads the account rather than trusting the first step, so a user deleted
+ * or deactivated between the two steps cannot complete a sign-in.
+ */
+export async function verifyLoginOtp(userId: number, otp: string) {
+  const user = await prisma.user.findFirst({
+    where: { id: userId, isDelete: "false_" as never },
+  });
+  if (!user) {
+    throw new UnauthorizedError("Request a new sign-in code");
+  }
+
+  await consumeLoginOtp(user.id, otp);
+
+  return {
+    status_code: 200,
+    message: null,
+    error: null,
+    userID: user.id,
+    type: user.userType,
   };
 }
 
@@ -150,13 +202,18 @@ export async function forgotPassword(username: string) {
     html: `Your OTP for password reset is: ${otp}`,
   });
 
-  await prisma.tempOtp.deleteMany({ where: { userId: user.id } });
+  // Scoped: a pending SIGN-IN code must not be wiped by a reset request, and
+  // must never be redeemable here.
+  await prisma.tempOtp.deleteMany({
+    where: { userId: user.id, purpose: "password_reset" },
+  });
 
   if (emailSent) {
     await prisma.tempOtp.create({
       data: {
         userId: user.id,
         otp,
+        purpose: "password_reset",
         createdAt: new Date(),
       },
     });
@@ -172,8 +229,10 @@ export async function validateOTP(userId: string, inputOTP: string) {
     throw new BadRequestError("User not found");
   }
 
+  // purpose is the whole point: without it a sign-in code mailed as a second
+  // factor could be exchanged here for a password-reset token.
   const otpRecord = await prisma.tempOtp.findFirst({
-    where: { userId: Number(userId) },
+    where: { userId: Number(userId), purpose: "password_reset" },
   });
 
   if (!otpRecord) {
@@ -189,7 +248,9 @@ export async function validateOTP(userId: string, inputOTP: string) {
     throw new BadRequestError("OTP has expired. Please request a new one.");
   }
 
-  await prisma.tempOtp.deleteMany({ where: { userId: Number(userId) } });
+  await prisma.tempOtp.deleteMany({
+    where: { userId: Number(userId), purpose: "password_reset" },
+  });
 
   const resetToken = await signPasswordResetToken(Number(userId));
 

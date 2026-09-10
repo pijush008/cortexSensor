@@ -1272,10 +1272,18 @@ model TempOtp {
   id        Int      @id @default(autoincrement())
   userId    Int
   otp       String   @db.VarChar(100)
+  /// What this code may be redeemed for.
+  ///
+  /// Load-bearing, not bookkeeping: validateOTP exchanges a code for a
+  /// password-reset token, so without this a second-factor code mailed at
+  /// sign-in could be redeemed to reset the password instead — turning a
+  /// defence into a takeover path. Every read filters on it.
+  purpose   String   @default("password_reset") @db.VarChar(32)
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
 
+  @@index([userId, purpose])
   @@map("temp_otps")
 }
 

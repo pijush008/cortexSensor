@@ -47,7 +47,12 @@ function GoogleMark() {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuthStore();
+  const { login, verifyLoginOtp } = useAuthStore();
+
+  // Set once a platform operator has cleared the password step and a code has
+  // been mailed. Until the code is accepted there is no session.
+  const [otpUserId, setOtpUserId] = useState<number | null>(null);
+  const [otp, setOtp] = useState("");
   const [mode, setMode] = useState<Mode>("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -124,12 +129,33 @@ export default function LoginPage() {
     return () => clearInterval(id);
   }, []);
 
+  const handleOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (otpUserId === null) return;
+    setError(null);
+    setLoading(true);
+    try {
+      await verifyLoginOtp(otpUserId, otp);
+      router.push("/dashboard");
+    } catch (err) {
+      setError(describeError(err, { credentialAttempt: true }));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      await login(username, password);
+      const outcome = await login(username, password);
+      if (outcome.otpRequired) {
+        // No session yet. The code decides whether one is issued.
+        setOtpUserId(outcome.userId);
+        setOtp("");
+        return;
+      }
       router.push("/dashboard");
     } catch (err) {
       // Routed through describeError so the user sees "Too many attempts,
@@ -323,6 +349,46 @@ export default function LoginPage() {
                 </div>
               )}
 
+              {/* Second factor. Replaces the credential form entirely rather
+                  than appearing beside it: the password step is finished, and
+                  leaving those fields on screen invites re-submitting them. */}
+              {otpUserId !== null ? (
+                <form onSubmit={handleOtp} className="mt-6 space-y-4">
+                  <p className="text-[13px] leading-relaxed text-slate-600">
+                    A six-digit sign-in code has been emailed to{" "}
+                    <span className="font-medium text-shm-navy-900">{username}</span>.
+                    It expires in 10 minutes.
+                  </p>
+                  <Input
+                    label="Sign-in code"
+                    placeholder="000000"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                    required
+                  />
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={loading || otp.length < 6}
+                  >
+                    {loading ? "Verifying…" : "Verify and sign in"}
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOtpUserId(null);
+                      setOtp("");
+                      setError(null);
+                    }}
+                    className="w-full text-[13px] text-slate-500 underline"
+                  >
+                    Use a different account
+                  </button>
+                </form>
+              ) : (
               <form
                 onSubmit={mode === "login" ? handleLogin : handleForgot}
                 className="mt-6 space-y-4"
@@ -355,11 +421,14 @@ export default function LoginPage() {
                   </Button>
                 )}
               </form>
+              )}
 
               {/* Google sign-in, shown only when the server reports it is
                   configured. Offering a button that answers 503 would be worse
                   than not offering one. */}
-              {mode === "login" && (googleAvailable || showGoogleAsUnconfigured) && (
+              {otpUserId === null &&
+                mode === "login" &&
+                (googleAvailable || showGoogleAsUnconfigured) && (
                 <>
                   <div className="my-5 flex items-center gap-3">
                     <span className="h-px flex-1 bg-slate-200" />

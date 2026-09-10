@@ -7,7 +7,8 @@ interface AuthState {
   userType: UserRole | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<LoginOutcome>;
+  verifyLoginOtp: (userId: number, otp: string) => Promise<void>;
   logout: () => Promise<void>;
   initialize: () => void;
 }
@@ -17,6 +18,13 @@ interface LoginPayload {
   message: string | null;
   userID?: number;
   type?: UserRole;
+  /** Platform operators finish signing in with an emailed code. */
+  otpRequired?: boolean;
+}
+
+export interface LoginOutcome {
+  otpRequired: boolean;
+  userId: number;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -33,6 +41,34 @@ export const useAuthStore = create<AuthState>((set) => ({
     const result = data as LoginPayload;
     if (result.status_code !== 200 || !result.userID || !result.type) {
       throw new Error(result.message || "Login failed");
+    }
+
+    // A code was mailed and NO session was issued. Marking the store
+    // authenticated here would defeat the second factor: the app would render
+    // as signed in while every API call still failed unauthenticated.
+    if (result.otpRequired) {
+      return { otpRequired: true, userId: result.userID };
+    }
+
+    localStorage.setItem("userId", String(result.userID));
+    localStorage.setItem("userType", result.type);
+    set({
+      userId: result.userID,
+      userType: result.type,
+      isAuthenticated: true,
+    });
+    return { otpRequired: false, userId: result.userID };
+  },
+
+  /** Second step for a platform operator: the session is issued here. */
+  verifyLoginOtp: async (userId: number, otp: string) => {
+    const { data } = await api.post<ApiResponse<LoginPayload>>(
+      "/commonLogin/otp",
+      { userID: userId, otp },
+    );
+    const result = data as LoginPayload;
+    if (result.status_code !== 200 || !result.userID || !result.type) {
+      throw new Error(result.message || "Sign-in failed");
     }
     localStorage.setItem("userId", String(result.userID));
     localStorage.setItem("userType", result.type);

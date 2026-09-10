@@ -54,6 +54,9 @@ const registerLimiter = rateLimit({
 });
 
 router.post("/commonLogin", loginLimiter, authController.authLogin);
+// Same limiter as the password step: the code is six digits, and without a
+// limit here the second factor could simply be enumerated.
+router.post("/commonLogin/otp", loginLimiter, authController.authLoginOtp);
 router.post("/forgotPassword", otpLimiter, authController.forgotPassword);
 router.post("/validateOTP", otpLimiter, authController.validateOTP);
 // Completing a reset is rate limited like requesting one: the token is 32

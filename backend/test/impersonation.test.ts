@@ -39,6 +39,7 @@ async function purge() {
   // Children before parents: audit entries, sessions and memberships all hold a
   // foreign key to the user.
   await prisma.auditLog.deleteMany({ where: { userId: { in: ids } } });
+  await prisma.tempOtp.deleteMany({ where: { userId: { in: ids } } });
   await prisma.refreshToken.deleteMany({ where: { userId: { in: ids } } });
   await prisma.membership.deleteMany({ where: { userId: { in: ids } } });
   await prisma.user.deleteMany({ where: { id: { in: ids } } });

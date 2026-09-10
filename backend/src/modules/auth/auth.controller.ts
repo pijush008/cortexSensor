@@ -51,7 +51,23 @@ export async function authLogin(
         message: errorMessage,
       });
     }
-    const { userID, type } = await authService.login(result.data);
+    const outcome = await authService.login(result.data);
+
+    // A platform operator gets a code by email and no session yet. Cookies are
+    // deliberately NOT set here — issuing them now would make the second factor
+    // decorative, since the caller could simply ignore the next step.
+    if (outcome.otpRequired) {
+      return res.status(200).json({
+        status_code: 200,
+        message: "A sign-in code has been sent to your email address.",
+        error: null,
+        userID: outcome.userID,
+        type: outcome.type,
+        otpRequired: true,
+      });
+    }
+
+    const { userID, type } = outcome;
     const accessToken = await authService.generateAccessToken(userID);
     const refreshToken = await issueRefreshToken(userID);
     setAuthCookies(res, accessToken, refreshToken);
@@ -61,7 +77,56 @@ export async function authLogin(
       error: null,
       userID,
       type,
+      otpRequired: false,
     });
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+}
+
+/**
+ * Second step of a platform operator's sign-in: submit the emailed code.
+ *
+ * This is where the session is finally issued, and the only place it can be
+ * for an account that requires a code.
+ */
+export async function authLoginOtp(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const body = (req.body ?? {}) as { userID?: unknown; otp?: unknown };
+    const userID = Number(body.userID);
+    const otp = String(body.otp ?? "").trim();
+
+    if (!Number.isInteger(userID) || userID <= 0 || otp.length === 0) {
+      return res.status(400).json({
+        status_code: 400,
+        message: "A user and a sign-in code are both required",
+      });
+    }
+
+    const { type } = await authService.verifyLoginOtp(userID, otp);
+    const accessToken = await authService.generateAccessToken(userID);
+    const refreshToken = await issueRefreshToken(userID);
+    setAuthCookies(res, accessToken, refreshToken);
+
+    const { ipAddress, userAgent } = auditLogger.requestContext(req);
+    await auditLogger.audit({
+      userId: userID,
+      action: "verify",
+      entity: "user",
+      // Security-relevant: records that a platform operator cleared the second
+      // factor, which is the moment the cross-tenant session begins.
+      newValue: { event: "platform_admin_sign_in", secondFactor: "email_otp" },
+      ipAddress,
+      userAgent,
+    });
+
+    return res
+      .status(200)
+      .json({ status_code: 200, message: null, error: null, userID, type });
   } catch (error) {
     return handleControllerError(res, error);
   }
