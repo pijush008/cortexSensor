@@ -1,0 +1,66 @@
+import prisma from "../../config/prisma";
+import { config } from "../../config";
+import { BadRequestError } from "../../utils/AppError";
+import { paymentProvider } from "./provider";
+
+export interface StartedCheckout {
+  orderId: string;
+  /** Publishable key. The secret never leaves the server. */
+  keyId: string;
+  amountPaise: number;
+  currency: string;
+  planName: string;
+}
+
+/**
+ * Opens a payment order for the subscription belonging to `userId`.
+ *
+ * The amount comes from the plan row, never from the request. A client able to
+ * name its own price could buy a year of monitoring for one paisa, so the only
+ * thing the caller gets to influence is WHICH subscription is being paid for —
+ * and even that is fixed by the signed token the route verified.
+ */
+export async function startCheckoutForUser(
+  userId: number,
+): Promise<StartedCheckout> {
+  const subscription = await prisma.subscription.findUnique({
+    where: { adminId: userId },
+    include: { plan: true },
+  });
+
+  if (!subscription) {
+    throw new BadRequestError("No subscription exists for this account");
+  }
+
+  // Charging an already-paid account is not a no-op, it is a second charge.
+  if (subscription.status === "active") {
+    throw new BadRequestError("This subscription is already active");
+  }
+
+  const plan =
+    subscription.plan ??
+    (await prisma.billingPlan.findFirst({
+      where: { code: config.billing.signupPlanCode, isActive: true },
+    }));
+
+  if (!plan) {
+    throw new BadRequestError("No billing plan is configured for sign-up");
+  }
+
+  const order = await paymentProvider.createOrder({
+    amountPaise: plan.priceMonthly,
+    currency: plan.currency,
+    receipt: `sub-${subscription.id}`,
+    // Read back by the webhook adapter to attribute the payment to a tenant.
+    // Without it a settled charge cannot be matched to an account.
+    notes: { subscriptionId: String(subscription.id) },
+  });
+
+  return {
+    orderId: order.orderId,
+    keyId: config.billing.razorpay.keyId,
+    amountPaise: order.amountPaise,
+    currency: order.currency,
+    planName: plan.name,
+  };
+}

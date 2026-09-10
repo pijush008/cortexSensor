@@ -6,6 +6,8 @@ import { logger } from "../../utils/logger";
 import { auditLogger } from "../../utils/audit";
 import { tenantScope } from "../rbac/rbac.service";
 import { paymentProvider } from "./provider";
+import { startCheckoutForUser } from "./checkout.service";
+import { verifyCheckoutToken } from "../../utils/jwt";
 import {
   evaluateEntitlement,
   handleWebhook,
@@ -177,16 +179,70 @@ router.post(
         userAgent,
       });
 
-      return res.status(501).json({
-        status_code: 501,
-        message:
-          "Checkout requires a payment provider adapter. The webhook, entitlement and lifecycle handling are implemented; the provider client is not wired.",
+      return res.status(200).json({
+        status_code: 200,
+        ...(await startCheckoutForUser(ctx.userId)),
       });
     } catch (error) {
       const err = error as { statusCode?: number; message: string };
       return res
         .status(err.statusCode || 400)
         .json({ status_code: err.statusCode || 400, message: err.message });
+    }
+  },
+);
+
+/**
+ * Start payment for an account that cannot sign in yet.
+ *
+ * Unauthenticated by necessity. A new organization admin is inactive until a
+ * webhook confirms their payment, so requiring a session here would mean
+ * needing a session to pay and a payment to get a session. The checkout token
+ * is the narrow substitute: one subscription, thirty minutes, no read access,
+ * and a purpose claim so a password-reset link cannot stand in for it.
+ */
+router.post(
+  "/billing/checkout/start",
+  // This router is mounted AHEAD of the global express.json() (app.ts:103 vs
+  // :106) so the webhook above can verify a signature over raw bytes. That
+  // leaves every other route here without a parsed body, so this one brings
+  // its own parser rather than moving the router and breaking the webhook.
+  express.json({ limit: "16kb" }),
+  async (req: AuthRequest, res: Response) => {
+    const token = String((req.body ?? {}).checkoutToken ?? "");
+
+    let userId: number;
+    try {
+      userId = Number(verifyCheckoutToken(token).userId);
+    } catch {
+      // Deliberately one message for every rejection — expired, forged,
+      // malformed or wrong-purpose. Distinguishing them tells an attacker
+      // which half of a guess was right.
+      return res.status(401).json({
+        status_code: 401,
+        message:
+          "This payment link is invalid or has expired. Register again to get a new one.",
+      });
+    }
+
+    if (!isBillingConfigured()) {
+      return res.status(503).json({
+        status_code: 503,
+        message:
+          "No payment provider is configured on this deployment, so checkout cannot be started.",
+      });
+    }
+
+    try {
+      return res
+        .status(200)
+        .json({ status_code: 200, ...(await startCheckoutForUser(userId)) });
+    } catch (error) {
+      // A provider that cannot open an order is a 503, not a client error:
+      // nothing the caller sent is wrong.
+      const err = error as { statusCode?: number; message: string };
+      const status = err.statusCode || 503;
+      return res.status(status).json({ status_code: status, message: err.message });
     }
   },
 );
