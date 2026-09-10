@@ -3,6 +3,8 @@ import { config } from "../../config";
 import {
   verifyHmacSignature,
   type BillingEventType,
+  type CreateOrderInput,
+  type CreatedOrder,
   type NormalizedEvent,
   type PaymentProvider,
 } from "./provider";
@@ -59,8 +61,13 @@ interface RazorpayEntity {
   plan_id?: string;
 }
 
+type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
+
 export class RazorpayProvider implements PaymentProvider {
   readonly name = "razorpay";
+
+  // Injectable so the test can assert what we send without a network call.
+  constructor(private readonly fetchImpl: FetchLike = fetch) {}
 
   isConfigured(): boolean {
     const rp = config.billing.razorpay;
@@ -73,6 +80,43 @@ export class RazorpayProvider implements PaymentProvider {
       signature,
       config.billing.razorpay.webhookSecret,
     );
+  }
+
+  async createOrder(input: CreateOrderInput): Promise<CreatedOrder> {
+    const rp = config.billing.razorpay;
+    const auth = Buffer.from(`${rp.keyId}:${rp.keySecret}`).toString("base64");
+
+    const res = await this.fetchImpl("https://api.razorpay.com/v1/orders", {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${auth}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        amount: input.amountPaise,
+        currency: input.currency,
+        receipt: input.receipt,
+        notes: input.notes,
+      }),
+    });
+
+    if (!res.ok) {
+      const detail = await res.text();
+      throw new Error(
+        `Razorpay order creation failed (${res.status}): ${detail.slice(0, 200)}`,
+      );
+    }
+
+    const order = (await res.json()) as {
+      id: string;
+      amount: number;
+      currency: string;
+    };
+    return {
+      orderId: order.id,
+      amountPaise: order.amount,
+      currency: order.currency,
+    };
   }
 
   parseEvent(rawBody: string): NormalizedEvent {

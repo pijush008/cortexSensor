@@ -151,3 +151,48 @@ describe("Razorpay configuration", () => {
     expect(provider.isConfigured()).toBe(expected);
   });
 });
+
+describe("createOrder", () => {
+  test("posts amount in paise and returns the order id", async () => {
+    const calls: Array<{ url: string; body: unknown; auth: string }> = [];
+    const fakeFetch = async (url: string, init: RequestInit) => {
+      calls.push({
+        url,
+        body: JSON.parse(String(init.body)),
+        auth: String((init.headers as Record<string, string>).Authorization),
+      });
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ id: "order_TEST123", amount: 499900, currency: "INR" }),
+      } as unknown as Response;
+    };
+
+    const provider = new RazorpayProvider(fakeFetch);
+    const order = await provider.createOrder({
+      amountPaise: 499900,
+      currency: "INR",
+      receipt: "sub-42",
+      notes: { subscriptionId: "42" },
+    });
+
+    expect(order).toEqual({ orderId: "order_TEST123", amountPaise: 499900, currency: "INR" });
+    expect(calls[0].url).toBe("https://api.razorpay.com/v1/orders");
+    expect(calls[0].body).toMatchObject({
+      amount: 499900,
+      currency: "INR",
+      notes: { subscriptionId: "42" },
+    });
+    // Our subscription id must ride along, or the webhook cannot be attributed.
+    expect(calls[0].auth.startsWith("Basic ")).toBe(true);
+  });
+
+  test("a provider error surfaces rather than returning a bogus order", async () => {
+    const fakeFetch = async () =>
+      ({ ok: false, status: 401, text: async () => "unauthorized" }) as unknown as Response;
+    const provider = new RazorpayProvider(fakeFetch);
+    await expect(
+      provider.createOrder({ amountPaise: 100, currency: "INR", receipt: "r", notes: {} }),
+    ).rejects.toThrow(/razorpay order creation failed/i);
+  });
+});

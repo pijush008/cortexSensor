@@ -41,12 +41,37 @@ export interface NormalizedEvent {
   raw: unknown;
 }
 
+export interface CreateOrderInput {
+  /** Integer minor units. Rupees are never floats here. */
+  amountPaise: number;
+  currency: string;
+  /** Our reference, echoed back by the provider for reconciliation. */
+  receipt: string;
+  /**
+   * Carried through to the webhook. Our own subscription id lives here so an
+   * incoming event can be attributed to a tenant without trusting the browser.
+   */
+  notes: Record<string, string>;
+}
+
+export interface CreatedOrder {
+  orderId: string;
+  amountPaise: number;
+  currency: string;
+}
+
 export interface PaymentProvider {
   readonly name: string;
   /** True when credentials are configured and the provider can be called. */
   isConfigured(): boolean;
   verifySignature(rawBody: string, signature: string | undefined): boolean;
   parseEvent(rawBody: string): NormalizedEvent;
+  /**
+   * Opens an order with the provider. Throws when the adapter cannot take a
+   * payment, so an unconfigured deployment fails loudly instead of handing the
+   * browser an order that does not exist.
+   */
+  createOrder(input: CreateOrderInput): Promise<CreatedOrder>;
 }
 
 /**
@@ -105,6 +130,14 @@ export class GenericHmacProvider implements PaymentProvider {
 
   verifySignature(rawBody: string, signature: string | undefined): boolean {
     return verifyHmacSignature(rawBody, signature, config.billing.webhookSecret);
+  }
+
+  async createOrder(): Promise<CreatedOrder> {
+    // The generic adapter verifies and parses webhooks; it has no API to open
+    // an order against. Refusing keeps the "never pretend" property.
+    throw new Error(
+      "The configured payment provider cannot start a checkout. Set BILLING_PROVIDER=razorpay and supply credentials.",
+    );
   }
 
   parseEvent(rawBody: string): NormalizedEvent {
