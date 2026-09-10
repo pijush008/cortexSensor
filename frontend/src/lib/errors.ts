@@ -46,6 +46,37 @@ function detailOf(error: AxiosError): string | undefined {
   return fromBody ?? error.message ?? undefined;
 }
 
+/**
+ * The message the API itself sent, or undefined.
+ *
+ * Deliberately NOT detailOf: that falls back to `error.message`, which on a
+ * rejected request is axios's own "Request failed with status code 400". Shown
+ * to someone filling in a form that is worse than the generic copy, so only a
+ * message the server actually wrote qualifies.
+ *
+ * The guards keep this from becoming a hole that prints whatever a 4xx happens
+ * to carry. A body-parser failure, an HTML error page from a proxy, or a stack
+ * trace escaping a handler is long or multi-line; a message written for a
+ * person is short and one line. Anything else falls through to the generic
+ * copy rather than putting server internals on screen.
+ */
+const MAX_SERVER_MESSAGE = 200;
+
+function serverMessageOf(error: AxiosError): string | undefined {
+  const data = error.response?.data as
+    | { message?: unknown; error?: unknown }
+    | undefined;
+  const raw =
+    (typeof data?.message === "string" && data.message) ||
+    (typeof data?.error === "string" && data.error) ||
+    "";
+  const text = raw.trim();
+  if (text.length === 0 || text.length > MAX_SERVER_MESSAGE) return undefined;
+  if (/[\r\n]/.test(text)) return undefined;
+  if (/^\s*</.test(text)) return undefined; // an HTML error page, not a sentence
+  return text;
+}
+
 export interface DescribeOptions {
   /**
    * Set on a sign-in / credential submission. A 401 means two different things
@@ -141,6 +172,35 @@ export function describeError(
           status,
           retryable: true,
         };
+      // A rejected submission. The API answers these with a message written for
+      // the person filling the form — "Email already exists", "Upload a png,
+      // jpg, webp image file", "Password must be at least 8 characters" — and
+      // that message is the only thing that says what to change.
+      //
+      // Without these cases they fell to the generic client fallback below, so
+      // registration failures read "That request couldn't be completed /
+      // Something about the request was rejected by the server": accurate,
+      // unactionable, and identical whether the email was taken or the logo was
+      // an SVG.
+      case 400:
+      case 409:
+      case 422: {
+        const fromServer = serverMessageOf(error);
+        if (fromServer) {
+          return {
+            kind: "client",
+            title:
+              status === 409
+                ? "That already exists"
+                : "Check the form and try again",
+            description: fromServer,
+            detail,
+            status,
+            retryable: false,
+          };
+        }
+        break;
+      }
       default:
         break;
     }
