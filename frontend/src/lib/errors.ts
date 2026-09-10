@@ -143,16 +143,29 @@ export function describeError(
               status,
               retryable: false,
             };
-      case 403:
+      case 403: {
+        // Not every 403 is about roles. Sign-in raises one for an account
+        // whose payment has not been confirmed yet, and answering that with
+        // "your role doesn't permit viewing this data" sends someone to an
+        // administrator over a step they need to complete themselves.
+        //
+        // When the API states a reason, that reason is the description; the
+        // role wording is only the fallback for a bare 403.
+        const fromServer = serverMessageOf(error);
         return {
           kind: "forbidden",
-          title: "You don't have access to this",
+          title:
+            fromServer && options.credentialAttempt
+              ? "Can't sign in yet"
+              : "You don't have access to this",
           description:
+            fromServer ??
             "Your role doesn't permit viewing this data. Contact an administrator if you think that's wrong.",
           detail,
           status,
           retryable: false,
         };
+      }
       case 404:
         return {
           kind: "notFound",
