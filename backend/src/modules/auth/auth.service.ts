@@ -15,6 +15,7 @@ import {
 } from "../../utils/helper";
 import {
   signAccessToken,
+  signCheckoutToken,
   signPasswordResetToken,
   verifyPasswordResetToken,
 } from "../../utils/jwt";
@@ -382,12 +383,22 @@ export async function register(
     );
   }
 
+  // The only credential a new admin can use. They cannot sign in — the account
+  // stays inactive until a webhook confirms payment — so without this the flow
+  // dead-ends at "register, then somehow pay".
+  //
+  // Admins only: a contractor or authority is added into an organization that
+  // has already paid, so they have nothing to check out.
+  const checkoutToken =
+    userType === "admin" ? await signCheckoutToken(userId) : undefined;
+
   return {
     status_code: 200,
     message: sent
       ? "User added successfully"
       : "Account created, but the verification email could not be sent. Contact your administrator.",
     emailSent: sent,
+    ...(checkoutToken ? { checkoutToken } : {}),
     // Development only, and only when mail is unconfigured: without this the
     // signup flow cannot be completed at all on a machine with no SMTP account,
     // because the link exists solely inside a message nobody can receive.
