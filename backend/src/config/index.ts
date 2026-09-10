@@ -37,9 +37,23 @@ export const config = {
     ingestClientId: process.env.MQTT_INGEST_CLIENT_ID || "shm-backend-ingest",
   },
   email: {
-    account: process.env.GMAIL_ACCOUNT || "",
-    password: process.env.GMAIL_PASSWORD || "",
+    /**
+     * SMTP credentials. GMAIL_* are the historical names and still work; the
+     * SMTP_* aliases exist because the transport was hardwired to Gmail, which
+     * ruled out every other provider — SendGrid, Mailgun, SES, or a company's
+     * own mail server.
+     */
+    account: process.env.SMTP_USER || process.env.GMAIL_ACCOUNT || "",
+    password: process.env.SMTP_PASSWORD || process.env.GMAIL_PASSWORD || "",
     from: process.env.EMAIL_FROM || "",
+    /**
+     * Leave SMTP_HOST unset to keep using Gmail. Set it to use any other
+     * provider; port defaults to 587 (STARTTLS), the usual submission port.
+     */
+    host: process.env.SMTP_HOST || "",
+    port: Number(process.env.SMTP_PORT ?? 587),
+    /** True for port 465 (implicit TLS); false for 587, which upgrades. */
+    secure: process.env.SMTP_SECURE === "true",
   },
   uploadDir: process.env.UPLOAD_DIR || "./uploads",
   maxFileSize: Number(process.env.MAX_FILE_SIZE) || 10485760,
@@ -66,11 +80,54 @@ export const config = {
    * hop is one more X-Forwarded-For entry taken on trust.
    */
   trustProxyHops: Number(process.env.TRUST_PROXY_HOPS ?? 1),
+  /**
+   * Where the FRONTEND is served. Used to build links that are emailed to
+   * people — password resets, email verification — which must open the app,
+   * not the API. Wrong here means a working token inside a dead link.
+   */
+  appUrl: process.env.APP_URL || "http://localhost:3000",
+  /**
+   * Organization registrations allowed per IP per hour.
+   *
+   * Configurable rather than hard-coded because the test suite runs every file
+   * in ONE process with an in-memory limiter store (test/setup.ts disables
+   * Redis, vitest.config.ts sets fileParallelism: false), so all suites share a
+   * single counter. A hard 5 would 429 the sixth registration of the whole run
+   * and take out most of the suite.
+   */
+  registerRateLimitMax: Number(process.env.REGISTER_RATE_LIMIT_MAX ?? 5),
   billing: {
     /** Master switch; billing endpoints refuse rather than pretend when off. */
     enabled: process.env.BILLING_ENABLED === "true",
     /** HMAC secret the provider signs webhook bodies with. */
     webhookSecret: process.env.BILLING_WEBHOOK_SECRET || "",
+    /**
+     * Which adapter handles checkout and webhooks. "razorpay" once credentials
+     * exist; "generic" is the documented HMAC envelope used by the tests, and
+     * is the default so a deployment without credentials refuses cleanly rather
+     * than half-working.
+     */
+    provider: process.env.BILLING_PROVIDER || "generic",
+    /**
+     * Plan every new organization is put on at sign-up, BY CODE.
+     *
+     * Named rather than inferred: picking "the first active plan" once put new
+     * customers on `complimentary`, the unlimited internal plan, silently
+     * removing every limit. Changing the price is an UPDATE on the row; this
+     * only chooses which row.
+     */
+    signupPlanCode: process.env.DEFAULT_SIGNUP_PLAN || "starter",
+    razorpay: {
+      keyId: process.env.RAZORPAY_KEY_ID || "",
+      /** Server-side only. Never sent to the browser. */
+      keySecret: process.env.RAZORPAY_KEY_SECRET || "",
+      /** Separate from the API secret; Razorpay signs webhooks with its own. */
+      webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET || "",
+    },
+  },
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID || "",
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
   },
   /**
    * Whether platform operators must enrol in MFA (§94). Configurable so a

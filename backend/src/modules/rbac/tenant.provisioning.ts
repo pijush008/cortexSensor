@@ -2,6 +2,14 @@ import { randomBytes } from "crypto";
 import { MembershipStatus, RoleKey, TenantStatus } from "@prisma/client";
 import prisma from "../../config/prisma";
 import { BadRequestError } from "../../utils/AppError";
+import { config } from "../../config";
+
+/**
+ * Plan a newly-registered organization starts on. Must match the fallback in
+ * subscription.service.ts; the two are the same business decision.
+ */
+// Single source of truth: checkout charges for the same plan sign-up assigns.
+const DEFAULT_PLAN_CODE = config.billing.signupPlanCode;
 
 /**
  * Tenant provisioning at sign-up.
@@ -59,6 +67,15 @@ async function roleIdFor(key: RoleKey): Promise<number> {
 export async function provisionTenantForAdmin(
   userId: number,
   organizationName: string,
+  /**
+   * Relative path to the organization's logo, already validated and written to
+   * disk by the caller. A PATH, not a data URI — decoding an image here would
+   * pull upload validation into a module about tenancy and roles.
+   *
+   * Optional with a default so the seeds and any future caller compile
+   * unchanged; today the only caller is auth.service.ts.
+   */
+  logoPath: string | null = null,
 ): Promise<number> {
   const existing = await prisma.membership.findFirst({
     where: { userId },
@@ -75,6 +92,7 @@ export async function provisionTenantForAdmin(
       name: organizationName || slug,
       slug,
       status: TenantStatus.active,
+      logoPath,
     },
   });
 
@@ -86,6 +104,38 @@ export async function provisionTenantForAdmin(
       status: MembershipStatus.active,
     },
   });
+
+  // The organization's billing record is created with the organization itself.
+  // Without it there is nothing for a checkout to attach a provider id to, and
+  // therefore nothing a later webhook can be matched against — the payment
+  // would arrive with no way to tell whose account to open.
+  //
+  // It starts `pending`: the account exists, and grants nothing until a
+  // verified webhook confirms the charge settled.
+  // The SAME default the subscription service uses, by CODE.
+  //
+  // Picking "the first active plan by id" instead put every new organization on
+  // `complimentary` — the unlimited internal plan — which silently disabled
+  // every plan limit for new customers. A default this consequential has to be
+  // named, not inferred from row order.
+  const plan = await prisma.billingPlan.findFirst({
+    where: { code: DEFAULT_PLAN_CODE, isActive: true },
+  });
+
+  if (plan) {
+    await prisma.subscription.upsert({
+      where: { adminId: userId },
+      update: { tenantId: tenant.id },
+      create: {
+        adminId: userId,
+        tenantId: tenant.id,
+        planId: plan.id,
+        status: "pending",
+        startsOn: new Date(),
+        autoRenew: true,
+      },
+    });
+  }
 
   return tenant.id;
 }
