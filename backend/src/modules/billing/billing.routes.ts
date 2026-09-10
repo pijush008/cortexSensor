@@ -257,6 +257,44 @@ router.post(
 );
 
 /**
+ * Has the payment landed yet?
+ *
+ * The register page needs to know when the webhook has activated the account,
+ * and it has no session to ask with — that is the whole reason the checkout
+ * token exists. Polling the sign-in endpoint instead would burn the 20-attempt
+ * login rate limit within a minute.
+ *
+ * Returns only a status string for the subscription the token already names.
+ */
+router.post(
+  "/billing/checkout/status",
+  express.json({ limit: "8kb" }),
+  async (req: AuthRequest, res: Response) => {
+    const token = String(((req.body ?? {}) as { checkoutToken?: unknown }).checkoutToken ?? "");
+
+    let userId: number;
+    try {
+      userId = Number(verifyCheckoutToken(token).userId);
+    } catch {
+      return res
+        .status(401)
+        .json({ status_code: 401, message: "This payment link is invalid or has expired." });
+    }
+
+    const subscription = await prisma.subscription.findUnique({
+      where: { adminId: userId },
+      select: { status: true },
+    });
+
+    return res.status(200).json({
+      status_code: 200,
+      status: subscription?.status ?? "unknown",
+      active: subscription?.status === "active",
+    });
+  },
+);
+
+/**
  * Plans a new organization can choose between.
  *
  * Public: the sign-up page needs it before anyone has an account. It exposes

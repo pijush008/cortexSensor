@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CheckCircle2, CreditCard, Mail, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { api } from "@/lib/api";
 import { describeError, type DescribedError } from "@/lib/errors";
 import { formatAmount, openRazorpayCheckout } from "./checkout";
+import { useAuthStore } from "@/stores/auth-store";
 
 /**
  * Registration for a new organization.
@@ -20,6 +22,16 @@ import { formatAmount, openRazorpayCheckout } from "./checkout";
  * fault — they have reached the next step. Saying so here is cheaper than a
  * support conversation later.
  */
+
+interface SignupPlan {
+  code: string;
+  name: string;
+  amountPaise: number;
+  currency: string;
+  maxStructures: number | null;
+  maxSensors: number | null;
+  maxUsers: number | null;
+}
 
 const MIN_PASSWORD = 8;
 
@@ -54,6 +66,14 @@ export default function RegisterPage() {
   const [devVerifyUrl, setDevVerifyUrl] = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState(true);
 
+  const router = useRouter();
+  const signIn = useAuthStore((s) => s.login);
+
+  // Plan selection, loaded from the server so the price shown is the price
+  // charged — a hardcoded figure here would drift from billing_plans.
+  const [plans, setPlans] = useState<SignupPlan[]>([]);
+  const [planCode, setPlanCode] = useState<string>("");
+
   // Payment, which begins the moment registration returns.
   const [paying, setPaying] = useState(false);
   const [checkoutError, setCheckoutError] = useState<DescribedError | null>(
@@ -66,6 +86,18 @@ export default function RegisterPage() {
   const [confirming, setConfirming] = useState(false);
   const [activated, setActivated] = useState(false);
   const [confirmTimedOut, setConfirmTimedOut] = useState(false);
+  const [checkoutToken, setCheckoutToken] = useState<string | null>(null);
+  const [autoSignInFailed, setAutoSignInFailed] = useState(false);
+
+  useEffect(() => {
+    api
+      .get<{ plans: SignupPlan[] }>("/billing/plans")
+      .then(({ data }) => {
+        setPlans(data.plans ?? []);
+        setPlanCode((current) => current || data.plans?.[0]?.code || "");
+      })
+      .catch(() => setPlans([]));
+  }, []);
 
   /**
    * Waits for the webhook to activate the organization.
@@ -84,21 +116,35 @@ export default function RegisterPage() {
         return;
       }
       try {
-        const { data } = await api.get<{
-          data?: { subscription?: { status?: string } };
-        }>("/billing/entitlement");
-        if (data?.data?.subscription?.status === "active") {
-          clearInterval(id);
-          setActivated(true);
+        // Token-scoped, so it works with no session. Retrying the sign-in
+        // endpoint instead would exhaust its 20-attempt rate limit in a minute.
+        const { data } = await api.post<{ active?: boolean }>(
+          "/billing/checkout/status",
+          { checkoutToken },
+        );
+        if (!data.active) return;
+
+        clearInterval(id);
+        setActivated(true);
+
+        // Straight to the dashboard: the person just paid, and making them
+        // retype the credentials they set sixty seconds ago is friction with
+        // no security value — the payment already proved far more.
+        try {
+          await signIn(emailId, password);
+          router.push("/dashboard");
+        } catch {
+          // Activated, but the automatic sign-in failed. The account is fine;
+          // say so and let them sign in by hand rather than implying a problem.
+          setAutoSignInFailed(true);
         }
       } catch {
-        // Expected while unauthenticated: the account cannot sign in until it
-        // is active, so this poll fails until the moment it succeeds.
+        // Not active yet, or the token expired. Keep waiting until the bound.
       }
     }, CONFIRM_POLL_MS);
 
     return () => clearInterval(id);
-  }, [confirming, activated]);
+  }, [confirming, activated, checkoutToken, emailId, password, router, signIn]);
 
   /**
    * Reads the chosen file into a data URI.
@@ -164,6 +210,7 @@ export default function RegisterPage() {
       // The account exists but is inactive, and the person cannot sign in to
       // pay. Open checkout immediately with the token registration handed back.
       if (data.checkoutToken) {
+        setCheckoutToken(data.checkoutToken);
         await startPayment(data.checkoutToken);
       }
     } catch (err) {
@@ -190,7 +237,7 @@ export default function RegisterPage() {
         amountPaise: number;
         currency: string;
         planName: string;
-      }>("/billing/checkout/start", { checkoutToken: token });
+      }>("/billing/checkout/start", { checkoutToken: token, planCode });
 
       setAmountLabel(formatAmount(order.amountPaise, order.currency));
       setPlanName(order.planName);
@@ -225,7 +272,9 @@ export default function RegisterPage() {
             icon={CreditCard}
             title={
               activated
-                ? "Payment confirmed"
+                ? autoSignInFailed
+                  ? "Payment confirmed"
+                  : "Taking you to your dashboard…"
                 : confirmTimedOut
                   ? "Payment is still being confirmed"
                   : confirming
@@ -236,7 +285,9 @@ export default function RegisterPage() {
             }
             body={
               activated
-                ? "Your organization is active. You can sign in now."
+                ? autoSignInFailed
+                  ? "Your organization is active, but signing you in automatically did not work. Use the sign-in page with the details you just set."
+                  : "Payment confirmed. Signing you in and opening your dashboard."
                 : confirmTimedOut
                   ? "The payment provider has not confirmed the charge yet. This can take a few minutes — we'll email you the moment it completes, and signing in will work from then on."
                   : confirming
@@ -304,6 +355,59 @@ export default function RegisterPage() {
       subtitle="For engineering teams monitoring their own structures."
     >
       <form onSubmit={submit} className="space-y-4">
+        {/* Chosen before paying, and priced from the server so what is shown
+            is what is charged. */}
+        {plans.length > 0 && (
+          <fieldset className="space-y-2">
+            <legend className="mb-2 text-[13px] font-medium text-shm-navy-900">
+              Choose a plan
+            </legend>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {plans.map((p) => {
+                const selected = planCode === p.code;
+                return (
+                  <label
+                    key={p.code}
+                    className={[
+                      "cursor-pointer rounded-xl border p-3.5 transition-colors",
+                      selected
+                        ? "border-shm-navy-900 bg-shm-lavender/40"
+                        : "border-slate-200 bg-white hover:border-shm-navy-300",
+                    ].join(" ")}
+                  >
+                    <input
+                      type="radio"
+                      name="plan"
+                      value={p.code}
+                      checked={selected}
+                      onChange={() => setPlanCode(p.code)}
+                      className="sr-only"
+                    />
+                    <span className="flex items-baseline justify-between">
+                      <span className="text-[14px] font-semibold text-shm-navy-900">
+                        {p.name}
+                      </span>
+                      <span className="font-mono text-[13px] text-shm-navy-800">
+                        {formatAmount(p.amountPaise, p.currency)}
+                        <span className="text-[11px] text-slate-500">/mo</span>
+                      </span>
+                    </span>
+                    <span className="mt-1.5 block text-[12px] leading-relaxed text-slate-600">
+                      {[
+                        p.maxStructures && `${p.maxStructures} structures`,
+                        p.maxSensors && `${p.maxSensors} sensors`,
+                        p.maxUsers && `${p.maxUsers} users`,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+        )}
+
         {error && (
           <div
             role="alert"
