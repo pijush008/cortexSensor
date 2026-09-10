@@ -30,6 +30,16 @@ export interface NormalizedEvent {
   type: BillingEventType;
   /** Provider's subscription id, when the event concerns one. */
   subscriptionId?: string;
+  /**
+   * OUR subscription id, echoed back by the provider from the metadata we sent
+   * at checkout.
+   *
+   * A one-time payment has no provider-side subscription, so there is nothing
+   * to match `providerSubscriptionId` against — that column is only ever
+   * populated for recurring plans. Without this the charge settles, the webhook
+   * is accepted, and no account is ever activated.
+   */
+  localSubscriptionId?: number;
   customerId?: string;
   /** Plan code the customer is moving to, for checkout/update events. */
   planCode?: string;
@@ -161,6 +171,10 @@ export class GenericHmacProvider implements PaymentProvider {
         ? String(data.subscriptionId)
         : data.subscription_id
           ? String(data.subscription_id)
+          : undefined,
+      localSubscriptionId:
+        data.localSubscriptionId !== undefined
+          ? Number(data.localSubscriptionId)
           : undefined,
       customerId: data.customerId ? String(data.customerId) : undefined,
       planCode: data.planCode ? String(data.planCode) : undefined,

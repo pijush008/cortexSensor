@@ -205,11 +205,21 @@ async function applyEvent(event: NormalizedEvent): Promise<string> {
     return "Event type not handled";
   }
 
-  const subscription = event.subscriptionId
-    ? await prisma.subscription.findFirst({
-        where: { providerSubscriptionId: event.subscriptionId },
-      })
-    : null;
+  // Provider-side subscription id first, for recurring plans that have one.
+  // Then our own id, echoed back through the checkout metadata — a one-time
+  // payment has no provider subscription, and matching on it alone meant a
+  // settled charge activated nothing.
+  const subscription =
+    (event.subscriptionId
+      ? await prisma.subscription.findFirst({
+          where: { providerSubscriptionId: event.subscriptionId },
+        })
+      : null) ??
+    (Number.isInteger(event.localSubscriptionId)
+      ? await prisma.subscription.findUnique({
+          where: { id: event.localSubscriptionId as number },
+        })
+      : null);
 
   if (!subscription) {
     return "No matching subscription for this event";

@@ -158,6 +158,13 @@ export class RazorpayProvider implements PaymentProvider {
       subscriptionId:
         subscription?.id ??
         (payment?.subscription_id ? String(payment.subscription_id) : undefined),
+      // The id we put in `notes` at checkout. For a one-time order payment
+      // there is no Razorpay subscription entity at all, so this is the only
+      // thing tying the settled charge back to an account.
+      localSubscriptionId:
+        notes.subscriptionId !== undefined
+          ? Number(notes.subscriptionId)
+          : undefined,
       customerId: notes.tenantPublicId ? String(notes.tenantPublicId) : undefined,
       planCode: notes.planCode ? String(notes.planCode) : undefined,
       // Razorpay amounts are in the minor unit (paise), which is what
