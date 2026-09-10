@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, CreditCard, Mail, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/ui/avatar";
 import { api } from "@/lib/api";
 import { describeError, type DescribedError } from "@/lib/errors";
+import { formatAmount, openRazorpayCheckout } from "./checkout";
 
 /**
  * Registration for a new organization.
@@ -25,6 +26,10 @@ const MIN_PASSWORD = 8;
 /** Must match saveImageUpload's cap on the server, which is authoritative. */
 const MAX_LOGO_BYTES = 600 * 1024;
 const ACCEPTED_LOGO = "image/png,image/jpeg,image/webp";
+
+/** How long to watch for the activating webhook before handing off to email. */
+const CONFIRM_TIMEOUT_MS = 120_000;
+const CONFIRM_POLL_MS = 4_000;
 
 export default function RegisterPage() {
   const [firstName, setFirstName] = useState("");
@@ -48,6 +53,52 @@ export default function RegisterPage() {
   // verification link it could not email, so the flow can still be completed.
   const [devVerifyUrl, setDevVerifyUrl] = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState(true);
+
+  // Payment, which begins the moment registration returns.
+  const [paying, setPaying] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<DescribedError | null>(
+    null,
+  );
+  const [amountLabel, setAmountLabel] = useState<string | null>(null);
+  const [planName, setPlanName] = useState<string | null>(null);
+  // Set when the payment modal closes. The browser is not told whether the
+  // charge succeeded, so this only means "start watching for the webhook".
+  const [confirming, setConfirming] = useState(false);
+  const [activated, setActivated] = useState(false);
+  const [confirmTimedOut, setConfirmTimedOut] = useState(false);
+
+  /**
+   * Waits for the webhook to activate the organization.
+   *
+   * Bounded deliberately. A webhook can be delayed, and a spinner that never
+   * resolves is worse than a clear hand-off to email.
+   */
+  useEffect(() => {
+    if (!confirming || activated) return;
+    const startedAt = Date.now();
+
+    const id = setInterval(async () => {
+      if (Date.now() - startedAt > CONFIRM_TIMEOUT_MS) {
+        clearInterval(id);
+        setConfirmTimedOut(true);
+        return;
+      }
+      try {
+        const { data } = await api.get<{
+          data?: { subscription?: { status?: string } };
+        }>("/billing/entitlement");
+        if (data?.data?.subscription?.status === "active") {
+          clearInterval(id);
+          setActivated(true);
+        }
+      } catch {
+        // Expected while unauthenticated: the account cannot sign in until it
+        // is active, so this poll fails until the moment it succeeds.
+      }
+    }, CONFIRM_POLL_MS);
+
+    return () => clearInterval(id);
+  }, [confirming, activated]);
 
   /**
    * Reads the chosen file into a data URI.
@@ -96,6 +147,7 @@ export default function RegisterPage() {
       const { data } = await api.post<{
         emailSent?: boolean;
         devVerificationUrl?: string;
+        checkoutToken?: string;
       }>("/register/admin", {
         firstName,
         lastName,
@@ -108,10 +160,51 @@ export default function RegisterPage() {
       setEmailSent(data.emailSent !== false);
       setDevVerifyUrl(data.devVerificationUrl ?? null);
       setRegistered(true);
+
+      // The account exists but is inactive, and the person cannot sign in to
+      // pay. Open checkout immediately with the token registration handed back.
+      if (data.checkoutToken) {
+        await startPayment(data.checkoutToken);
+      }
     } catch (err) {
       setError(describeError(err));
     } finally {
       setLoading(false);
+    }
+  };
+
+  /**
+   * Opens the provider's payment page.
+   *
+   * A failure here is NOT a registration failure — the account was created.
+   * Saying so matters, because someone told only "that didn't work" will try to
+   * register again and hit "Email already exists".
+   */
+  const startPayment = async (token: string) => {
+    setCheckoutError(null);
+    setPaying(true);
+    try {
+      const { data: order } = await api.post<{
+        orderId: string;
+        keyId: string;
+        amountPaise: number;
+        currency: string;
+        planName: string;
+      }>("/billing/checkout/start", { checkoutToken: token });
+
+      setAmountLabel(formatAmount(order.amountPaise, order.currency));
+      setPlanName(order.planName);
+
+      await openRazorpayCheckout({
+        ...order,
+        companyName,
+        email: emailId,
+        onClosed: () => setConfirming(true),
+      });
+    } catch (err) {
+      setCheckoutError(describeError(err));
+    } finally {
+      setPaying(false);
     }
   };
 
@@ -130,10 +223,48 @@ export default function RegisterPage() {
           />
           <Step
             icon={CreditCard}
-            title="Complete payment"
-            body="Your organization is activated when your payment is confirmed. Until then, signing in will tell you the account is not active yet — that is expected, not a fault."
+            title={
+              activated
+                ? "Payment confirmed"
+                : confirmTimedOut
+                  ? "Payment is still being confirmed"
+                  : confirming
+                    ? "Confirming your payment…"
+                    : paying
+                      ? "Opening the payment page…"
+                      : "Complete payment"
+            }
+            body={
+              activated
+                ? "Your organization is active. You can sign in now."
+                : confirmTimedOut
+                  ? "The payment provider has not confirmed the charge yet. This can take a few minutes — we'll email you the moment it completes, and signing in will work from then on."
+                  : confirming
+                    ? "Waiting for the payment provider to confirm the charge. Your organization is activated by that confirmation, not by this page, so it is safe to close this window."
+                    : paying
+                      ? `Opening a secure payment page${amountLabel ? ` for ${amountLabel}` : ""}${planName ? ` — ${planName} plan` : ""}.`
+                      : "Your organization is activated when your payment is confirmed. Until then, signing in will tell you the account is not active yet — that is expected, not a fault."
+            }
           />
         </ol>
+
+        {/* A checkout failure is NOT a registration failure. Saying so stops
+            someone re-registering and hitting "Email already exists". */}
+        {checkoutError && (
+          <div className="mt-6 rounded-lg border border-shm-red/25 bg-shm-red/5 p-3.5">
+            <p className="text-[13px] font-medium text-shm-red">
+              Your account was created, but the payment page could not be
+              opened.
+            </p>
+            <p className="mt-1 text-[13px] text-slate-600">
+              {checkoutError.description}
+            </p>
+            <p className="mt-2 text-[12px] text-slate-500">
+              Do not register again — the account already exists. Sign in once
+              payment has been completed, or contact support.
+            </p>
+          </div>
+        )}
 
         {/* Shown only when the server could not send the message, and only
             outside production. Without it there is no way to finish signing up
