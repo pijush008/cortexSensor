@@ -11,13 +11,19 @@ import { signAccessToken, verifyRefreshToken } from "../../utils/jwt";
 import {
   loginSchema,
   forgotPasswordSchema,
+  resetPasswordSchema,
   validateOtpSchema,
   changePasswordSchema,
   registerSchema,
+  registerAdminSchema,
   updateUserSchema,
 } from "./auth.types";
 import { BadRequestError, ForbiddenError } from "../../utils/AppError";
 import { auditLogger } from "../../utils/audit";
+import {
+  requestPasswordReset,
+  resetPasswordWithToken,
+} from "./password-reset.service";
 
 function handleControllerError(res: Response, error: unknown) {
   const err = error as { statusCode?: number; message: string };
@@ -112,8 +118,49 @@ export async function forgotPassword(
         message: errorMessage,
       });
     }
-    const response = await authService.forgotPassword(result.data.username);
-    return res.status(200).json(response);
+    // Emails a single-use link. The response is identical whether or not an
+    // account exists, so this endpoint cannot be used to discover which
+    // addresses are registered.
+    const response = await requestPasswordReset(
+      result.data.username,
+      req.ip ?? undefined,
+    );
+    return res.status(200).json({ status_code: 200, ...response });
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+}
+
+/** Completes a reset started by the emailed link. */
+export async function resetPassword(
+  req: AuthRequest,
+  res: Response,
+  _next: NextFunction,
+) {
+  try {
+    const parsed = resetPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        status_code: 400,
+        message: parsed.error.errors[0].message.replace(/"/g, ""),
+      });
+    }
+
+    const result = await resetPasswordWithToken(
+      parsed.data.token,
+      parsed.data.password,
+    );
+
+    await auditLogger.audit({
+      // The actor is not authenticated here; the token proves control of the
+      // mailbox, which is what the record should reflect.
+      action: "update",
+      entity: "user",
+      newValue: { passwordReset: true },
+      ...auditLogger.requestContext(req),
+    });
+
+    return res.status(200).json({ status_code: 200, ...result });
   } catch (error) {
     return handleControllerError(res, error);
   }
@@ -185,7 +232,12 @@ export async function registerAll(
       throw new BadRequestError("Invalid user type");
     }
 
-    const result = registerSchema.safeParse(req.body);
+    // An admin brings a company with them; a contractor or authority is being
+    // added into one that already exists. Picking the schema here rather than
+    // making the extra fields optional means a member payload carrying them has
+    // them stripped, not quietly honoured.
+    const schema = userType === "admin" ? registerAdminSchema : registerSchema;
+    const result = schema.safeParse(req.body);
     if (!result.success) {
       const errorMessage = result.error.errors[0].message.replace(/"/g, "");
       return res.status(400).json({
@@ -194,7 +246,25 @@ export async function registerAll(
       });
     }
 
-    const response = await authService.register(userType, result.data);
+    const payload = { ...result.data };
+
+    if (userType !== "admin") {
+      // Adding somebody to an organization requires being in one.
+      //
+      // The organization comes from the SESSION, never from the body. It used
+      // to be `admin_id` as posted, on a route with no authentication at all, so
+      // anyone could grant themselves an active VIEWER membership in any tenant
+      // by naming its admin's id — the same "never trust a tenant id from the
+      // client" rule the rest of the platform follows.
+      if (!req.user) {
+        throw new ForbiddenError(
+          "You must be signed in to add someone to an organization",
+        );
+      }
+      payload.admin_id = String(req.user.id);
+    }
+
+    const response = await authService.register(userType, payload);
     const { ipAddress, userAgent } = auditLogger.requestContext(req);
     await auditLogger.audit({
       userId: req.user?.id,

@@ -8,6 +8,7 @@ import {
   isAnalysisGrade,
   QUALITY_FLAGS,
 } from "../src/modules/measurements/quality";
+import { TINY_PNG } from "./fixtures/registration";
 
 /**
  * Measurement ingestion (§12, §28, §29, §30, §78, §79).
@@ -77,6 +78,8 @@ describe("measurement ingestion", () => {
     await cleanup();
 
     await request(app).post("/api/v1/register/admin").send({
+      companyName: `Test Org ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      companyLogo: TINY_PNG,
       firstName: "Meas",
       lastName: "Admin",
       emailId: EMAIL,

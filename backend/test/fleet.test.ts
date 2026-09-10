@@ -12,6 +12,7 @@ import {
   recordHeartbeat,
 } from "../src/modules/gateways/gateways.service";
 import { resolveLocationAt } from "../src/modules/sensors/sensor-lifecycle.service";
+import { TINY_PNG } from "./fixtures/registration";
 
 /**
  * Gateways, device credentials, and sensor placement/calibration history.
@@ -34,6 +35,8 @@ function cookieHeader(raw: unknown): string {
 
 async function registerAndLogin(email: string) {
   await request(app).post("/api/v1/register/admin").send({
+      companyName: `Test Org ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      companyLogo: TINY_PNG,
     firstName: "Fleet",
     lastName: "Test",
     emailId: email,

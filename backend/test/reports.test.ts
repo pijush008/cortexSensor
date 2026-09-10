@@ -11,6 +11,7 @@ import {
 import { createInspection } from "../src/modules/inspections/inspections.service";
 import { listAuditLog } from "../src/modules/audit/audit.service";
 import { resolveAuthContext } from "../src/modules/rbac/rbac.service";
+import { TINY_PNG } from "./fixtures/registration";
 
 /**
  * Reports, inspections and the audit viewer.
@@ -86,6 +87,8 @@ describe("reports, inspections and audit", () => {
     await cleanup();
 
     await request(app).post("/api/v1/register/admin").send({
+      companyName: `Test Org ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      companyLogo: TINY_PNG,
       firstName: "Reports",
       lastName: "Admin",
       emailId: EMAIL,
@@ -375,6 +378,8 @@ describe("reports, inspections and audit", () => {
   test("an inspection cannot attach to another tenant's structure", async () => {
     const otherEmail = `reports-other-${Date.now()}@example.com`;
     await request(app).post("/api/v1/register/admin").send({
+      companyName: `Test Org ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      companyLogo: TINY_PNG,
       firstName: "Other",
       lastName: "Org",
       emailId: otherEmail,
@@ -459,6 +464,8 @@ describe("reports, inspections and audit", () => {
   test("the audit log never shows another organization's activity", async () => {
     const otherEmail = `audit-other-${Date.now()}@example.com`;
     await request(app).post("/api/v1/register/admin").send({
+      companyName: `Test Org ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      companyLogo: TINY_PNG,
       firstName: "Audit",
       lastName: "Other",
       emailId: otherEmail,

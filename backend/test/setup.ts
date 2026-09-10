@@ -23,6 +23,20 @@ process.env.REDIS_ENABLED = process.env.REDIS_ENABLED ?? "false";
 process.env.BILLING_ENABLED = "true";
 process.env.BILLING_WEBHOOK_SECRET = "test-webhook-secret";
 
+// The Razorpay adapter's webhook secret, pinned for the same reason: the suite
+// signs payloads with this exact literal, so deferring to the ambient
+// environment would verify a signature made with one key against another.
+process.env.RAZORPAY_WEBHOOK_SECRET = "test-rzp-webhook-secret";
+
+// Effectively unlimited registrations during a test run.
+//
+// Every suite shares one process (vitest.config.ts sets fileParallelism: false)
+// and one in-memory limiter store (Redis is off, above), so the production
+// default of 5 per hour would 429 the sixth admin registration of the ENTIRE run
+// and fail most of the suite. The limiter's own behaviour is covered in
+// isolation instead.
+process.env.REGISTER_RATE_LIMIT_MAX = "100000";
+
 // Keep the ingest path on its documented default so the contract tests and the
 // legacy-key deprecation path behave predictably.
 process.env.MQTT_INGEST_ENABLED = process.env.MQTT_INGEST_ENABLED ?? "false";

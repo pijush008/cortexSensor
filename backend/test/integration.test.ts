@@ -2,6 +2,7 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import app from "../src/app";
 import prisma from "../src/config/prisma";
+import { TINY_PNG } from "./fixtures/registration";
 
 describe("API integration tests", () => {
   beforeAll(async () => {
@@ -22,6 +23,8 @@ describe("API integration tests", () => {
 
   test("register -> verify -> login -> ingest sensor data", async () => {
     const registerRes = await request(app).post("/api/register/admin").send({
+      companyName: `Test Org ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      companyLogo: TINY_PNG,
       firstName: "Test",
       lastName: "Integ",
       emailId: "test-integ@example.com",

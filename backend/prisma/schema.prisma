@@ -83,6 +83,16 @@ model Tenant {
   name      String       @db.VarChar(255)
   slug      String       @unique @db.VarChar(64)
   status    TenantStatus @default(active)
+  /// The organization's own logo, shown as the avatar for every one of its
+  /// members. A RELATIVE path (uploads/tenants/<uuid>.png), matching
+  /// Project.projectLogo and User.profileImage — never a URL, so the origin
+  /// serving it can change without rewriting rows.
+  ///
+  /// Nullable even though registration requires one: organizations created
+  /// before this existed, and those made by the seeds, have no logo, and a NOT
+  /// NULL column would mean inventing a value for each. The requirement lives
+  /// at the point of entry; the UI falls back to an initial letter.
+  logoPath  String?      @db.VarChar(255)
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
@@ -204,6 +214,7 @@ model User {
   assignedSensors Sensor[]        @relation("SensorAdmin")
   firebaseTokens  FirebaseToken[]
   tempOtps        TempOtp[]
+  passwordResets  PasswordResetToken[]
   auditLogs       AuditLog[]
   refreshTokens   RefreshToken[]
   subscription    Subscription?
@@ -1268,6 +1279,33 @@ model TempOtp {
   @@map("temp_otps")
 }
 
+/// A single-use password reset link.
+///
+/// The token itself is never stored — only its SHA-256 hash, exactly as refresh
+/// tokens are handled. A stolen database backup then yields no usable reset
+/// links, and a leaked row cannot be replayed against the account it belongs to.
+///
+/// Rows are kept after use rather than deleted so that a second click on the
+/// same link can be answered "this link has already been used" instead of the
+/// indistinguishable "invalid link", and so the reset is visible in the record.
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  /// SHA-256 of the token that was emailed. Never the token.
+  tokenHash String    @unique @db.VarChar(128)
+  expiresAt DateTime
+  usedAt    DateTime?
+  /// Where the request came from, for the security record.
+  requestIp String?   @db.VarChar(45)
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
 // ─── REFRESH TOKENS (auth rotation & revocation) ────────────────────────────
 
 model RefreshToken {
@@ -1299,6 +1337,12 @@ model RefreshToken {
 /// either cutting a customer off on the first failed charge, or never cutting
 /// them off at all.
 enum SubscriptionStatus {
+  /// Registered but not yet paid for. The account exists so a payment can be
+  /// attached to it, and grants nothing until a verified webhook says the
+  /// charge settled. Distinct from `expired`, which means access was once
+  /// granted and has lapsed — telling a new customer their brand-new account
+  /// has "expired" is both wrong and alarming.
+  pending
   trial
   active
   past_due

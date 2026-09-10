@@ -1,9 +1,20 @@
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-[background-color,box-shadow,transform,color,border-color] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-shm-navy-500 focus-visible:ring-offset-2 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
+  [
+    "relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium cursor-pointer",
+    "transition-[background-color,box-shadow,transform,color,border-color] duration-200 ease-out",
+    // Keyboard focus must be at least as visible as hover, never less.
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sheet-rust focus-visible:ring-offset-2",
+    // Lift on hover, press below the resting line on click: the pair is what
+    // makes a button feel like a physical control rather than a colour swap.
+    "hover:-translate-y-px active:translate-y-[1px] active:scale-[0.985]",
+    "motion-reduce:transform-none motion-reduce:transition-none",
+    "disabled:pointer-events-none disabled:opacity-50",
+  ].join(" "),
   {
     variants: {
       variant: {
@@ -33,15 +44,36 @@ const buttonVariants = cva(
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {}
+    VariantProps<typeof buttonVariants> {
+  /**
+   * Shows a spinner and blocks further clicks while an action is in flight.
+   *
+   * The label stays in place and keeps its width — swapping it for "Loading…"
+   * makes the button resize under the cursor, and hiding it loses the one piece
+   * of information that says what is currently happening.
+   */
+  loading?: boolean;
+}
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, ...props }, ref) => (
+  ({ className, variant, size, loading, disabled, children, ...props }, ref) => (
     <button
       className={cn(buttonVariants({ variant, size, className }))}
       ref={ref}
+      disabled={disabled || loading}
+      // Announced to assistive technology, which cannot see the spinner.
+      aria-busy={loading || undefined}
       {...props}
-    />
+    >
+      {loading && (
+        <Loader2
+          className="mo-spin h-4 w-4 shrink-0"
+          aria-hidden="true"
+          strokeWidth={2.25}
+        />
+      )}
+      {children}
+    </button>
   )
 );
 Button.displayName = "Button";

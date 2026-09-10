@@ -1,9 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Reveal } from "@/components/ui/reveal";
+import { Motion, MotionOnLoad } from "@/components/ui/motion";
 import { SectionLabel } from "@/components/ui/section-label";
 import {
-  Activity,
   AlertTriangle,
   BarChart3,
   Bell,
@@ -17,7 +16,6 @@ import {
   FileText,
   Gauge,
   Globe,
-  HardDrive,
   Layers,
   Lock,
   MonitorDot,
@@ -28,59 +26,74 @@ import {
   TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
+import { ConsoleLink } from "@/components/home/console-link";
+import { InstrumentationSchematic } from "@/components/home/instrumentation-schematic";
+import { ReferenceStructures } from "@/components/home/reference-structures";
 
-const TICKER = [
-  "GWH-03 · Tower Leg 1 — vibration band nominal",
-  "SEN-55 · Micro-strain +38με — within tolerance",
-  "GWH-07 · Node battery 19% — charging advised",
-  "MQTT · 412 msg/s — ingestion nominal",
-  "SEN-12 · Modal drift +0.42% — Δ2.4°C ambient",
-  "GWH-01 · Watchdog restart cleared",
-];
+/**
+ * The company's own mark, from public/brand.
+ *
+ * `company-logo.png` rather than the .jpeg the console uses: it carries an alpha
+ * channel, so it sits on the translucent navigation bar without the white box a
+ * JPEG would paint behind it.
+ *
+ * NOTE: public/brand also contains logo_01.png, which is the Canon
+ * corporation's logo. It is not used here and must not be — placing another
+ * company's trademark on this homepage would assert a relationship that does
+ * not exist.
+ */
+const LOGO = {
+  src: "/brand/company-logo.png",
+  /** Intrinsic size; Next needs it to reserve space and avoid layout shift. */
+  width: 599,
+  height: 126,
+} as const;
+
+const COMPANY = "Cloudglance Sensinglab Pvt Ltd";
+/** The tagline set in the logo artwork itself. */
+const TAGLINE = "Infrahealth-sensing from anywhere";
+
 
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-slate-200 bg-white/85 backdrop-blur-xl">
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-sheet-ink/15 bg-white/85 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="group flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-shm-navy-800 transition-transform duration-300 group-hover:scale-105">
-              <Activity className="h-5 w-5 text-white" strokeWidth={1.75} />
-            </span>
-            <span className="flex flex-col leading-none">
-              <span className="text-[15px] font-bold tracking-tight text-shm-navy-900">
-                StructGuard
-              </span>
-              <span className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.24em] text-slate-400">
-                Structural Monitor
-              </span>
-            </span>
+          {/* The logo is a horizontal lockup that already contains the company
+              name, so it stands alone — setting the name in type beside it
+              would print it twice. */}
+          <Link href="/" className="group flex items-center" aria-label={COMPANY}>
+            <Image
+              src={LOGO.src}
+              alt={COMPANY}
+              width={LOGO.width}
+              height={LOGO.height}
+              // Height-constrained, width automatic, so the lockup keeps its
+              // proportions at any breakpoint.
+              className="h-8 w-auto transition-transform duration-300 group-hover:scale-[1.03] sm:h-9"
+              priority
+            />
           </Link>
           <div className="hidden items-center gap-1 md:flex">
             {[
               { label: "Platform", href: "#platform" },
               { label: "Architecture", href: "#architecture" },
               { label: "Modules", href: "#modules" },
-              { label: "Technology", href: "#technology" },
             ].map((item) => (
               <a
                 key={item.label}
                 href={item.href}
-                className="group relative px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:text-shm-navy-800"
+                className="group relative px-4 py-2 text-sm font-medium text-sheet-ink/70 transition-colors hover:text-sheet-ink"
               >
                 {item.label}
-                <span className="absolute inset-x-4 -bottom-px h-px origin-left scale-x-0 bg-shm-navy-600 transition-transform duration-300 group-hover:scale-x-100" />
+                <span className="absolute inset-x-4 -bottom-px h-px origin-left scale-x-0 bg-sheet-rust transition-transform duration-300 group-hover:scale-x-100 motion-reduce:transition-none" />
               </a>
             ))}
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/login">
-              <Button size="sm">
-                Sign In
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </Link>
+            <ConsoleLink size="sm">Sign in</ConsoleLink>
           </div>
         </div>
       </nav>
@@ -88,265 +101,114 @@ export default function HomePage() {
       {/* Hero */}
       <section
         id="platform"
-        className="bg-blueprint relative overflow-hidden bg-gradient-to-br from-shm-lavender via-shm-lavender-soft to-shm-cyan-soft pt-32 pb-20 lg:pt-40 lg:pb-24"
+        className="bg-sheet-hero relative pt-28 pb-16 lg:pt-36 lg:pb-20"
       >
-        {/* Real structure photo as backdrop — monochrome, heavily under-exposed */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/images/structures/hero-bridge.jpg"
-          alt=""
-          aria-hidden
-          className="absolute inset-0 h-full w-full object-cover opacity-[0.14] mix-blend-multiply"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-shm-lavender/90 via-shm-lavender/60 to-transparent" />
+        {/* The sheet's own margin rule, at the drawing-border inset. No blurred
+            colour orbs, no photographic wash: a drawing sheet is a flat,
+            legible ground, and anything behind the linework competes with it. */}
         <div
-          className="pointer-events-none absolute inset-0 opacity-50 mix-blend-overlay"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 25px 25px, rgba(26,18,37,0.10) 1px, transparent 0)",
-            backgroundSize: "44px 44px",
-          }}
+          aria-hidden
+          className="pointer-events-none absolute inset-y-6 left-6 hidden w-px bg-sheet-ink/15 lg:block"
         />
-        <div className="absolute -top-24 right-0 h-[26rem] w-[26rem] rounded-full bg-shm-cyan/30 blur-3xl" />
-        <div className="absolute bottom-0 -left-24 h-80 w-80 rounded-full bg-shm-mint/25 blur-3xl" />
 
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-16 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
-            <div className="max-w-2xl">
-              <Reveal>
-                <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-shm-navy-900/12 bg-white/70 px-3.5 py-1.5 backdrop-blur">
-                  <PulseDotLike />
-                  <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-shm-navy-700">
-                    Structural Monitoring as a Service
-                  </span>
-                </div>
-              </Reveal>
-              <Reveal delay={80}>
-                <h1 className="mb-6 font-display text-[42px] font-semibold leading-[1.04] tracking-tight text-shm-navy-900 sm:text-[56px] lg:text-[64px]">
-                  Structure,
-                  <br />
-                  instrumented.
-                  <br />
-                  <span className="text-shm-navy-600">Risk, measured.</span>
-                </h1>
-              </Reveal>
-              <Reveal delay={160}>
-                <p className="mb-9 max-w-xl text-[17px] leading-relaxed text-slate-700">
-                  IoT edge nodes feed continuous strain, vibration and
-                  deflection data into a cloud platform that detects the
-                  anomalies engineers need to know — before they become
-                  failures.
+        <div className="relative mx-auto max-w-[88rem] px-5 sm:px-8">
+          <div className="grid gap-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-center">
+            <div>
+              {/* Set as a running head on a drawing, not a pill badge. */}
+              <MotionOnLoad index={0}>
+                <p className="mb-8 flex items-center gap-3 font-mono text-[11.5px] text-sheet-ink/50">
+                  <span className="h-px w-10 bg-sheet-rust" />
+                  Structural monitoring as a service
                 </p>
-              </Reveal>
-              <Reveal delay={240}>
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <Link href="/login">
-                    <Button
-                      size="lg"
-                      className="w-full bg-shm-navy-900 text-white hover:bg-shm-navy-800 sm:w-auto"
-                    >
-                      Explore the console
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </Link>
-                  <a href="#architecture">
-                    <Button
-                      size="lg"
-                      variant="ghost"
-                      className="w-full border border-shm-navy-900/25 text-shm-navy-900 hover:border-shm-navy-900/40 hover:bg-white/60 sm:w-auto"
-                    >
-                      <Layers className="h-4 w-4" />
-                      Architecture
-                    </Button>
-                  </a>
-                </div>
-              </Reveal>
-              <Reveal delay={320}>
-                <div className="mt-11 flex flex-col gap-x-8 gap-y-3 border-t border-shm-navy-900/12 pt-6 text-[13px] text-slate-700 sm:flex-row">
-                  {[
-                    { icon: Lock, text: "SOC 2 · ISO 27001" },
-                    { icon: Globe, text: "Multi-tenant SaaS" },
-                    { icon: Brain, text: "Physics-informed AI" },
-                  ].map((item) => (
-                    <div key={item.text} className="flex items-center gap-2">
-                      <item.icon
-                        className="h-4 w-4 text-shm-navy-600"
-                        strokeWidth={1.75}
-                      />
-                      {item.text}
-                    </div>
-                  ))}
-                </div>
-              </Reveal>
-            </div>
+              </MotionOnLoad>
 
-            {/* Live dashboard mock */}
-            <Reveal delay={180} className="hidden lg:block">
-              <div className="relative">
-                <div className="absolute -inset-5 rounded-2xl bg-shm-cyan/25 blur-2xl" />
-                <div className="relative rounded-2xl border border-shm-navy-900/10 bg-white p-5 shadow-2xl backdrop-blur">
-                  <div className="mb-4 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-md bg-shm-lavender">
-                        <Activity className="h-3.5 w-3.5 text-shm-navy-700" />
-                      </span>
-                      <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
-                        Live telemetry
-                      </span>
-                    </div>
-                    <span className="flex items-center gap-1.5 text-[11px] text-shm-green-text">
-                      <LiveDot />
-                      All systems nominal
-                    </span>
-                  </div>
+              <MotionOnLoad index={1}>
+                <h1 className="max-w-[15ch] text-[44px] font-bold leading-[1.02] tracking-[-0.035em] text-sheet-ink sm:text-[58px] lg:text-[66px]">
+                  Every structure is already telling you something.
+                </h1>
+              </MotionOnLoad>
 
-                  <div className="grid grid-cols-3 gap-2.5">
-                    {[
-                      {
-                        label: "TEMP",
-                        value: "24.5",
-                        unit: "°C",
-                        dot: "bg-shm-yellow",
-                      },
-                      {
-                        label: "VIB",
-                        value: "0.12",
-                        unit: "g",
-                        dot: "bg-shm-green",
-                      },
-                      {
-                        label: "STRAIN",
-                        value: "145",
-                        unit: "με",
-                        dot: "bg-shm-chart-1",
-                      },
-                      {
-                        label: "HUM",
-                        value: "62",
-                        unit: "%",
-                        dot: "bg-shm-navy-500",
-                      },
-                      {
-                        label: "DEFL",
-                        value: "2.3",
-                        unit: "mm",
-                        dot: "bg-shm-peach",
-                      },
-                      {
-                        label: "LOAD",
-                        value: "45",
-                        unit: "kN",
-                        dot: "bg-shm-green",
-                      },
-                    ].map((s) => (
-                      <div
-                        key={s.label}
-                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-slate-500">
-                            {s.label}
-                          </span>
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full ${s.dot}`}
-                          />
-                        </div>
-                        <p className="mt-1 font-mono text-[15px] font-medium tabular-nums text-shm-navy-900">
-                          {s.value}
-                          <span className="ml-0.5 text-[10px] text-slate-500">
-                            {s.unit}
-                          </span>
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    <div className="mb-2 flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.14em] text-slate-500">
-                      <span>FFT spectrum · bridge span 2</span>
-                      <span className="text-shm-navy-700">f₁ = 3.42 Hz</span>
-                    </div>
-                    <div className="flex h-14 items-end gap-px">
-                      {[
-                        15, 25, 20, 35, 30, 45, 40, 60, 55, 80, 70, 90, 65, 50,
-                        45, 35, 30, 25, 20, 18, 15, 12, 10, 8, 6, 5, 4, 3, 2, 1,
-                      ].map((h, i) => (
-                        <div
-                          key={i}
-                          className="anim-rise flex-1 origin-bottom rounded-t-sm bg-gradient-to-t from-shm-chart-1 to-shm-cyan"
-                          style={{
-                            height: `${h}%`,
-                            animationDelay: `${i * 18}ms`,
-                            animationDuration: "0.7s",
-                          }}
-                        />
-                      ))}
-                    </div>
-                    <div className="mt-2 flex justify-between font-mono text-[8px] text-slate-500">
-                      <span>0 Hz</span>
-                      <span>10 Hz</span>
-                      <span>20 Hz</span>
-                      <span>30 Hz</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Reveal>
-          </div>
-
-          {/* ticker */}
-          <div className="relative mt-16 overflow-hidden border-t border-shm-navy-900/12 pt-4">
-            <div className="anim-marquee flex w-max gap-10">
-              {[...TICKER, ...TICKER].map((t, i) => (
-                <span
-                  key={i}
-                  className="flex items-center gap-2 whitespace-nowrap font-mono text-[11px] text-slate-600"
+              <MotionOnLoad index={2}>
+                <p className="mt-7 max-w-[54ch] text-[17px] leading-[1.62] text-sheet-ink/75">
+                  Strain, vibration and deflection, measured continuously at the
+                  structure and carried to engineers who can act on them. The
+                  platform records what was measured, when, and by which
+                  instrument — so a finding can be traced back to its evidence.
+                </p>
+              </MotionOnLoad>
+              <MotionOnLoad index={3} className="mt-9 flex flex-col gap-3 sm:flex-row">
+                <ConsoleLink
+                  size="lg"
+                  className="w-full bg-sheet-ink text-sheet-paper hover:bg-sheet-navy sm:w-auto"
                 >
-                  <span className="h-1 w-1 rounded-full bg-shm-cyan" />
-                  {t}
-                </span>
-              ))}
+                  Open the console
+                </ConsoleLink>
+                <a href="#structures">
+                  <Button
+                    size="lg"
+                    variant="ghost"
+                    className="w-full border border-sheet-ink/25 text-sheet-ink hover:border-sheet-ink/45 hover:bg-sheet-paper sm:w-auto"
+                  >
+                    <Layers className="h-4 w-4" />
+                    See what it monitors
+                  </Button>
+                </a>
+              </MotionOnLoad>
+
+              {/* Capabilities the platform actually has, not certifications it
+                  does not. This row previously read "SOC 2 · ISO 27001" — an
+                  audit claim no code in this repository can support, and the
+                  kind of statement a buyer verifies. */}
+              {/* Also above the fold, so the cascade is CSS-only. The index
+                  continues the hero's sequence rather than restarting it. */}
+              <ul className="mt-10 flex flex-col gap-x-8 gap-y-3 border-t border-sheet-ink/15 pt-6 text-[13.5px] text-sheet-ink/70 sm:flex-row">
+                {[
+                  { icon: Lock, text: "Tenant isolation enforced in the database" },
+                  { icon: Globe, text: "Per-device credentials, not a shared key" },
+                  { icon: Brain, text: "Every reading traced to its calibration" },
+                ].map((item, i) => (
+                  <li
+                    key={item.text}
+                    className="mo-load flex items-start gap-2.5"
+                    style={{ ["--i" as string]: i + 5 }}
+                  >
+                    <item.icon
+                      className="mt-0.5 h-4 w-4 shrink-0 text-sheet-rust"
+                      strokeWidth={1.75}
+                    />
+                    {item.text}
+                  </li>
+                ))}
+              </ul>
             </div>
+
+            {/* The drawing, not a dashboard mock. A schematic instrumentation
+                layout says what this platform attaches to and where, without
+                asserting a reading that does not exist. */}
+            <MotionOnLoad index={4} className="hidden lg:block">
+              <InstrumentationSchematic />
+            </MotionOnLoad>
           </div>
+
         </div>
       </section>
 
-      {/* Stats band */}
-      <section className="relative z-10 mx-auto -mt-9 max-w-6xl px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 shadow-[0_12px_40px_-16px_rgba(17,17,17,0.25)] md:grid-cols-4">
-          {[
-            { value: "500+", label: "Structures monitored" },
-            { value: "10K+", label: "Sensors connected" },
-            { value: "99.9%", label: "Platform uptime" },
-            { value: "24/7", label: "Real-time coverage" },
-          ].map((stat) => (
-            <div key={stat.label} className="bg-white px-5 py-6">
-              <p className="font-display text-3xl font-semibold tracking-tight text-shm-navy-800">
-                {stat.value}
-              </p>
-              <p className="mt-1 font-mono text-[10.5px] uppercase tracking-[0.16em] text-slate-500">
-                {stat.label}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
 
       {/* Architecture */}
       <section id="architecture" className="py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <Reveal>
+          <Motion variant="rise">
             <div className="mb-12 max-w-2xl">
-              <SectionLabel index="01" label="Three-plane architecture" />
-              <h2 className="mt-5 font-display text-3xl font-semibold tracking-tight text-shm-navy-900 sm:text-4xl">
+              <SectionLabel label="Three-plane architecture" />
+              <h2 className="mt-5 text-3xl font-semibold tracking-tight text-sheet-ink sm:text-4xl">
                 One platform. Three planes. End-to-end.
               </h2>
-              <p className="mt-4 text-[15px] leading-relaxed text-slate-500">
+              <p className="mt-4 text-[15px] leading-relaxed text-sheet-ink/55">
                 Control, application, and edge planes operate independently yet
                 integrate for continuous structural monitoring.
               </p>
             </div>
-          </Reveal>
+          </Motion>
 
           <div className="grid gap-6 lg:grid-cols-3">
             {[
@@ -355,8 +217,8 @@ export default function HomePage() {
                 title: "Control Plane",
                 sub: "Platform management",
                 icon: Cog,
-                tone: "from-shm-navy-700 to-shm-navy-900",
-                accent: "text-shm-navy-300",
+                tone: "from-sheet-navy to-sheet-ink",
+                accent: "text-sheet-rule",
                 items: [
                   "Tenant & RBAC administration",
                   "Subscriptions, billing & payments",
@@ -369,7 +231,7 @@ export default function HomePage() {
                 title: "Application Plane",
                 sub: "Analytics & intelligence",
                 icon: MonitorDot,
-                tone: "from-shm-navy-500 to-shm-navy-700",
+                tone: "from-sheet-rule to-sheet-navy",
                 accent: "text-shm-cyan",
                 items: [
                   "Signal processing, FFT & modal analysis",
@@ -383,8 +245,8 @@ export default function HomePage() {
                 title: "Edge / IoT Plane",
                 sub: "Sensors & gateways",
                 icon: Radio,
-                tone: "from-shm-navy-700 to-shm-navy-900",
-                accent: "text-shm-navy-300",
+                tone: "from-sheet-navy to-sheet-ink",
+                accent: "text-sheet-rule",
                 items: [
                   "ESP32 / MCU sensor nodes",
                   "Marine & industrial gateways",
@@ -393,8 +255,8 @@ export default function HomePage() {
                 ],
               },
             ].map((plane, i) => (
-              <Reveal key={plane.title} delay={i * 80}>
-                <Card className="group h-full overflow-hidden border-slate-200">
+              <Motion key={plane.title} variant="ink" index={i}>
+                <Card className="group h-full overflow-hidden border-sheet-ink/15">
                   <div
                     className={`flex items-center justify-between bg-gradient-to-r ${plane.tone} px-5 py-3`}
                   >
@@ -407,17 +269,17 @@ export default function HomePage() {
                     />
                   </div>
                   <CardContent className="p-5">
-                    <h3 className="text-[15px] font-semibold tracking-tight text-shm-navy-900">
+                    <h3 className="text-[15px] font-semibold tracking-tight text-sheet-ink">
                       {plane.title}
                     </h3>
-                    <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-slate-400">
+                    <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-sheet-ink/45">
                       {plane.sub}
                     </p>
                     <ul className="mt-4 space-y-2.5">
                       {plane.items.map((item) => (
                         <li
                           key={item}
-                          className="flex items-start gap-2.5 text-[13px] leading-snug text-slate-600"
+                          className="flex items-start gap-2.5 text-[13px] leading-snug text-sheet-ink/70"
                         >
                           <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-shm-navy-400" />
                           {item}
@@ -426,18 +288,18 @@ export default function HomePage() {
                     </ul>
                   </CardContent>
                 </Card>
-              </Reveal>
+              </Motion>
             ))}
           </div>
 
           {/* Data flow */}
-          <Reveal delay={120}>
-            <div className="mt-10 rounded-xl border border-slate-200 bg-white p-5">
+          <Motion variant="rise" index={2}>
+            <div className="mt-10 rounded-xl border border-sheet-ink/15 bg-white p-5">
               <div className="mb-4 flex items-center justify-between">
-                <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-sheet-ink/55">
                   Data flow
                 </span>
-                <span className="font-mono text-[10px] text-slate-400">
+                <span className="font-mono text-[10px] text-sheet-ink/45">
                   SENSOR → INGEST → ANALYZE
                 </span>
               </div>
@@ -447,41 +309,41 @@ export default function HomePage() {
                     label: "Sensors",
                     icon: Gauge,
                     color:
-                      "bg-shm-navy-500/10 text-shm-navy-700 border-shm-navy-500/20",
+                      "bg-sheet-paper0/10 text-sheet-navy border-sheet-navy/20",
                   },
                   {
                     label: "ESP32",
                     icon: Cpu,
-                    color: "bg-slate-100 text-slate-700 border-slate-200",
+                    color: "bg-slate-100 text-sheet-ink/75 border-sheet-ink/15",
                   },
                   {
                     label: "Gateway",
                     icon: Server,
-                    color: "bg-slate-100 text-slate-700 border-slate-200",
+                    color: "bg-slate-100 text-sheet-ink/75 border-sheet-ink/15",
                   },
                   {
                     label: "MQTT",
                     icon: Radio,
                     color:
-                      "bg-shm-navy-500/10 text-shm-navy-700 border-shm-navy-500/20",
+                      "bg-sheet-paper0/10 text-sheet-navy border-sheet-navy/20",
                   },
                   {
                     label: "Cloud",
                     icon: Cloud,
                     color:
-                      "bg-shm-navy-50 text-shm-navy-700 border-shm-navy-200",
+                      "bg-sheet-paper text-sheet-navy border-sheet-ink/15",
                   },
                   {
                     label: "TimescaleDB",
                     icon: Database,
                     color:
-                      "bg-shm-navy-50 text-shm-navy-700 border-shm-navy-200",
+                      "bg-sheet-paper text-sheet-navy border-sheet-ink/15",
                   },
                   {
                     label: "SHM Engine",
                     icon: Brain,
                     color:
-                      "bg-shm-navy-500/10 text-shm-navy-700 border-shm-navy-500/20",
+                      "bg-sheet-paper0/10 text-sheet-navy border-sheet-navy/20",
                   },
                   {
                     label: "Alerts",
@@ -502,105 +364,37 @@ export default function HomePage() {
                       {step.label}
                     </span>
                     {i < 8 && (
-                      <ChevronRight className="hidden h-3.5 w-3.5 text-slate-300 sm:block" />
+                      <ChevronRight className="hidden h-3.5 w-3.5 text-sheet-paper/70 sm:block" />
                     )}
                   </div>
                 ))}
               </div>
             </div>
-          </Reveal>
+          </Motion>
         </div>
       </section>
 
       {/* Structures showcase — real civil-engineering assets */}
-      <section id="structures" className="bg-white py-20 lg:py-28">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <Reveal>
-            <div className="mb-12 grid gap-8 lg:grid-cols-[1fr_1.4fr] lg:items-end">
-              <div className="max-w-xl">
-                <SectionLabel index="02" label="Instrumented structures" />
-                <h2 className="mt-5 font-display text-3xl font-semibold tracking-tight text-shm-navy-900 sm:text-4xl">
-                  Bridges, dams, towers — under constant watch.
-                </h2>
-              </div>
-              <p className="text-[15px] leading-relaxed text-slate-500 lg:max-w-xl lg:justify-self-end">
-                Every structure feeds strain, vibration and deflection into the
-                platform, transformed into engineering decisions.
-              </p>
-            </div>
-          </Reveal>
-
-          <div className="grid gap-5 md:grid-cols-3">
-            {[
-              {
-                src: "/images/structures/cable-stayed.jpg",
-                name: "Cable-Stayed Viaduct",
-                meta: "Bengaluru · 42 sensors",
-                stat: "VIB 0.12g",
-              },
-              {
-                src: "/images/structures/hero-bridge.jpg",
-                name: "Suspension Deck",
-                meta: "Mumbai · 38 sensors",
-                stat: "STRAIN 145 με",
-              },
-              {
-                src: "/images/structures/night-bridge.jpg",
-                name: "Night Span",
-                meta: "Kolkata · 51 sensors",
-                stat: "TEMPERATURE 24.5°C",
-              },
-            ].map((s, i) => (
-              <Reveal key={s.name} delay={(i % 3) * 90}>
-                <figure className="group relative overflow-hidden rounded-xl border border-slate-200 bg-shm-navy-900">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={s.src}
-                    alt={`${s.name} — structural health monitoring`}
-                    loading="lazy"
-                    className="aspect-[4/3] w-full object-cover opacity-90 transition-all duration-500 group-hover:opacity-100 group-hover:grayscale-0"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-                  <figcaption className="absolute inset-x-0 bottom-0 p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-[15px] font-semibold tracking-tight text-white">
-                          {s.name}
-                        </p>
-                        <p className="mt-0.5 font-mono text-[9.5px] uppercase tracking-[0.18em] text-slate-300">
-                          {s.meta}
-                        </p>
-                      </div>
-                      <span className="rounded-md border border-white/25 bg-white/10 px-2 py-1 font-mono text-[9.5px] text-shm-green backdrop-blur">
-                        {s.stat}
-                      </span>
-                    </div>
-                  </figcaption>
-                </figure>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
+      <ReferenceStructures />
 
       {/* Modules */}
       <section
         id="modules"
-        className="bg-paper-grid border-y border-slate-200 bg-shm-cream py-20 lg:py-28"
+        className="bg-sheet border-y border-sheet-rule/40 py-20 lg:py-28"
       >
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <Reveal>
+          <Motion variant="rise">
             <div className="mb-12 max-w-2xl">
-              <SectionLabel index="02" label="Platform modules" />
-              <h2 className="mt-5 font-display text-3xl font-semibold tracking-tight text-shm-navy-900 sm:text-4xl">
+              <SectionLabel label="Platform modules" />
+              <h2 className="mt-5 text-3xl font-semibold tracking-tight text-sheet-ink sm:text-4xl">
                 Twelve capabilities, one instrumented truth.
               </h2>
-              <p className="mt-4 text-[15px] leading-relaxed text-slate-500">
+              <p className="mt-4 text-[15px] leading-relaxed text-sheet-ink/55">
                 From IoT ingestion to damage localization, every module is built
                 for production-grade structural monitoring.
               </p>
             </div>
-          </Reveal>
+          </Motion>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {[
@@ -689,136 +483,24 @@ export default function HomePage() {
                 tag: "Vision",
               },
             ].map((m, i) => (
-              <Reveal key={m.title} delay={(i % 3) * 70}>
-                <div className="group h-full rounded-xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(17,17,17,0.04)] transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_10px_30px_-12px_rgba(17,17,17,0.2)]">
+              <Motion key={m.title} variant="ink" index={i % 3}>
+                <div className="group h-full rounded-xl border border-sheet-ink/15 bg-sheet-paper p-5 shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-sheet-rule hover:shadow-[0_10px_30px_-12px_rgba(17,17,17,0.2)]">
                   <div className="mb-4 flex items-center justify-between">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-shm-cyan-soft text-shm-navy-800 transition-colors duration-300 group-hover:bg-shm-navy-800 group-hover:text-white">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sheet-paper text-sheet-ink transition-colors duration-300 group-hover:bg-sheet-ink group-hover:text-white">
                       <m.icon className="h-4.5 w-4.5" strokeWidth={1.75} />
                     </div>
-                    <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-sheet-ink/45">
                       {m.tag}
                     </span>
                   </div>
-                  <h3 className="text-[14.5px] font-semibold tracking-tight text-shm-navy-900">
+                  <h3 className="text-[14.5px] font-semibold tracking-tight text-sheet-ink">
                     {m.title}
                   </h3>
-                  <p className="mt-1.5 text-[12.5px] leading-relaxed text-slate-500">
+                  <p className="mt-1.5 text-[12.5px] leading-relaxed text-sheet-ink/55">
                     {m.description}
                   </p>
                 </div>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Technology */}
-      <section
-        id="technology"
-        className="bg-blueprint bg-shm-navy-900 py-20 lg:py-28"
-      >
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <Reveal>
-            <div className="mb-12 max-w-2xl">
-              <SectionLabel index="03" label="Technology" light />
-              <h2 className="mt-5 font-display text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-                TypeScript for products. Python for physics.
-              </h2>
-              <p className="mt-4 text-[15px] leading-relaxed text-slate-300">
-                Every layer is chosen for a specific workload — from real-time
-                web dashboards to heavy signal-processing pipelines.
-              </p>
-            </div>
-          </Reveal>
-
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {[
-              {
-                title: "Frontend",
-                icon: MonitorDot,
-                items: [
-                  "Next.js 15",
-                  "React 19",
-                  "TypeScript",
-                  "Tailwind CSS",
-                  "Recharts",
-                  "PWA",
-                ],
-              },
-              {
-                title: "Product Backend",
-                icon: Server,
-                items: [
-                  "Next.js API Routes",
-                  "Prisma ORM",
-                  "Auth & RBAC",
-                  "REST APIs",
-                ],
-              },
-              {
-                title: "Engineering Backend",
-                icon: Cog,
-                items: [
-                  "Python / FastAPI",
-                  "NumPy / SciPy",
-                  "pandas",
-                  "PyTorch",
-                  "OpenCV",
-                ],
-              },
-              {
-                title: "Data",
-                icon: Database,
-                items: ["PostgreSQL", "TimescaleDB", "Redis", "Object Storage"],
-              },
-              {
-                title: "IoT & Edge",
-                icon: Radio,
-                items: [
-                  "ESP32 / MCU",
-                  "Raspberry Pi",
-                  "MQTT",
-                  "NTP / PTP",
-                  "OTA",
-                ],
-              },
-              {
-                title: "Infrastructure",
-                icon: HardDrive,
-                items: [
-                  "Nginx / WAF",
-                  "Docker",
-                  "CI/CD",
-                  "OpenTelemetry",
-                  "AWS / GCP / Azure",
-                ],
-              },
-            ].map((s, i) => (
-              <Reveal key={s.title} delay={(i % 3) * 70}>
-                <div className="group h-full rounded-xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur transition-colors duration-300 hover:border-white/20 hover:bg-white/[0.07]">
-                  <div className="mb-4 flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-shm-cyan/15">
-                      <s.icon
-                        className="h-4.5 w-4.5 text-shm-navy-200"
-                        strokeWidth={1.75}
-                      />
-                    </div>
-                    <h3 className="text-[14.5px] font-semibold tracking-tight text-white">
-                      {s.title}
-                    </h3>
-                  </div>
-                  <ul className="flex flex-wrap gap-1.5">
-                    {s.items.map((item) => (
-                      <li
-                        key={item}
-                        className="rounded-md border border-white/10 px-2 py-1 font-mono text-[10.5px] text-slate-300"
-                      >
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </Reveal>
+              </Motion>
             ))}
           </div>
         </div>
@@ -827,18 +509,18 @@ export default function HomePage() {
       {/* Roles */}
       <section className="py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <Reveal>
+          <Motion variant="rise">
             <div className="mb-12 max-w-2xl">
-              <SectionLabel index="04" label="Access control" />
-              <h2 className="mt-5 font-display text-3xl font-semibold tracking-tight text-shm-navy-900 sm:text-4xl">
+              <SectionLabel label="Access control" />
+              <h2 className="mt-5 text-3xl font-semibold tracking-tight text-sheet-ink sm:text-4xl">
                 Role-based access, fully audited.
               </h2>
-              <p className="mt-4 text-[15px] leading-relaxed text-slate-500">
+              <p className="mt-4 text-[15px] leading-relaxed text-sheet-ink/55">
                 Five distinct roles with permission-based access. Every action
                 is recorded.
               </p>
             </div>
-          </Reveal>
+          </Motion>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {[
@@ -878,54 +560,54 @@ export default function HomePage() {
                 items: ["Dashboard", "Alerts"],
               },
             ].map((r, i) => (
-              <Reveal key={r.role} delay={i * 60}>
-                <div className="group h-full rounded-xl border border-slate-200 bg-white p-5 text-left shadow-[0_1px_2px_rgba(17,17,17,0.04)] transition-all duration-300 hover:-translate-y-0.5 hover:border-shm-navy-300 hover:shadow-[0_10px_30px_-12px_rgba(17,17,17,0.2)]">
+              <Motion key={r.role} variant="ink" index={i}>
+                <div className="group h-full rounded-xl border border-sheet-ink/15 bg-sheet-paper p-5 text-left shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-sheet-rule hover:shadow-[0_10px_30px_-12px_rgba(17,17,17,0.2)]">
                   <div className="mb-3 flex items-center justify-between">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-shm-navy-800 text-white transition-transform duration-300 group-hover:scale-105">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sheet-ink text-white transition-transform duration-300 group-hover:scale-105">
                       <r.icon className="h-4.5 w-4.5" strokeWidth={1.75} />
                     </div>
-                    <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-sheet-ink/45">
                       {r.tag}
                     </span>
                   </div>
-                  <h3 className="text-[14.5px] font-semibold tracking-tight text-shm-navy-900">
+                  <h3 className="text-[14.5px] font-semibold tracking-tight text-sheet-ink">
                     {r.role}
                   </h3>
-                  <p className="mt-1.5 text-[12px] leading-relaxed text-slate-500">
+                  <p className="mt-1.5 text-[12px] leading-relaxed text-sheet-ink/55">
                     {r.desc}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-1">
                     {r.items.map((item) => (
                       <span
                         key={item}
-                        className="rounded bg-slate-100 px-2 py-0.5 font-mono text-[9.5px] text-slate-500"
+                        className="rounded bg-slate-100 px-2 py-0.5 font-mono text-[9.5px] text-sheet-ink/55"
                       >
                         {item}
                       </span>
                     ))}
                   </div>
                 </div>
-              </Reveal>
+              </Motion>
             ))}
           </div>
         </div>
       </section>
 
       {/* Pricing */}
-      <section className="bg-paper-grid border-y border-slate-200 bg-shm-lavender-soft/45 py-20 lg:py-28">
+      <section className="border-y border-sheet-ink/15 bg-sheet-paper py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <Reveal>
+          <Motion variant="rise">
             <div className="mb-12 max-w-2xl">
-              <SectionLabel index="05" label="Subscription plans" />
-              <h2 className="mt-5 font-display text-3xl font-semibold tracking-tight text-shm-navy-900 sm:text-4xl">
+              <SectionLabel label="Subscription plans" />
+              <h2 className="mt-5 text-3xl font-semibold tracking-tight text-sheet-ink sm:text-4xl">
                 Pricing by scale, not by structure.
               </h2>
-              <p className="mt-4 text-[15px] leading-relaxed text-slate-500">
+              <p className="mt-4 text-[15px] leading-relaxed text-sheet-ink/55">
                 Entitlement-based plans that grow with your infrastructure
                 footprint.
               </p>
             </div>
-          </Reveal>
+          </Motion>
 
           <div className="grid gap-5 lg:grid-cols-3">
             {[
@@ -977,43 +659,43 @@ export default function HomePage() {
                 featured: false,
               },
             ].map((plan, i) => (
-              <Reveal key={plan.name} delay={i * 90}>
+              <Motion key={plan.name} variant="ink" index={i}>
                 <div
                   className={`relative flex h-full flex-col rounded-xl border bg-white p-6 ${
                     plan.featured
                       ? "border-shm-navy-500 shadow-[0_0_0_1px_rgba(17,17,17,0.25),0_20px_60px_-20px_rgba(17,17,17,0.35)]"
-                      : "border-slate-200 shadow-[0_1px_2px_rgba(17,17,17,0.04)]"
+                      : "border-sheet-ink/15 shadow-[0_1px_2px_rgba(17,17,17,0.04)]"
                   }`}
                 >
                   {plan.featured && (
-                    <span className="absolute -top-3 left-6 rounded-full bg-shm-navy-800 px-3 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-white">
+                    <span className="absolute -top-3 left-6 rounded-full bg-sheet-ink px-3 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-white">
                       Most deployed
                     </span>
                   )}
                   <div className="flex items-baseline justify-between">
-                    <h3 className="text-[16px] font-semibold tracking-tight text-shm-navy-900">
+                    <h3 className="text-[16px] font-semibold tracking-tight text-sheet-ink">
                       {plan.name}
                     </h3>
-                    <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-slate-400">
+                    <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-sheet-ink/45">
                       TIER 0{i + 1}
                     </span>
                   </div>
-                  <p className="mt-1 text-[12.5px] text-slate-500">
+                  <p className="mt-1 text-[12.5px] text-sheet-ink/55">
                     {plan.desc}
                   </p>
                   <div className="mt-5 flex items-baseline gap-1">
-                    <span className="font-display text-3xl font-semibold tracking-tight text-shm-navy-900">
+                    <span className="text-3xl font-semibold tracking-tight text-sheet-ink">
                       {plan.price}
                     </span>
-                    <span className="text-[12px] text-slate-400">
+                    <span className="text-[12px] text-sheet-ink/45">
                       {plan.period}
                     </span>
                   </div>
-                  <ul className="mt-5 flex-1 space-y-2 border-t border-slate-100 pt-5">
+                  <ul className="mt-5 flex-1 space-y-2 border-t border-sheet-ink/10 pt-5">
                     {plan.features.map((f) => (
                       <li
                         key={f}
-                        className="flex items-start gap-2 text-[13px] text-slate-600"
+                        className="flex items-start gap-2 text-[13px] text-sheet-ink/70"
                       >
                         <CheckMark />
                         {f}
@@ -1022,43 +704,40 @@ export default function HomePage() {
                   </ul>
                   <Link href="/login" className="mt-6">
                     <Button
-                      className={`w-full ${plan.featured ? "" : "bg-slate-100 text-slate-800 hover:bg-slate-200"}`}
+                      className={`w-full ${plan.featured ? "" : "bg-slate-100 text-slate-800 hover:bg-sheet-ink/15"}`}
                     >
                       Get started
                     </Button>
                   </Link>
                 </div>
-              </Reveal>
+              </Motion>
             ))}
           </div>
         </div>
       </section>
 
       {/* CTA */}
-      <section className="bg-blueprint relative overflow-hidden bg-gradient-to-br from-shm-navy-800 to-shm-navy-900 py-20">
-        <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-shm-cyan/25 blur-3xl" />
+      <section className="relative overflow-hidden bg-sheet-ink py-24">
+        <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-transparent blur-3xl" />
         <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
-          <Reveal>
-            <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.24em] text-shm-navy-300">
+          <Motion variant="rise">
+            <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.24em] text-sheet-rule">
               Ready when you are
             </p>
-            <h2 className="mb-5 font-display text-3xl font-semibold tracking-tight text-white sm:text-5xl">
+            <h2 className="mb-5 text-3xl font-semibold tracking-tight text-white sm:text-5xl">
               Protect your infrastructure before it signals.
             </h2>
-            <p className="mx-auto mb-8 max-w-xl text-[15px] leading-relaxed text-slate-300">
+            <p className="mx-auto mb-8 max-w-xl text-[15px] leading-relaxed text-sheet-paper/70">
               Start monitoring in minutes. Live telemetry, engineering analysis,
               and alerts that reach the right person at the right time.
             </p>
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-              <Link href="/login">
-                <Button
-                  size="lg"
-                  className="w-full bg-white text-shm-navy-900 hover:bg-slate-100 sm:w-auto"
-                >
-                  Start free trial
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </Link>
+              <ConsoleLink
+                size="lg"
+                className="w-full bg-white text-sheet-ink hover:bg-sheet-print sm:w-auto"
+              >
+                Start free trial
+              </ConsoleLink>
               <Button
                 size="lg"
                 variant="ghost"
@@ -1068,29 +747,26 @@ export default function HomePage() {
                 Request a demo
               </Button>
             </div>
-          </Reveal>
+          </Motion>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 bg-white py-12">
+      <footer className="border-t border-sheet-ink/15 bg-white py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-8 md:grid-cols-4">
             <div className="max-w-xs">
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-shm-navy-800">
-                  <Activity className="h-4 w-4 text-white" strokeWidth={1.75} />
-                </span>
-                <div className="leading-none">
-                  <p className="text-[14px] font-bold tracking-tight text-shm-navy-900">
-                    StructGuard
-                  </p>
-                  <p className="mt-0.5 font-mono text-[8.5px] uppercase tracking-[0.22em] text-slate-400">
-                    by Arctano Sensors
-                  </p>
-                </div>
-              </div>
-              <p className="mt-4 text-[13px] leading-relaxed text-slate-500">
+              <Image
+                src={LOGO.src}
+                alt={COMPANY}
+                width={LOGO.width}
+                height={LOGO.height}
+                className="h-9 w-auto"
+              />
+              <p className="mt-3 font-mono text-[8.5px] uppercase tracking-[0.22em] text-sheet-ink/45">
+                {TAGLINE}
+              </p>
+              <p className="mt-4 text-[13px] leading-relaxed text-sheet-ink/55">
                 Continuous structural health monitoring — IoT edge nodes, cloud
                 analytics, physics-informed AI, and a full multi-tenant SaaS
                 platform.
@@ -1116,34 +792,35 @@ export default function HomePage() {
               },
             ].map((col) => (
               <div key={col.title}>
-                <h4 className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-shm-navy-800">
+                <h4 className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-sheet-ink">
                   {col.title}
                 </h4>
-                <ul className="space-y-2 text-[13px] text-slate-500">
+                <ul className="space-y-2 text-[13px] text-sheet-ink/55">
                   {col.links.map((l) => (
-                    <li
-                      key={l}
-                      className="transition-colors hover:text-shm-navy-700"
-                    >
-                      {l}
+                    <li key={l}>
+                      <span className="mo-link cursor-pointer transition-colors hover:text-sheet-ink">
+                        {l}
+                      </span>
                     </li>
                   ))}
                 </ul>
               </div>
             ))}
           </div>
-          <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-slate-200 pt-6 sm:flex-row">
-            <p className="font-mono text-[11px] text-slate-400">
-              © 2026 StructGuard · Arctano Sensors
+          <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-sheet-ink/15 pt-6 sm:flex-row">
+            <p className="font-mono text-[11px] text-sheet-ink/45">
+              {/* Derived from the clock, so the notice does not silently go
+                  stale on 1 January. */}
+              © {new Date().getFullYear()} {COMPANY}
             </p>
-            <div className="flex gap-5 font-mono text-[11px] text-slate-400">
-              <span className="cursor-pointer transition-colors hover:text-slate-600">
+            <div className="flex gap-5 font-mono text-[11px] text-sheet-ink/45">
+              <span className="cursor-pointer transition-colors hover:text-sheet-ink/70">
                 PRIVACY
               </span>
-              <span className="cursor-pointer transition-colors hover:text-slate-600">
+              <span className="cursor-pointer transition-colors hover:text-sheet-ink/70">
                 TERMS
               </span>
-              <span className="cursor-pointer transition-colors hover:text-slate-600">
+              <span className="cursor-pointer transition-colors hover:text-sheet-ink/70">
                 SECURITY
               </span>
             </div>
@@ -1154,33 +831,11 @@ export default function HomePage() {
   );
 }
 
-function PulseDotLike() {
-  return (
-    <span className="relative flex h-1.5 w-1.5">
-      <span
-        className="absolute inline-flex h-full w-full animate-ping rounded-full bg-shm-green opacity-60"
-        style={{ animationDuration: "2s" }}
-      />
-      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-shm-green" />
-    </span>
-  );
-}
 
-function LiveDot() {
-  return (
-    <span className="relative flex h-1.5 w-1.5">
-      <span
-        className="absolute inline-flex h-full w-full animate-ping rounded-full bg-shm-green opacity-60"
-        style={{ animationDuration: "1.6s" }}
-      />
-      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-shm-green" />
-    </span>
-  );
-}
 
 function CheckMark() {
   return (
-    <span className="mt-[3px] flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-shm-navy-500/10 text-shm-navy-600">
+    <span className="mt-[3px] flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-sheet-paper0/10 text-sheet-navy">
       <svg
         width="10"
         height="10"

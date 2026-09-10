@@ -10,13 +10,34 @@ export interface MailOptions {
   bcc?: string;
 }
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: config.email.account,
-    pass: config.email.password,
-  },
-});
+/**
+ * The transport.
+ *
+ * Gmail stays the default so existing setups keep working, but the service is no
+ * longer hardwired: setting SMTP_HOST switches to any provider. Hardwiring it
+ * meant a deployment could only ever send through a Google account, and Google
+ * requires an App Password rather than the account password, which is a common
+ * reason mail silently fails to send.
+ */
+const transporter = nodemailer.createTransport(
+  config.email.host
+    ? {
+        host: config.email.host,
+        port: config.email.port,
+        secure: config.email.secure,
+        auth: { user: config.email.account, pass: config.email.password },
+      }
+    : {
+        service: "gmail",
+        auth: { user: config.email.account, pass: config.email.password },
+      },
+);
+
+/** Whether outbound mail can be sent at all. Exported so callers can tell the
+ *  difference between "sent" and "there is nowhere to send from". */
+export function isEmailConfigured(): boolean {
+  return Boolean(config.email.account && config.email.password);
+}
 
 /**
  * Whether outbound mail is configured at all.

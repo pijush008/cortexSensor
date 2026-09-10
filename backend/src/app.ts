@@ -11,6 +11,7 @@ import { requestContext } from "./middleware/requestContext";
 import healthRoutes from "./modules/health/health.routes";
 
 import authRoutes from "./modules/auth/auth.routes";
+import googleAuthRoutes from "./modules/auth/google.routes";
 import usersRoutes from "./modules/users/users.routes";
 import devicesRoutes from "./modules/devices/devices.routes";
 import sensorsRoutes from "./modules/sensors/sensors.routes";
@@ -130,6 +131,7 @@ const API_MOUNTS = ["/api/v1", "/api"] as const;
 
 for (const base of API_MOUNTS) {
   app.use(base, authRoutes);
+  app.use(base, googleAuthRoutes);
   app.use(base, usersRoutes);
   app.use(`${base}/device`, devicesRoutes);
   app.use(`${base}/sensor`, sensorsRoutes);

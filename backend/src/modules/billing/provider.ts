@@ -145,4 +145,23 @@ export class GenericHmacProvider implements PaymentProvider {
   }
 }
 
-export const paymentProvider: PaymentProvider = new GenericHmacProvider();
+/**
+ * The active adapter, chosen by configuration.
+ *
+ * Defaults to the generic HMAC envelope. A deployment that sets
+ * BILLING_PROVIDER=razorpay without credentials still gets a provider whose
+ * isConfigured() returns false, so checkout refuses with a clear message
+ * instead of appearing to work.
+ */
+function selectProvider(): PaymentProvider {
+  if (config.billing.provider === "razorpay") {
+    // Imported lazily to keep this module free of a cycle: the Razorpay adapter
+    // imports verifyHmacSignature from here.
+     
+    const { RazorpayProvider } = require("./razorpay.provider") as typeof import("./razorpay.provider");
+    return new RazorpayProvider();
+  }
+  return new GenericHmacProvider();
+}
+
+export const paymentProvider: PaymentProvider = selectProvider();

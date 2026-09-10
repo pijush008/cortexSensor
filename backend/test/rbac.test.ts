@@ -16,6 +16,7 @@ import {
 } from "../src/modules/rbac/rbac.service";
 import { evaluateMfaGate, verifyToken } from "../src/modules/auth/mfa.service";
 import { authenticator } from "otplib";
+import { TINY_PNG } from "./fixtures/registration";
 
 /**
  * Tenancy and RBAC.
@@ -78,6 +79,8 @@ describe("tenancy and RBAC", () => {
 
     // Registering an admin must provision their organization (§93).
     const registration = await request(app).post("/api/register/admin").send({
+      companyName: `Test Org ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      companyLogo: TINY_PNG,
       firstName: "Rbac",
       lastName: "Owner",
       emailId: EMAIL_OWNER,
@@ -104,7 +107,24 @@ describe("tenancy and RBAC", () => {
     tenantId = membership.tenantId;
 
     // A member of the same tenant, downgraded to VIEWER.
-    await request(app).post("/api/register/authority").send({
+    //
+    // Added while signed in as the owner: the organization a member joins now
+    // comes from the inviting admin's SESSION, not from `admin_id` in the body.
+    const ownerLogin = await request(app)
+      .post("/api/commonLogin")
+      .send({ username: EMAIL_OWNER, password: PASSWORD });
+    expect(ownerLogin.status).toBe(200);
+    const ownerCookieRaw = ownerLogin.headers["set-cookie"];
+    const ownerCookie = (Array.isArray(ownerCookieRaw) ? ownerCookieRaw : [])
+      .map((c: string) => c.split(";")[0])
+      .join("; ");
+
+    await request(app)
+      .post("/api/register/authority")
+      .set("Cookie", ownerCookie)
+      .send({
+      companyName: `Test Org ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      companyLogo: TINY_PNG,
       firstName: "Rbac",
       lastName: "Viewer",
       emailId: EMAIL_VIEWER,

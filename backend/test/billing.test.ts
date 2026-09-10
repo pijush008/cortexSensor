@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import app from "../src/app";
 import prisma from "../src/config/prisma";
 import { assertWithinLimits, countUsage } from "../src/modules/subscription/subscription.service";
+import { TINY_PNG } from "./fixtures/registration";
 
 const EMAIL_P = "bill-admin-p@example.com"; // starts on Starter (trial)
 const EMAIL_Q = "bill-admin-q@example.com"; // other tenant for invoice scoping
@@ -27,8 +28,18 @@ async function registerAndLogin(
   email: string,
   userType: "admin" | "contractor" | "authority",
   adminId?: string,
+  /**
+   * The inviting admin's session. Required for contractors and authorities:
+   * adding somebody to an organization now takes the tenant from the SESSION,
+   * because taking it from `admin_id` in the body let anyone join any tenant.
+   */
+  adminCookie?: string,
 ) {
-  const reg = await request(app).post(`/api/register/${userType}`).send({
+  const req = request(app).post(`/api/register/${userType}`);
+  if (adminCookie) req.set("Cookie", adminCookie);
+  const reg = await req.send({
+      companyName: `Test Org ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      companyLogo: TINY_PNG,
     firstName: "Bill",
     lastName: "Test",
     emailId: email,
@@ -181,7 +192,7 @@ describe("billing (plan enrollment, enforcement, invoices)", () => {
     await prisma.$disconnect();
   }, 60000);
 
-  test("admin gets a default Starter trial plan with zero usage", async () => {
+  test("a new admin starts on Starter, awaiting payment, with zero usage", async () => {
     const res = await request(app)
       .get("/api/subscription/plan")
       .set("Cookie", adminP.cookie);
@@ -189,13 +200,28 @@ describe("billing (plan enrollment, enforcement, invoices)", () => {
     const data = res.body.data;
     expect(data.scheme).toBe("subscription");
     expect(data.plan.code).toBe("starter");
-    expect(data.status).toBe("trial");
+    // `pending`, not `trial`. Registration no longer grants a free period: an
+    // organization is activated by a verified payment webhook and by nothing
+    // else. The plan and its limits are still assigned at registration so the
+    // account has something for a payment to attach to.
+    expect(data.status).toBe("pending");
     expect(data.plan.limits.structures).toBe(3);
     expect(data.usage).toEqual({ structures: 0, sensors: 0, users: 0 });
   });
 
   test("contractor members cannot read the billing admin endpoint", async () => {
-    const contractor = await registerAndLogin(EMAIL_CONTRACTOR, "contractor");
+    // Added by adminQ, not adminP.
+    //
+    // A member now joins the INVITING admin's organization, so putting this
+    // contractor under adminP would occupy one of the five Starter seats that
+    // the limit test below fills deliberately — and that test would then find
+    // six users where it expects five.
+    const contractor = await registerAndLogin(
+      EMAIL_CONTRACTOR,
+      "contractor",
+      String(adminQ.userId),
+      adminQ.cookie,
+    );
     const res = await request(app)
       .get("/api/subscription/plan")
       .set("Cookie", contractor.cookie);
@@ -214,7 +240,10 @@ describe("billing (plan enrollment, enforcement, invoices)", () => {
 
     const attempt = await request(app)
       .post("/api/register/contractor")
+      .set("Cookie", adminP.cookie)
       .send({
+      companyName: `Test Org ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      companyLogo: TINY_PNG,
         firstName: "Over",
         lastName: "Limit",
         emailId: "bill-overlimit@example.com",

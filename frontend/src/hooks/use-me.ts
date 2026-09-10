@@ -24,6 +24,13 @@ export interface SessionInfo {
     name: string;
     slug: string;
     status: string;
+    /**
+     * Relative path to the organization's logo (/api/uploads/tenants/x.png),
+     * or null. Relative on purpose — see toPublicImagePath on the server: an
+     * absolute URL built from BASE_URL points at the backend's own port and
+     * fails everywhere except a developer's own machine.
+     */
+    logoUrl: string | null;
   } | null;
   isPlatformAdmin: boolean;
   role: string | null;

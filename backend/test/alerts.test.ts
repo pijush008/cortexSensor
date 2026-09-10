@@ -16,6 +16,7 @@ import {
   isEscalation,
 } from "../src/modules/alerts/severity";
 import { resolveAuthContext } from "../src/modules/rbac/rbac.service";
+import { TINY_PNG } from "./fixtures/registration";
 
 /**
  * Alerting.
@@ -84,6 +85,8 @@ describe("alerting", () => {
     await cleanup();
 
     await request(app).post("/api/v1/register/admin").send({
+      companyName: `Test Org ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      companyLogo: TINY_PNG,
       firstName: "Alerts",
       lastName: "Admin",
       emailId: EMAIL,
@@ -458,6 +461,8 @@ describe("alerting", () => {
   test("alerts are tenant scoped", async () => {
     const otherEmail = `alerts-other-${Date.now()}@example.com`;
     await request(app).post("/api/v1/register/admin").send({
+      companyName: `Test Org ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      companyLogo: TINY_PNG,
       firstName: "Other",
       lastName: "Org",
       emailId: otherEmail,

@@ -40,6 +40,12 @@ services:
       # container is nothing — every analysis run fails while the engine sits
       # healthy one hop away. Host-run tests hide it, because 8000 is published.
       SHM_ENGINE_URL: "http://python-shm:8000"
+      # Origin used to build links that are EMAILED to people — verification and
+      # password reset. Must be an address the recipient's browser can open, so
+      # it is the app's own origin rather than the backend's port: getBaseUrl()
+      # otherwise falls back to http://localhost:3001, which nobody browses.
+      BASE_URL: "http://localhost:3000"
+      APP_URL: "http://localhost:3000"
       # Billing. The webhook verifies an HMAC over the raw body; with no secret
       # the endpoint refuses rather than accepting unsigned traffic.
       BILLING_ENABLED: "true"
@@ -79,6 +85,10 @@ services:
       NODE_ENV: development
       PORT: 3000
       NEXT_PUBLIC_API_URL: "/api"
+      # Target for the Next rewrite that forwards /api to the backend, so the
+      # app works when opened directly on the frontend's port and not only
+      # through nginx.
+      BACKEND_ORIGIN: "http://backend:3001"
       # NOTE: broker credentials are deliberately NOT provided to the frontend.
       # Next.js inlines every NEXT_PUBLIC_* value into the client bundle, so a
       # broker password here would be readable in page source, and the old
@@ -86,6 +96,10 @@ services:
       # Live data now reaches the browser through the API's authenticated,
       # tenant-filtered SSE stream at /api/v1/stream/measurements.
     ports:
+      # 3000 on the host as well as in the container, so the address people
+      # actually type — http://localhost:3000 — reaches the app. 3005 is kept
+      # so any existing bookmark still resolves.
+      - "3000:3000"
       - "3005:3000"
     # `npm ci` (not `npm install`) so platform-specific optional deps such as
     # @tailwindcss/oxide-linux-x64-gnu resolve correctly from the lockfile —

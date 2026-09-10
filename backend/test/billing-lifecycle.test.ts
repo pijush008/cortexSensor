@@ -10,6 +10,7 @@ import {
   GRACE_PERIOD_DAYS,
 } from "../src/modules/billing/billing.service";
 import { verifyHmacSignature } from "../src/modules/billing/provider";
+import { TINY_PNG } from "./fixtures/registration";
 
 /**
  * Payment lifecycle (§25, §80).
@@ -88,6 +89,8 @@ describe("payment lifecycle", () => {
     await cleanup();
 
     await request(app).post("/api/v1/register/admin").send({
+      companyName: `Test Org ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      companyLogo: TINY_PNG,
       firstName: "Billing",
       lastName: "Admin",
       emailId: EMAIL,

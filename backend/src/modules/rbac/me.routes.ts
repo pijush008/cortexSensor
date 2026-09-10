@@ -1,6 +1,7 @@
 import { Response, Router } from "express";
 import { authenticate, AuthRequest } from "../../middleware/auth";
 import prisma from "../../config/prisma";
+import { toPublicImagePath } from "../../utils/helper";
 
 /**
  * The authenticated session's own identity and entitlements.
@@ -34,7 +35,14 @@ router.get("/me", authenticate, async (req: AuthRequest, res: Response) => {
   const tenant = req.auth.tenantId
     ? await prisma.tenant.findUnique({
         where: { id: req.auth.tenantId },
-        select: { id: true, publicId: true, name: true, slug: true, status: true },
+        select: {
+          id: true,
+          publicId: true,
+          name: true,
+          slug: true,
+          status: true,
+          logoPath: true,
+        },
       })
     : null;
 
@@ -74,7 +82,16 @@ router.get("/me", authenticate, async (req: AuthRequest, res: Response) => {
         /** Deprecated; retained while the client migrates to permissions. */
         userType: req.user.userType,
       },
-      tenant,
+      // The stored path is a filesystem detail; the client gets something it
+      // can put straight in an <img src>.
+      tenant: tenant && {
+        id: tenant.id,
+        publicId: tenant.publicId,
+        name: tenant.name,
+        slug: tenant.slug,
+        status: tenant.status,
+        logoUrl: toPublicImagePath(tenant.logoPath),
+      },
       isPlatformAdmin: req.auth.isPlatformAdmin,
       /** >1 means the session silently resolved to one of several organizations. */
       membershipCount: memberships,

@@ -14,6 +14,22 @@ export const forgotPasswordSchema = z.object({
   username: z.string().email("Invalid email format"),
 });
 
+/**
+ * A new password set from an emailed reset link.
+ *
+ * The minimum is stated once here and enforced on the server, so it cannot be
+ * bypassed by posting straight to the endpoint. It matches the rule applied at
+ * registration; a reset must not be a way to install a weaker password than
+ * signing up allows.
+ */
+export const resetPasswordSchema = z.object({
+  token: z.string().min(32, "Invalid reset link"),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .max(200, "Password is too long"),
+});
+
 export const validateOtpSchema = z.object({
   userId: z.string().min(1, "User ID is required"),
   inputOTP: z.string().min(1, "OTP is required"),
@@ -31,9 +47,43 @@ export const registerSchema = z.object({
   lastName: z.string().min(1, "Last name is required"),
   emailId: z.string().email("Invalid email format"),
   phoneNo: z.string().min(1, "Phone number is required"),
-  password: z.string().min(1, "Password is required"),
+  // Eight, matching the password reset path. It was min(1), which accepted a
+  // single character — so an account could be created with a weaker password
+  // than the same account is allowed to reset to.
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .max(200, "Password is too long"),
   profileImage: z.string().nullable().optional(),
   admin_id: z.string().nullable().optional(),
+});
+
+/**
+ * Registration of an organization ADMIN, who brings a company with them.
+ *
+ * A separate schema rather than optional fields on the base one, because the
+ * same endpoint also registers contractors and authorities — people being added
+ * INTO an existing organization, who have no company of their own to name. Zod
+ * strips unknown keys, so a contractor payload carrying `companyName` has it
+ * discarded before the service sees it: the scoping is enforced by the shape
+ * rather than by a runtime check somebody has to remember to write.
+ *
+ * The discriminator is `:userType` in the path, not a body field, so this
+ * cannot be a discriminated union or a superRefine — the controller picks the
+ * schema.
+ */
+export const registerAdminSchema = registerSchema.extend({
+  // `required_error` as well as `.min(1)`: when the key is absent entirely Zod
+  // raises invalid_type before any string rule runs, and the default message is
+  // the bare word "Required", which tells the person nothing about which field.
+  companyName: z
+    .string({ required_error: "Company name is required" })
+    .trim()
+    .min(1, "Company name is required")
+    .max(255, "Company name is too long"),
+  companyLogo: z
+    .string({ required_error: "A company logo is required" })
+    .min(1, "A company logo is required"),
 });
 
 export const updateUserSchema = z.object({
@@ -50,6 +100,7 @@ export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ValidateOtpInput = z.infer<typeof validateOtpSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
+export type RegisterAdminInput = z.infer<typeof registerAdminSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 
 export interface ApiResponse {

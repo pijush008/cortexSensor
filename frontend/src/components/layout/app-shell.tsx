@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Menu, Bell, ChevronRight } from "lucide-react";
 import { ImpersonationBanner } from "./impersonation-banner";
+import { Avatar } from "@/components/ui/avatar";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "./sidebar";
 import { Button } from "@/components/ui/button";
@@ -129,9 +130,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Button>
 
             <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white pl-1 pr-2.5 py-1">
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-shm-navy-700 text-xs font-semibold text-white uppercase">
-                {userType?.[0] || "U"}
-              </div>
+              <Avatar
+                src={me.data?.tenant?.logoUrl}
+                name={me.data?.tenant?.name}
+                fallback={userType}
+                size="sm"
+              />
               <div className="hidden leading-tight sm:block">
                 <p className="text-xs font-medium text-slate-800 capitalize">{capitalize(userType)}</p>
                 <p className="font-mono text-[9.5px] text-slate-400">ID: {userId}</p>

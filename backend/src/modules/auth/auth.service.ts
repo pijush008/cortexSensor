@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 import prisma from "../../config/prisma";
 import { config } from "../../config";
 import { sendEmail } from "../../utils/email";
+import { logger } from "../../utils/logger";
 import {
   generateRandomPassword,
   generateVerificationToken,
@@ -25,6 +26,7 @@ import {
   UnauthorizedError,
 } from "../../utils/AppError";
 import { assertWithinLimits } from "../subscription/subscription.service";
+import { saveImageUpload } from "../../utils/image-upload";
 import {
   addMemberToAdminTenant,
   provisionTenantForAdmin,
@@ -32,6 +34,7 @@ import {
 import { evaluateMfaGate, verifyToken } from "./mfa.service";
 import {
   LoginInput,
+  RegisterAdminInput,
   RegisterInput,
   UpdateUserInput,
 } from "./auth.types";
@@ -81,11 +84,17 @@ export async function login(input: LoginInput) {
     throw new BadRequestError("Email Not Verified");
   }
 
+  // An organization admin is not usable until their payment has been confirmed
+  // by a verified webhook. The old message here was "User Not Verified", which
+  // told someone who had just paid nothing about what to do next and read as a
+  // fault rather than a pending step.
   if (
     user.isUserVerified !== ("true_" as never) &&
     user.userType === "admin"
   ) {
-    throw new BadRequestError("User Not Verified");
+    throw new ForbiddenError(
+      "This account is not active yet. It is activated once payment is confirmed — if you have just paid, this can take a moment.",
+    );
   }
 
   // Second factor, checked only after the password has been verified so a
@@ -240,7 +249,7 @@ export async function changePassword(
 
 export async function register(
   userType: string,
-  input: RegisterInput,
+  input: RegisterInput | RegisterAdminInput,
 ) {
   let userId: number | null = null;
 
@@ -321,10 +330,26 @@ export async function register(
   // afterwards lands in a tenant, instead of relying on a backfill to repair
   // rows that were created without one.
   if (userType === "admin") {
-    const organizationName =
-      [input.firstName, input.lastName].filter(Boolean).join(" ").trim() ||
-      input.emailId;
-    await provisionTenantForAdmin(userId, organizationName);
+    const admin = input as RegisterAdminInput;
+
+    // The company the person typed, not their own name. This used to be
+    // `firstName + lastName`, which named every organization after a person and
+    // left nowhere to put a logo.
+    //
+    // The email fallback is unreachable through the API — the schema requires a
+    // non-empty name — but Tenant.name is NOT NULL and `register()` is callable
+    // from a script, so it stays as the last line of defence.
+    const organizationName = admin.companyName?.trim() || input.emailId;
+
+    // Written to disk only now, AFTER the duplicate-email check and the user
+    // row have both succeeded. Saving it earlier would leave an orphaned file
+    // behind every rejected registration — and with a required logo, a rejected
+    // registration is the common case, not the rare one.
+    const logoPath = await saveImageUpload(admin.companyLogo, {
+      dir: "uploads/tenants",
+    });
+
+    await provisionTenantForAdmin(userId, organizationName, logoPath);
   } else if (input.admin_id) {
     await addMemberToAdminTenant(userId, Number(input.admin_id));
   }
@@ -333,13 +358,43 @@ export async function register(
   const baseUrl = getBaseUrl();
   const verificationLink = `${baseUrl}/api/verifyUser/${verificationToken}`;
 
-  await sendEmail({
+  const sent = await sendEmail({
     to: input.emailId,
-    subject: "Verify Email",
-    html: `Click <a href="${verificationLink}">here</a> to confirm your email.`,
+    subject: "Verify your email",
+    html: [
+      `<p>Hello ${input.firstName || "there"},</p>`,
+      `<p>Confirm this address to finish setting up your account.</p>`,
+      `<p><a href="${verificationLink}">Verify my email</a></p>`,
+    ].join(""),
+    text: `Confirm your email address: ${verificationLink}`,
   });
 
-  return { status_code: 200, message: "User added successfully" };
+  // Say what actually happened.
+  //
+  // This used to return "User added successfully" whether or not the message
+  // went anywhere, so a deployment with no SMTP credentials looked like it was
+  // working while every account sat unverifiable and unable to sign in. The
+  // account IS created either way — the registration succeeded — but the person
+  // waiting for an email deserves to know none is coming.
+  if (!sent) {
+    logger.warn(
+      `Verification email for ${input.emailId} was NOT sent: outbound mail is not configured.`,
+    );
+  }
+
+  return {
+    status_code: 200,
+    message: sent
+      ? "User added successfully"
+      : "Account created, but the verification email could not be sent. Contact your administrator.",
+    emailSent: sent,
+    // Development only, and only when mail is unconfigured: without this the
+    // signup flow cannot be completed at all on a machine with no SMTP account,
+    // because the link exists solely inside a message nobody can receive.
+    ...(!sent && config.nodeEnv !== "production"
+      ? { devVerificationUrl: verificationLink }
+      : {}),
+  };
 }
 
 export async function verifyPrimaryUser(token: string) {

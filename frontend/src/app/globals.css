@@ -8,13 +8,47 @@
 @import "@fontsource/fira-code/500.css";
 @import "@fontsource/fira-code/700.css";
 @import "@fontsource-variable/fraunces";
+@import "@fontsource-variable/inter";
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Fira Sans", ui-sans-serif, system-ui, sans-serif;
+  /* Typeface stand-ins for the Equals reference.
+     Equals sets Unica77 (body), Serrif Condensed (display) and Aeonik Fono
+     (mono) — all three are commercially licensed to that site and cannot be
+     copied here. Inter is the closest freely-licensed match to Unica77: the
+     same neo-grotesque lineage, a large x-height, and drawn for screen. If a
+     Unica77 licence is bought, swapping it in is a change to these two lines.
+     Display is the same family, not a serif: the reference sets its headings
+     in the body face at large sizes with tight tracking. */
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Fira Code", ui-monospace, monospace;
-  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-display: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+@theme {
+  /* ── Homepage role tokens ─────────────────────────────────────────────────
+     These are ROLES (ink, paper, ground, rule, line, accent), pointed at the
+     Equals palette defined further down so the public pages, the login screen
+     and the app all draw from one set of values.
+
+     An earlier revision pointed these at a cool diazo-whiteprint palette. That
+     was a defensible idea on its own and the wrong one for this product: it put
+     the homepage in a colour world the rest of the app does not share, so the
+     marketing page and the console looked like two different products.
+
+     Note which values are used for LINEWORK. The Equals accents are background
+     tints — the palette below records that none of them is dark enough for a
+     1px stroke or for text — so the structural drawings are inked in
+     #1a1225 and the deepened chart violet, never in the pastels. */
+  --color-sheet-print: #eeeee6;   /* cream section ground */
+  --color-sheet-paper: #ffffff;   /* card and panel surface */
+  --color-sheet-hero: #dbc2f8;    /* lavender hero ground */
+  --color-sheet-ink: #1a1225;     /* text and primary linework */
+  --color-sheet-rule: #d8d2df;    /* borders and dimension lines */
+  --color-sheet-navy: #6b4fd8;    /* secondary linework (chart violet) */
+  --color-sheet-rust: #fb7f87;    /* accent marks (coral) */
+  --color-sheet-crimson: #cc1c16;
 }
 
 @theme {
@@ -197,7 +231,7 @@
   body {
     background: var(--background);
     color: var(--foreground);
-    font-family: "Fira Sans", ui-sans-serif, system-ui, sans-serif;
+    font-family: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
@@ -394,4 +428,318 @@
   --background: 220 25% 4%;
   --foreground: 210 40% 98%;
   --card: 220 20% 10%;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Drawing-sheet motion — homepage only.
+
+   ONE orchestrated moment: the structural linework draws itself, the way a
+   drawing is actually produced, then the stays and dimension strings settle.
+   Nothing else on the page animates unattended. Scattering a fade-and-rise
+   over every section is the house style of generated pages, and on a page
+   whose argument is precision it reads as decoration.
+
+   Each animated path carries the SVG attribute pathLength="1", which
+   normalises it to unit length; `stroke-dasharray: 1` then means "one whole
+   path", so a single duration draws a short tick and a 467 m arch at the same
+   apparent speed. pathLength is an SVG attribute, not a CSS property — setting
+   it in this stylesheet would silently do nothing.
+   ───────────────────────────────────────────────────────────── */
+@keyframes sheet-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes sheet-settle {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: sheet-draw 1.1s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+  animation-delay: var(--stagger, 0s);
+}
+
+/* Stays and dimension strings are annotation: they appear after the structure
+   they annotate exists, never before it. */
+.stays,
+.dim {
+  opacity: 0;
+  animation: sheet-settle 0.5s ease-out forwards;
+  animation-delay: calc(var(--stagger, 0s) + 0.75s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .draw,
+  .stays,
+  .dim {
+    animation: none;
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+/* The sheet's own ground: a fine drafting grid, at the density of a real
+   whiteprint rather than the heavy 40px grid of a landing-page backdrop. */
+.bg-sheet {
+  background-color: var(--color-sheet-print);
+  background-image:
+    linear-gradient(to right, rgba(26, 18, 37, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(26, 18, 37, 0.05) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* The hero carries the palette at full strength, as the reference does. */
+.bg-sheet-hero {
+  background-color: var(--color-sheet-hero);
+  background-image:
+    linear-gradient(to right, rgba(26, 18, 37, 0.055) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(26, 18, 37, 0.055) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* The spectrum rule from the reference: a full-bleed band of the palette used
+   as a section divider. Flat blocks, no gradient — the reference reads as
+   swatches laid side by side, and a blend would lose the individual colours. */
+.rule-spectrum {
+  height: 6px;
+  background: linear-gradient(
+    to right,
+    var(--color-shm-lavender) 0 12.5%,
+    var(--color-shm-cyan) 12.5% 25%,
+    var(--color-shm-mint) 25% 37.5%,
+    var(--color-shm-yellow-pastel) 37.5% 50%,
+    var(--color-shm-gold) 50% 62.5%,
+    var(--color-shm-coral) 62.5% 75%,
+    var(--color-shm-lavender-soft) 75% 87.5%,
+    var(--color-shm-cyan-soft) 87.5% 100%
+  );
+}
+
+/* ═════════════════════════════════════════════════════════════
+   Motion system — homepage
+
+   Three entrance variants rather than one, chosen per content type so a long
+   page does not repeat a single gesture twenty times. All of them are short,
+   travel a small distance, and run ONCE; the eye should register that
+   something arrived, not watch it arrive.
+
+   Every variant is disabled wholesale under prefers-reduced-motion at the end
+   of this block. Motion is the decoration here — the page must be complete and
+   legible without any of it.
+   ═════════════════════════════════════════════════════════════ */
+
+/* Shared entrance state. `--i` is the child's index within a stagger group and
+   `--step` the gap between them, so a grid can cascade without every card
+   needing its own hand-written delay. */
+.mo {
+  --i: 0;
+  --step: 90ms;
+  opacity: 0;
+  transition:
+    opacity 0.75s var(--ease-out-expo),
+    transform 0.75s var(--ease-out-expo),
+    clip-path 0.95s var(--ease-out-expo),
+    filter 0.6s ease-out;
+  transition-delay: calc(var(--i) * var(--step));
+}
+
+/* Rise: for headings and prose.
+   28px, not the 14px this started at. At 14px over half a second, triggered the
+   moment the element cleared the viewport edge, the movement finished before
+   anyone looked at it — the animation ran and read as nothing at all. Motion
+   that cannot be perceived is the same as no motion, only slower. */
+.mo-rise {
+  transform: translateY(28px);
+}
+
+/* Ink: for cards and panels. Settles out of a slight blur, the way a line
+   resolves on a diazo print rather than sliding in from off-page. */
+.mo-ink {
+  transform: translateY(22px) scale(0.98);
+  filter: blur(6px);
+}
+
+/* Unroll: for full-width plates and rules. Wipes left to right, the direction
+   a drawing is unrolled and the direction this page is read. */
+.mo-unroll {
+  clip-path: inset(0 100% 0 0);
+  opacity: 1;
+}
+
+.mo-in {
+  opacity: 1;
+  transform: none;
+  filter: none;
+  clip-path: inset(0 0 0 0);
+}
+
+/* ── Interaction ─────────────────────────────────────────────────────────── */
+
+/* Press: a button should feel like it went down. Paired with the hover lift on
+   the button variants themselves. */
+@keyframes mo-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.mo-spin {
+  animation: mo-spin 0.7s linear infinite;
+}
+
+/* Underline that grows from the cursor's side rather than fading in. */
+.mo-link {
+  position: relative;
+}
+.mo-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.28s var(--ease-out-expo);
+}
+.mo-link:hover::after,
+.mo-link:focus-visible::after {
+  transform: scaleX(1);
+}
+
+/* ── Route progress ──────────────────────────────────────────────────────── */
+
+/* Shown while a navigation is in flight. Indeterminate on purpose: the app
+   cannot know how far along a route transition is, and a bar that pretends to
+   would be inventing progress. */
+@keyframes mo-progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.mo-progress-track {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 2px;
+  z-index: 100;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-sheet-ink) 8%, transparent);
+}
+.mo-progress-track > span {
+  display: block;
+  height: 100%;
+  width: 45%;
+  background: var(--color-sheet-rust);
+  animation: mo-progress 0.9s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mo,
+  .mo-rise,
+  .mo-ink,
+  .mo-unroll {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    clip-path: none;
+    transition: none;
+  }
+  .mo-spin,
+  .mo-progress-track > span {
+    animation: none;
+  }
+  .mo-link::after {
+    transition: none;
+  }
+}
+
+/* Without JavaScript, nothing would ever add .mo-in, and every animated
+   element would stay at opacity 0 — the page would render blank. The entrance
+   states are therefore conditional on scripting being available. */
+@media (scripting: none) {
+  .mo,
+  .mo-rise,
+  .mo-ink,
+  .mo-unroll {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    clip-path: none;
+  }
+}
+
+/* ── Above-the-fold entrance ──────────────────────────────────────────────
+   The hero cannot wait for JavaScript.
+
+   The scroll-triggered classes above start at opacity 0 and are revealed by a
+   React effect. Below the fold that is invisible and fine. Applied to the hero
+   it means the first thing a visitor sees is a BLANK PAGE until hydration
+   finishes — measured at roughly 600 ms here, and worse on a slow device or a
+   cold cache. A blank hero is a far bigger problem than an unanimated one.
+
+   So above-the-fold content animates from CSS alone: it begins the moment the
+   stylesheet applies, needs no script, and cannot leave anything stranded. */
+@keyframes mo-enter {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.mo-load {
+  --i: 0;
+  --step: 90ms;
+  /* `both` holds the from-state during the delay, so a staggered child does not
+     flash in at full opacity before its turn. */
+  animation: mo-enter 0.75s var(--ease-out-expo) both;
+  animation-delay: calc(var(--i) * var(--step));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mo-load {
+    animation: none;
+  }
+}
+
+/* The mark on the branded loading screen. A slow opacity pulse — the logo is
+   not rotated, because a spinning wordmark reads as a novelty rather than as
+   waiting, and this one contains type that would be upside down half the time. */
+@keyframes brand-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.brand-loader-mark {
+  animation: brand-breathe 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-loader-mark {
+    animation: none;
+  }
 }

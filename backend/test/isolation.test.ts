@@ -2,6 +2,7 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import app from "../src/app";
 import prisma from "../src/config/prisma";
+import { TINY_PNG } from "./fixtures/registration";
 
 // Deterministic test identities so cleanup is safe across runs.
 const EMAIL_A = "iso-admin-a@example.com";
@@ -26,6 +27,8 @@ async function registerAndLogin(
   userType: "admin" | "contractor" | "authority",
 ) {
   const reg = await request(app).post(`/api/register/${userType}`).send({
+      companyName: `Test Org ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      companyLogo: TINY_PNG,
     firstName: "Iso",
     lastName: "Test",
     emailId: email,
@@ -129,11 +132,30 @@ async function cleanupTestData() {
   await prisma.membership
     .deleteMany({ where: { userId: { in: ids } } })
     .catch(() => {});
-  await prisma.user.deleteMany({ where: { id: { in: ids } } }).catch(() => {});
-  if (ownTenantIds.length) {
-    await prisma.tenant
-      .deleteMany({ where: { id: { in: ownTenantIds } } })
+
+  // Registration now creates a subscription for every organization admin, and
+  // it holds foreign keys to BOTH the user and the tenant. Without deleting it
+  // first the user delete below fails — silently, because of the .catch — and
+  // the next run finds a stale account with its membership already removed,
+  // which fails in a place that has nothing to do with the real cause.
+  const subs = await prisma.subscription
+    .findMany({ where: { adminId: { in: ids } }, select: { id: true } })
+    .catch(() => [] as { id: number }[]);
+  if (subs.length) {
+    await prisma.invoice
+      .deleteMany({ where: { subscriptionId: { in: subs.map((x) => x.id) } } })
       .catch(() => {});
+    await prisma.subscription
+      .deleteMany({ where: { id: { in: subs.map((x) => x.id) } } })
+      .catch(() => {});
+  }
+
+  // These two are NOT swallowed. Everything above is best-effort cleanup of
+  // optional fixtures; if the user or tenant cannot be removed the next run is
+  // already compromised, and failing here names the reason.
+  await prisma.user.deleteMany({ where: { id: { in: ids } } });
+  if (ownTenantIds.length) {
+    await prisma.tenant.deleteMany({ where: { id: { in: ownTenantIds } } });
   }
 }
 

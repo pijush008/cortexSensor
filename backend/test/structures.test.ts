@@ -3,6 +3,7 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import app from "../src/app";
 import prisma from "../src/config/prisma";
+import { TINY_PNG } from "./fixtures/registration";
 
 /**
  * Structures and locations — the first module built entirely on the tenancy
@@ -24,10 +25,22 @@ function cookieHeader(raw: unknown): string {
   return cookie;
 }
 
-async function registerAndLogin(email: string, kind: "admin" | "authority", adminId?: number) {
-  await request(app)
-    .post(`/api/v1/register/${kind}`)
+async function registerAndLogin(
+  email: string,
+  kind: "admin" | "authority",
+  adminId?: number,
+  /**
+   * The inviting admin's session. Required for an authority: the organization a
+   * member joins is taken from the session now, not from `admin_id`.
+   */
+  adminCookie?: string,
+) {
+  const reg = request(app).post(`/api/v1/register/${kind}`);
+  if (adminCookie) reg.set("Cookie", adminCookie);
+  await reg
     .send({
+      companyName: `Test Org ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      companyLogo: TINY_PNG,
       firstName: "Struct",
       lastName: "Test",
       emailId: email,
@@ -100,7 +113,12 @@ describe("structures and locations", () => {
 
     adminA = await registerAndLogin(EMAIL_A, "admin");
     adminB = await registerAndLogin(EMAIL_B, "admin");
-    viewerA = await registerAndLogin(EMAIL_VIEWER, "authority", adminA.userId);
+    viewerA = await registerAndLogin(
+      EMAIL_VIEWER,
+      "authority",
+      adminA.userId,
+      adminA.cookie,
+    );
 
     const mkProject = async (tenantId: number, createdBy: number, name: string) =>
       prisma.project.create({

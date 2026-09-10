@@ -76,8 +76,8 @@ function SuperAdminFreeView({ priceLabel }: { priceLabel: string }) {
                   </div>
                   <p className="max-w-xl text-sm text-slate-300">
                     As the platform superadmin, your subscription is fully covered
-                    by Arctano Sensors. There is nothing to pay — no invoices, no
-                    renewal, no card on file.
+                    by Cloudglance Sensinglab Pvt Ltd. There is nothing to pay —
+                    no invoices, no renewal, no card on file.
                   </p>
                 </div>
               </div>

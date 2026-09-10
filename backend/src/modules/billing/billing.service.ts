@@ -57,6 +57,17 @@ export function evaluateEntitlement(
     currentPeriodEnd: sub.currentPeriodEnd,
   };
 
+  if (sub.status === SubscriptionStatus.pending) {
+    // Registered, not yet paid. Grants nothing — and says why in terms the
+    // customer can act on, rather than reporting their new account as expired.
+    return {
+      ...base,
+      active: false,
+      inGracePeriod: false,
+      reason: "Awaiting payment",
+    };
+  }
+
   if (sub.status === SubscriptionStatus.suspended) {
     return {
       ...base,
@@ -221,6 +232,12 @@ async function applyEvent(event: NormalizedEvent): Promise<string> {
         },
       });
 
+      // The account becomes usable HERE, on a signed webhook, and nowhere else.
+      // A browser returning from checkout can be replayed, forged, or simply
+      // closed before the charge settles; only the provider's signature is
+      // evidence that money moved.
+      await activateOwnerAfterPayment(subscription.adminId);
+
       if (event.invoiceId && event.amountMinor !== undefined) {
         await prisma.invoice
           .create({
@@ -316,6 +333,44 @@ export async function expireLapsedSubscriptions(now = new Date()): Promise<numbe
     logger.info(`Billing: ${result.count} subscription(s) moved to expired`);
   }
   return result.count;
+}
+
+/**
+ * Lets a newly-registered organization admin sign in, once their payment has
+ * been confirmed by a verified webhook.
+ *
+ * Registration leaves an admin with isUserVerified = false, which the sign-in
+ * path already refuses. This is the only thing that flips it for a paying
+ * customer, so the gate cannot be opened from the browser.
+ *
+ * Deliberately narrow: it never touches an account that is already active, and
+ * it never activates anything but the tenant's own admin.
+ */
+async function activateOwnerAfterPayment(adminId: number): Promise<void> {
+  const owner = await prisma.user.findUnique({
+    where: { id: adminId },
+    select: { id: true, emailId: true, isUserVerified: true, isDelete: true },
+  });
+
+  if (!owner || owner.isDelete === ("true_" as never)) return;
+  if (owner.isUserVerified === ("true_" as never)) return;
+
+  await prisma.user.update({
+    where: { id: owner.id },
+    data: { isUserVerified: "true_" as never },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      userId: owner.id,
+      action: "verify",
+      entity: "user",
+      entityId: owner.id,
+      newValue: { activatedBy: "payment-webhook", provider: paymentProvider.name },
+    },
+  });
+
+  logger.info(`Account ${owner.id} activated by verified payment webhook`);
 }
 
 export function isBillingConfigured(): boolean {

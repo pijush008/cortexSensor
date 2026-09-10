@@ -11,9 +11,12 @@ import { SectionLabel } from "@/components/ui/section-label";
 import { PageHeader } from "@/components/layout/page-header";
 import { api, type ApiResponse } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
+import { useMe } from "@/hooks/use-me";
+import { Avatar } from "@/components/ui/avatar";
 
 export default function ProfilePage() {
   const { userId, userType } = useAuthStore();
+  const me = useMe();
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -70,12 +73,18 @@ export default function ProfilePage() {
             </CardHeader>
             <CardContent>
               <div className="mb-6 flex items-center gap-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-shm-navy-50 text-2xl font-bold uppercase text-shm-navy-700 ring-1 ring-shm-navy-100">
-                  {userType?.[0] ?? "U"}
-                </div>
+                <Avatar
+                  src={me.data?.tenant?.logoUrl}
+                  name={me.data?.tenant?.name}
+                  fallback={userType}
+                  size="lg"
+                />
                 <div>
                   <p className="font-semibold text-slate-900">User #{userId}</p>
                   <p className="text-sm text-slate-500">Role: {userType}</p>
+                  {me.data?.tenant?.name && (
+                    <p className="text-sm text-slate-500">{me.data.tenant.name}</p>
+                  )}
                 </div>
               </div>
             </CardContent>

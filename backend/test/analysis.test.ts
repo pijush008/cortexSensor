@@ -11,6 +11,7 @@ import {
   requestSpectrum,
 } from "../src/modules/analysis/analysis.service";
 import { resolveAuthContext } from "../src/modules/rbac/rbac.service";
+import { TINY_PNG } from "./fixtures/registration";
 
 /**
  * Spectral analysis.
@@ -95,6 +96,8 @@ describe("spectral analysis", () => {
     }
 
     await request(app).post("/api/v1/register/admin").send({
+      companyName: `Test Org ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      companyLogo: TINY_PNG,
       firstName: "Analysis",
       lastName: "Admin",
       emailId: EMAIL,
@@ -349,6 +352,8 @@ describe("spectral analysis", () => {
   test("another tenant cannot request analysis on a foreign sensor", async () => {
     const otherEmail = `analysis-other-${Date.now()}@example.com`;
     await request(app).post("/api/v1/register/admin").send({
+      companyName: `Test Org ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      companyLogo: TINY_PNG,
       firstName: "Other",
       lastName: "Tenant",
       emailId: otherEmail,

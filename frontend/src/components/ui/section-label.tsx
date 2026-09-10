@@ -14,7 +14,7 @@ export function SectionLabel({ index, label, className, light }: SectionLabelPro
         <span
           className={cn(
             "font-mono text-[11px] font-medium tracking-widest",
-            light ? "text-shm-navy-300" : "text-shm-navy-500"
+            light ? "text-sheet-rule" : "text-sheet-rule"
           )}
         >
           {index}
@@ -23,7 +23,7 @@ export function SectionLabel({ index, label, className, light }: SectionLabelPro
       <span
         className={cn(
           "font-mono text-[11px] font-semibold uppercase tracking-[0.22em]",
-          light ? "text-slate-300" : "text-slate-500"
+          light ? "text-sheet-paper/70" : "text-sheet-ink/55"
         )}
       >
         {label}
@@ -31,7 +31,7 @@ export function SectionLabel({ index, label, className, light }: SectionLabelPro
       <span
         className={cn(
           "h-px flex-1",
-          light ? "bg-white/15" : "bg-slate-200"
+          light ? "bg-sheet-paper/20" : "bg-sheet-ink/15"
         )}
       />
     </div>
