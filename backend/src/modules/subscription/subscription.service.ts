@@ -1,4 +1,5 @@
 import prisma from "../../config/prisma";
+import { config } from "../../config";
 import { AuthenticatedRequestUser } from "../../types";
 import {
   BadRequestError,
@@ -7,7 +8,8 @@ import {
 } from "../../utils/AppError";
 import type { SwitchPlanInput } from "./subscription.types";
 
-const FALLBACK_CODE = "starter";
+// Single source of truth: checkout charges for the same plan sign-up assigns.
+const FALLBACK_CODE = config.billing.signupPlanCode;
 const TRIAL_DAYS = 14;
 
 export interface UsageCounts {
