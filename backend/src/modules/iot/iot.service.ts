@@ -366,52 +366,82 @@ async function thresholdTriggeredAlert(
 
   const projectEmails = await prisma.projectEmail.findMany({
     where: { projectId: projectData.projectId, isEnable: true },
-    select: { email: true },
+    select: { email: true, name: true },
   });
 
-  const emailList = projectEmails.map((e) => e.email.trim()).filter(Boolean);
+  const recipients = projectEmails
+    .map((e) => ({ email: e.email.trim(), name: e.name?.trim() || null }))
+    .filter((e) => e.email.length > 0);
 
-  if (emailList.length === 0) return;
+  if (recipients.length === 0) return;
 
-  const htmlMessage = `
-    <html><body>
-      <div style="color: red; font-weight: bold; font-size: 16px;">
-        THRESHOLD ALERT: ${alertType}
-      </div>
-      <p><strong>Project Details:</strong></p>
-      <ul>
-        <li><strong>Project Name:</strong> ${projectData.projectName}</li>
-        <li><strong>Project Unique ID:</strong> ${projectData.projectUniqueID || "N/A"}</li>
-      </ul>
-      <p><strong>Device Details:</strong></p>
-      <ul>
-        <li><strong>Device Table ID:</strong> ${projectData.deviceId || "N/A"}</li>
-        <li><strong>Device Name:</strong> ${projectData.deviceName || "N/A"}</li>
-        <li><strong>Device ID (Ackcio):</strong> ${deviceId}</li>
-      </ul>
-      <p><strong>Sensor Details:</strong></p>
-      <ul>
-        <li><strong>Sensor ID:</strong> ${sensorId}</li>
-        <li><strong>Sensor Name:</strong> ${sensor?.sensorName || "N/A"}</li>
-        <li><strong>Sensor Type:</strong> ${sensor?.sensorType?.sensorType || "N/A"}</li>
-        <li><strong>Current Reading:</strong> ${currentReading}</li>
-        <li><strong>Trigger Value:</strong> ${triggerValue || "N/A"}</li>
-        <li><strong>Threshold Value:</strong> ${thresholdValue || "N/A"}</li>
-        <li><strong>Last 5 Readings:</strong> ${readings.join(", ")}</li>
-      </ul>
-      <p><strong>Alert Status:</strong> ${alertType}</p>
-      <p><strong>Alert Time:</strong> ${actualDateTime}</p>
-      <p>Please review the sensor data and take appropriate action.</p>
-      <p><em>This is a system-generated email. Please do not reply.</em></p>
+  // Addressed to a person, not dumped at them. The reading that crossed its
+  // limit is the first thing stated; the supporting detail follows for whoever
+  // needs to act on it. Sent one message per recipient so each can be greeted
+  // by name — the list is small (a project's contacts), and a shared BCC would
+  // make every greeting wrong for everyone but the first.
+  const structure = projectData.projectName;
+  const sensorName = sensor?.sensorName || `sensor ${sensorId}`;
+  const unit = sensor?.sensorType?.unit?.trim() || "";
+  const isFailure = alertType === "Above Threshold Value";
+  const limitName = isFailure ? "threshold" : "trigger";
+  const headline = isFailure
+    ? `Your structure has failed \u2014 ${structure}.`
+    : `${structure} needs attention.`;
+  const limitValue =
+    alertType === "Above Threshold Value" ? thresholdValue : triggerValue;
+  const direction = alertType === "Above Threshold Value" ? "above" : "below";
+
+  for (const recipient of recipients) {
+    const greeting = recipient.name ? `Hello ${recipient.name},` : "Hello,";
+
+    const htmlMessage = `
+    <html><body style="font-family:Arial,Helvetica,sans-serif;color:#1a1225;line-height:1.55">
+      <p>${greeting}</p>
+
+      <p style="font-size:17px;font-weight:700;color:${isFailure ? "#cc1c16" : "#1a1225"}">
+        ${headline}
+      </p>
+
+      <p>
+        The sensor <strong>${sensorName}</strong> has read
+        <strong>${currentReading}${unit ? " " + unit : ""}</strong>, which is
+        ${direction} its ${limitName} of
+        <strong>${limitValue ?? "\u2014"}${unit ? " " + unit : ""}</strong>.
+      </p>
+
+      <table cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:14px">
+        <tr><td style="color:#5b5b5b">Structure</td><td><strong>${structure}</strong></td></tr>
+        <tr><td style="color:#5b5b5b">Project ID</td><td>${projectData.projectUniqueID || "\u2014"}</td></tr>
+        <tr><td style="color:#5b5b5b">Sensor</td><td>${sensorName}${sensor?.sensorType?.sensorType ? ` (${sensor.sensorType.sensorType})` : ""}</td></tr>
+        <tr><td style="color:#5b5b5b">Device</td><td>${projectData.deviceName || "\u2014"}</td></tr>
+        <tr><td style="color:#5b5b5b">Reading</td><td><strong>${currentReading}${unit ? " " + unit : ""}</strong></td></tr>
+        <tr><td style="color:#5b5b5b">Trigger</td><td>${triggerValue ?? "\u2014"}${unit && triggerValue ? " " + unit : ""}</td></tr>
+        <tr><td style="color:#5b5b5b">Threshold</td><td>${thresholdValue ?? "\u2014"}${unit && thresholdValue ? " " + unit : ""}</td></tr>
+        <tr><td style="color:#5b5b5b">Recorded</td><td>${actualDateTime}</td></tr>
+      </table>
+
+      <p>Recent readings: ${readings.join(", ")}</p>
+
+      <p>Please check the structure and the sensor before acting on this reading:
+         a limit can be crossed by a fault in the instrument as well as by the
+         structure itself.</p>
+
+      <p style="color:#5b5b5b;font-size:13px">
+        Sent automatically by the Cloudglance monitoring console. You are
+        receiving this because you are on the contact list for ${structure}.
+      </p>
     </body></html>
   `;
 
-  await sendEmail({
-    to: emailList[0],
-    subject: `Threshold Alert: ${projectData.projectName} - ${alertType}`,
-    html: htmlMessage,
-    bcc: emailList.length > 1 ? emailList.slice(1).join(",") : undefined,
-  });
+    await sendEmail({
+      to: recipient.email,
+      subject: isFailure
+        ? `Structure failed: ${structure} \u2014 ${sensorName} past its threshold`
+        : `${structure}: ${sensorName} is ${direction} its ${limitName}`,
+      html: htmlMessage,
+    });
+  }
 }
 
 export async function getNodeData(userId: number, userType: string) {

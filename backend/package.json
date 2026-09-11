@@ -17,6 +17,7 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "seed:demo-users": "ts-node prisma/seed-demo-users.ts",
+    "seed:demo-project": "ts-node prisma/seed-demo-project.ts",
     "dev:replay-webhook": "ts-node scripts/replay-webhook.ts"
   },
   "dependencies": {

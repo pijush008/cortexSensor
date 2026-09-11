@@ -110,6 +110,7 @@ model Tenant {
   inspections  Inspection[]
   reports      Report[]
   subscription Subscription?
+  invitations  ProjectInvitation[]
 
   @@index([status])
   @@map("tenants")
@@ -199,6 +200,15 @@ model User {
   isUserVerified  YesNo      @default(false_)
   password        String     @db.VarChar(255)
   profileImage    String?    @db.Text
+  /// The organisation this person works for — a contractor's construction firm,
+  /// an authority's department. Free text on the account, NOT a Tenant: they
+  /// are members of the project's organization, and giving them one of their
+  /// own would put them across an isolation boundary from the project itself.
+  companyName     String?    @db.VarChar(255)
+  /// That company's logo. A RELATIVE path (uploads/users/<uuid>.png), matching
+  /// Tenant.logoPath and Project.projectLogo — never a URL, so the origin
+  /// serving it can change without rewriting rows.
+  companyLogo     String?    @db.VarChar(255)
   status          UserStatus
   csv             Int?       @default(0)
   createdAt       DateTime?  @default(now())
@@ -206,12 +216,12 @@ model User {
   isDelete        YesNo      @default(false_)
 
   // Relations
-  createdProjects Project[]       @relation("ProjectCreator")
-  managedProjects Project[]       @relation("ProjectContractor")
-  auditedProjects Project[]       @relation("ProjectAuthority")
-  assignedDevices Device[]        @relation("DeviceAdmin")
-  updatedDevices  Device[]        @relation("DeviceUpdater")
-  assignedSensors Sensor[]        @relation("SensorAdmin")
+  createdProjects Project[]            @relation("ProjectCreator")
+  managedProjects Project[]            @relation("ProjectContractor")
+  auditedProjects Project[]            @relation("ProjectAuthority")
+  assignedDevices Device[]             @relation("DeviceAdmin")
+  updatedDevices  Device[]             @relation("DeviceUpdater")
+  assignedSensors Sensor[]             @relation("SensorAdmin")
   firebaseTokens  FirebaseToken[]
   tempOtps        TempOtp[]
   passwordResets  PasswordResetToken[]
@@ -219,6 +229,7 @@ model User {
   refreshTokens   RefreshToken[]
   subscription    Subscription?
   memberships     Membership[]
+  sentInvitations ProjectInvitation[]  @relation("InvitationInviter")
 
   @@index([userType])
   @@index([parentId])
@@ -249,7 +260,16 @@ model Device {
   deviceName       String          @db.VarChar(255)
   deviceType       Int
   channelCount     Int
-  deviceId         String?         @db.VarChar(255)
+  /// The unit's serial number, as printed on the hardware.
+  ///
+  /// Unique: two cabinets cannot carry the same serial, and the project form
+  /// shows this string to tell otherwise similarly-named devices apart — a
+  /// duplicate there would make the chooser ambiguous in exactly the way a
+  /// list of identically-named rows is.
+  ///
+  /// Still nullable, and Postgres allows many NULLs under a unique index, so
+  /// devices recorded before a serial was known are unaffected.
+  deviceId         String?         @unique @db.VarChar(255)
   gatewayDeviceId  String          @db.VarChar(255)
   addedBy          Int             @default(0)
   deviceStatus     DeviceStatus    @default(inactive)
@@ -367,8 +387,15 @@ model Project {
   authorityId     Int?
   deviceId        String?       @db.VarChar(255) // Device ID string (e.g. "33")
   sensorId        String?       @db.Text // JSON array e.g. "[28,29]"
+  /// The project image shown on the dashboard, uploaded by the assigned
+  /// contractor. dashImage2 is the legacy second slot, kept so images already
+  /// uploaded there are not orphaned; new uploads write dashImage.
   dashImage       String?       @db.VarChar(255)
   dashImage2      String?       @db.VarChar(255)
+  /// Source for the dashboard's live video panel — an HLS or MP4 URL for the
+  /// site camera. A URL rather than stored media: the platform does not host
+  /// video, and a live feed is not ours to record.
+  liveVideoUrl    String?       @db.VarChar(512)
   status          ProjectStatus @default(not_start)
   offset          Int           @default(0)
   createdAt       DateTime      @default(now())
@@ -381,13 +408,14 @@ model Project {
   isRegistered    Boolean       @default(false)
 
   // Relations
-  tenant        Tenant         @relation(fields: [tenantId], references: [id])
-  creator       User           @relation("ProjectCreator", fields: [createdBy], references: [id])
-  contractor    User?          @relation("ProjectContractor", fields: [contractorId], references: [id])
-  authority     User?          @relation("ProjectAuthority", fields: [authorityId], references: [id])
+  tenant        Tenant              @relation(fields: [tenantId], references: [id])
+  creator       User                @relation("ProjectCreator", fields: [createdBy], references: [id])
+  contractor    User?               @relation("ProjectContractor", fields: [contractorId], references: [id])
+  authority     User?               @relation("ProjectAuthority", fields: [authorityId], references: [id])
   projectEmails ProjectEmail[]
   sensorData    SensorData[]
   structures    Structure[]
+  invitations   ProjectInvitation[]
 
   @@index([tenantId])
   @@index([tenantId, status])
@@ -1243,6 +1271,10 @@ model Notification {
 model ProjectEmail {
   id        Int     @id @default(autoincrement())
   email     String  @db.VarChar(255)
+  /// Who the alert is addressed to, so a warning opens "Hello Asha," rather
+  /// than at a bare address. Optional: rows created before this existed have
+  /// none, and the mail falls back to greeting by project.
+  name      String? @db.VarChar(120)
   isEnable  Boolean @default(true)
   projectId Int
 
@@ -1499,4 +1531,69 @@ model AuditLog {
   @@index([entity, entityId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// ─── PROJECT INVITATIONS ─────────────────────────────────────────────────────
+// Assigning a contractor or an authority used to mean an administrator creating
+// the account outright and choosing that person's password for them. The
+// password was therefore known to someone other than its owner from the moment
+// the account existed, and the platform had no evidence the address it was
+// typed against belonged to anybody.
+//
+// An invitation replaces that: the administrator names only an email, and the
+// person on the other end proves they hold it and chooses their own secret.
+
+enum InvitationStatus {
+  pending
+  accepted
+  revoked
+}
+
+/// An offer of a project role to an email address.
+///
+/// The User row is created only on acceptance. A pending invitation therefore
+/// cannot be mistaken for an account: user lists, seat counts and tenant
+/// membership all stay free of half-built rows carrying placeholder names and
+/// an unusable password hash.
+model ProjectInvitation {
+  id            Int       @id @default(autoincrement())
+  projectId     Int
+  /// Denormalised from the project ON PURPOSE. The tenant an invitee joins is
+  /// fixed at the moment of invitation; reading it back through the project
+  /// would let a project that later moves carry its outstanding invitations
+  /// into an organization nobody agreed to.
+  tenantId      Int
+  /// contractor or authority. The enum has four values and the other two are
+  /// rejected in the service, where the reason can be stated, rather than by a
+  /// second enum that would have to be kept in step with UserRole.
+  role          UserRole
+  emailId       String    @db.VarChar(255)
+  /// SHA-256 of the six-digit code, hashed for the same reason. A code that
+  /// sits in the clear next to the address it was mailed to is not a factor.
+  otpHash       String    @db.VarChar(128)
+  /// Wrong guesses so far. The code is short by design, so the attempt cap —
+  /// not the code's length — is what makes guessing impractical.
+  otpAttempts   Int       @default(0)
+  /// Set by the verify step. Completion refuses to run without it, so the
+  /// profile-and-password call cannot be used to bypass the code.
+  otpVerifiedAt DateTime?
+
+  status     InvitationStatus @default(pending)
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  /// The user the invitation resolved to, once accepted. Kept for the record:
+  /// Project.contractorId alone cannot say which invitation put them there.
+  acceptedBy Int?
+  invitedBy  Int
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  inviter User    @relation("InvitationInviter", fields: [invitedBy], references: [id])
+
+  @@index([projectId, role, status])
+  @@index([emailId])
+  @@index([expiresAt])
+  @@map("project_invitations")
 }

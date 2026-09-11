@@ -78,6 +78,25 @@ export interface SeriesResult {
   timescale: boolean;
 }
 
+/**
+ * The raw-SQL equivalent of tenantScope().
+ *
+ * These queries are hand-written SQL, so they cannot spread the Prisma `where`
+ * fragment the rest of the codebase uses — and a literal `"tenantId" = -1` was
+ * standing in for it. That silently emptied every result for a PLATFORM
+ * OPERATOR, whose tenantId is null even though tenantScope() grants them
+ * unrestricted access: the sensor check let them in and the row filter threw
+ * their data away, returning 200 with no points.
+ *
+ * The two branches mirror tenantScope() exactly: nothing for a platform
+ * operator, and an impossible predicate for a user with no tenant, so a missing
+ * membership still fails closed rather than widening to every tenant.
+ */
+function tenantPredicate(ctx: AuthContext): Prisma.Sql {
+  if (ctx.isPlatformAdmin) return Prisma.empty;
+  return Prisma.sql`AND "tenantId" = ${ctx.tenantId ?? -1}`;
+}
+
 /** Confirms the sensor is the caller's before any data is read. */
 async function assertSensorInScope(ctx: AuthContext, sensorId: number) {
   const sensor = await prisma.sensor.findFirst({
@@ -152,7 +171,7 @@ export async function getSeries(
       COUNT(*) FILTER (WHERE "qualityFlags" && ${TRACEABILITY_FLAGS}::text[]) AS "untraceable"
     FROM "measurements"
     WHERE "sensorId" = ${params.sensorId}
-      AND "tenantId" = ${ctx.tenantId ?? -1}
+      ${tenantPredicate(ctx)}
       AND "ts" >= ${params.from}
       AND "ts" <= ${params.to}
     GROUP BY 1
@@ -219,7 +238,7 @@ export async function getLatestReadings(
       "sensorId", "ts", "value", "qualityFlags"
     FROM "measurements"
     WHERE "sensorId" IN (${Prisma.join(sensorIds)})
-      AND "tenantId" = ${ctx.tenantId ?? -1}
+      ${tenantPredicate(ctx)}
       ${structureId ? Prisma.sql`AND "structureId" = ${structureId}` : Prisma.empty}
     ORDER BY "sensorId", "ts" DESC
   `);
