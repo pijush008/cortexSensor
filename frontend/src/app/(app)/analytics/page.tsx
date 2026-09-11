@@ -134,7 +134,7 @@ export default function AnalyticsPage() {
 
       {/* Request panel */}
       <section className="rounded-xl border border-slate-200/90 bg-white p-5">
-        <h2 className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+        <h2 className="font-mono text-[0.625rem] font-semibold uppercase tracking-[0.22em] text-slate-400">
           Run analysis
         </h2>
         <div className="mt-3 grid gap-4 sm:grid-cols-4">
@@ -171,7 +171,7 @@ export default function AnalyticsPage() {
             <Play className="h-4 w-4" />
             {requestSpectrum.isPending ? "Queueing…" : "Run spectrum"}
           </Button>
-          <p className="text-[12px] text-slate-400">
+          <p className="text-[0.75rem] text-slate-400">
             Welch PSD, Hann window, linear detrend. Analysis runs in the
             background; the result appears below when it completes.
           </p>
@@ -180,7 +180,7 @@ export default function AnalyticsPage() {
         {formError && (
           <p
             role="alert"
-            className="mt-3 rounded-lg border border-shm-red/25 bg-shm-red/5 px-3 py-2 text-[13px] text-shm-red"
+            className="mt-3 rounded-lg border border-shm-red/25 bg-shm-red/5 px-3 py-2 text-[0.8125rem] text-shm-red"
           >
             {formError}
           </p>
@@ -208,7 +208,7 @@ export default function AnalyticsPage() {
                     label={activeRun.status}
                     tone={STATUS_TONE[activeRun.status]}
                   />
-                  <span className="font-mono text-[11.5px] text-slate-400">
+                  <span className="font-mono text-[0.71875rem] text-slate-400">
                     {activeRun.publicId}
                   </span>
                 </div>
@@ -237,10 +237,10 @@ export default function AnalyticsPage() {
                 >
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-shm-red" />
                   <div>
-                    <p className="text-[13px] font-medium text-shm-red">
+                    <p className="text-[0.8125rem] font-medium text-shm-red">
                       Analysis could not be completed
                     </p>
-                    <p className="mt-0.5 text-[12.5px] text-slate-600">
+                    <p className="mt-0.5 text-[0.78125rem] text-slate-600">
                       {activeRun.error}
                     </p>
                   </div>
@@ -249,7 +249,7 @@ export default function AnalyticsPage() {
 
               {(activeRun.status === "queued" || activeRun.status === "running") && (
                 <div className="rounded-xl border border-slate-200/90 bg-white px-5 py-8 text-center">
-                  <p className="text-[13px] text-slate-500">
+                  <p className="text-[0.8125rem] text-slate-500">
                     {activeRun.status === "queued"
                       ? "Queued — waiting for a worker."
                       : "Running…"}
@@ -278,12 +278,12 @@ export default function AnalyticsPage() {
 
                   {result.warnings.length > 0 && (
                     <div className="rounded-xl border border-shm-yellow/30 bg-shm-yellow/5 px-4 py-3">
-                      <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-700">
+                      <p className="font-mono text-[0.625rem] font-semibold uppercase tracking-[0.18em] text-amber-700">
                         Warnings
                       </p>
                       <ul className="mt-2 space-y-1">
                         {result.warnings.map((w) => (
-                          <li key={w} className="text-[12.5px] text-amber-800">
+                          <li key={w} className="text-[0.78125rem] text-amber-800">
                             {w}
                           </li>
                         ))}
@@ -294,10 +294,10 @@ export default function AnalyticsPage() {
                   {/* Spectrum */}
                   <div className="rounded-xl border border-slate-200/90 bg-white p-5">
                     <div className="mb-3 flex items-baseline justify-between">
-                      <h3 className="text-[15px] font-semibold tracking-tight text-slate-900">
+                      <h3 className="text-[0.9375rem] font-semibold tracking-tight text-slate-900">
                         Power spectral density
                       </h3>
-                      <span className="font-mono text-[11px] text-slate-400">
+                      <span className="font-mono text-[0.6875rem] text-slate-400">
                         Welch · {result.segment_length}-point segments
                       </span>
                     </div>
@@ -375,21 +375,21 @@ export default function AnalyticsPage() {
                             key={p.frequency_hz}
                             className="border-b border-slate-100 last:border-0"
                           >
-                            <td className="px-4 py-2.5 font-mono text-[12.5px] font-semibold text-slate-800">
+                            <td className="px-4 py-2.5 font-mono text-[0.78125rem] font-semibold text-slate-800">
                               {p.frequency_hz.toFixed(3)} Hz
                             </td>
-                            <td className="px-4 py-2.5 text-right font-mono text-[12px] text-slate-400">
+                            <td className="px-4 py-2.5 text-right font-mono text-[0.75rem] text-slate-400">
                               ± {p.resolution_hz.toFixed(4)}
                             </td>
-                            <td className="px-4 py-2.5 text-right font-mono text-[12px] text-slate-600">
+                            <td className="px-4 py-2.5 text-right font-mono text-[0.75rem] text-slate-600">
                               {p.prominence.toExponential(2)}
                             </td>
-                            <td className="px-4 py-2.5 text-right font-mono text-[12px] text-slate-600">
+                            <td className="px-4 py-2.5 text-right font-mono text-[0.75rem] text-slate-600">
                               {p.bandwidth_hz === null
                                 ? "unresolved"
                                 : `${p.bandwidth_hz.toFixed(4)} Hz`}
                             </td>
-                            <td className="px-4 py-2.5 text-right font-mono text-[12px] text-slate-600">
+                            <td className="px-4 py-2.5 text-right font-mono text-[0.75rem] text-slate-600">
                               {/* Null when the peak is narrower than one bin —
                                   stated rather than filled with a fake number. */}
                               {p.damping_ratio === null
@@ -405,14 +405,14 @@ export default function AnalyticsPage() {
                   {/* Baseline comparison */}
                   {result.baselineComparison && (
                     <div className="rounded-xl border border-slate-200/90 bg-white p-5">
-                      <h3 className="text-[15px] font-semibold tracking-tight text-slate-900">
+                      <h3 className="text-[0.9375rem] font-semibold tracking-tight text-slate-900">
                         Comparison against baseline
                       </h3>
                       <ul className="mt-3 space-y-2">
                         {result.baselineComparison.matched.map((m) => (
                           <li
                             key={m.baseline_frequency_hz}
-                            className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-slate-100 pt-2 text-[13px] first:border-0 first:pt-0"
+                            className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-slate-100 pt-2 text-[0.8125rem] first:border-0 first:pt-0"
                           >
                             <span className="font-mono text-slate-700">
                               {m.baseline_frequency_hz.toFixed(3)} →{" "}
@@ -431,7 +431,7 @@ export default function AnalyticsPage() {
                                 ? ` (${m.shift_percent >= 0 ? "+" : ""}${m.shift_percent.toFixed(2)}%)`
                                 : ""}
                             </span>
-                            <span className="text-[12px] text-slate-400">
+                            <span className="text-[0.75rem] text-slate-400">
                               {m.exceeds_resolution
                                 ? "exceeds measurement resolution"
                                 : "within measurement resolution"}
@@ -439,7 +439,7 @@ export default function AnalyticsPage() {
                           </li>
                         ))}
                       </ul>
-                      <p className="mt-3 border-t border-slate-100 pt-3 text-[12.5px] leading-relaxed text-slate-500">
+                      <p className="mt-3 border-t border-slate-100 pt-3 text-[0.78125rem] leading-relaxed text-slate-500">
                         {result.baselineComparison.interpretation}
                       </p>
                     </div>
@@ -449,7 +449,7 @@ export default function AnalyticsPage() {
                   <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-5">
                     <div className="flex items-center gap-2">
                       <Info className="h-3.5 w-3.5 text-slate-400" />
-                      <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      <p className="font-mono text-[0.625rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
                         Method limitations
                       </p>
                     </div>
@@ -457,7 +457,7 @@ export default function AnalyticsPage() {
                       {result.limitations.map((l) => (
                         <li
                           key={l}
-                          className="flex items-baseline gap-2.5 text-[12.5px] leading-relaxed text-slate-600"
+                          className="flex items-baseline gap-2.5 text-[0.78125rem] leading-relaxed text-slate-600"
                         >
                           <span
                             aria-hidden
@@ -477,7 +477,7 @@ export default function AnalyticsPage() {
 
       {/* History */}
       <section>
-        <h2 className="mb-3 text-[15px] font-semibold tracking-tight text-slate-900">
+        <h2 className="mb-3 text-[0.9375rem] font-semibold tracking-tight text-slate-900">
           Recent runs
         </h2>
         <QueryState
@@ -510,20 +510,20 @@ export default function AnalyticsPage() {
                       onClick={() => setActiveRunId(r.id)}
                       className="cursor-pointer border-b border-slate-100 last:border-0 transition-colors hover:bg-slate-50/70"
                     >
-                      <td className="px-4 py-2.5 font-mono text-[11.5px] text-shm-navy-700">
+                      <td className="px-4 py-2.5 font-mono text-[0.71875rem] text-shm-navy-700">
                         {r.publicId}
                       </td>
-                      <td className="px-4 py-2.5 font-mono text-[12px] text-slate-600">
+                      <td className="px-4 py-2.5 font-mono text-[0.75rem] text-slate-600">
                         #{r.sensorId}
                       </td>
-                      <td className="px-4 py-2.5 text-[12.5px] text-slate-500">
+                      <td className="px-4 py-2.5 text-[0.78125rem] text-slate-500">
                         {new Date(r.windowFrom).toLocaleString()} →{" "}
                         {new Date(r.windowTo).toLocaleTimeString()}
                       </td>
                       <td className="px-4 py-2.5">
                         <StatusBadge label={r.status} tone={STATUS_TONE[r.status]} />
                       </td>
-                      <td className="px-4 py-2.5 text-right font-mono text-[12px] text-slate-600">
+                      <td className="px-4 py-2.5 text-right font-mono text-[0.75rem] text-slate-600">
                         {r.result?.peaks?.length ?? "—"}
                       </td>
                     </tr>
@@ -548,7 +548,7 @@ function Th({
   return (
     <th
       scope="col"
-      className={`px-4 py-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400 ${className}`}
+      className={`px-4 py-2.5 font-mono text-[0.75rem] font-medium text-slate-500 ${className}`}
     >
       {children}
     </th>
@@ -558,10 +558,10 @@ function Th({
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-slate-200/90 bg-white px-4 py-3">
-      <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+      <p className="font-mono text-[0.75rem] font-medium text-slate-500">
         {label}
       </p>
-      <p className="mt-1 font-mono text-[13px] text-slate-800">{value}</p>
+      <p className="mt-1 font-mono text-[0.8125rem] text-slate-800">{value}</p>
     </div>
   );
 }

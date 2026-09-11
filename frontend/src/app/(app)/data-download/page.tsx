@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Reveal } from "@/components/ui/reveal";
-import { SectionLabel } from "@/components/ui/section-label";
 import { PulseDot } from "@/components/ui/pulse-dot";
 import { PageHeader } from "@/components/layout/page-header";
 import { useLiveStream } from "@/hooks/use-live-stream";
@@ -290,18 +289,17 @@ export default function DataDownloadPage() {
           <CardHeader className="border-b border-white/10 bg-shm-navy-900">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <SectionLabel index="30" label="Capture" light />
                 <CardTitle className="flex items-center gap-2 font-mono text-sm font-medium text-white">
                   <Activity className="h-4 w-4 text-shm-teal" />
                   Live MQTT Stream
                 </CardTitle>
               </div>
               <div className="flex items-center gap-3">
-                <span className="flex items-center gap-2 font-mono text-[11px] text-shm-navy-300">
+                <span className="flex items-center gap-2 font-mono text-[0.6875rem] text-shm-navy-300">
                   <PulseDot tone={connected ? "green" : "slate"} />
                   {connected ? "Connected" : "Disconnected"}
                 </span>
-                <span className="font-mono text-[11px] text-shm-navy-300">
+                <span className="font-mono text-[0.6875rem] text-shm-navy-300">
                   captured={messages.length}
                 </span>
               </div>
@@ -310,13 +308,13 @@ export default function DataDownloadPage() {
 
           <CardContent className="bg-shm-navy-900 p-0">
             <div className="flex items-center gap-2 overflow-x-auto border-b border-white/10 px-4 py-2">
-              <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.18em] text-shm-navy-400">
+              <span className="shrink-0 font-mono text-[0.75rem] font-medium text-shm-navy-600">
                 Listening
               </span>
-              <code className="shrink-0 rounded bg-white/[0.06] px-2 py-1 font-mono text-[11px] text-shm-teal">
+              <code className="shrink-0 rounded bg-white/[0.06] px-2 py-1 font-mono text-[0.6875rem] text-shm-teal">
                 your organization&apos;s measurements
               </code>
-              <span className="truncate font-mono text-[11px] text-shm-navy-300">
+              <span className="truncate font-mono text-[0.6875rem] text-shm-navy-300">
                 via authenticated stream
               </span>
               <Button
@@ -343,7 +341,7 @@ export default function DataDownloadPage() {
               <div className="max-h-[440px] overflow-auto">
                 <table className="w-full min-w-[720px] border-collapse font-mono text-xs">
                   <thead>
-                    <tr className="border-b border-white/10 text-left text-[10px] uppercase tracking-[0.14em] text-shm-navy-400">
+                    <tr className="border-b border-white/10 text-left text-[0.75rem] font-medium text-shm-navy-600">
                       <th className="sticky top-0 bg-shm-navy-900 px-4 py-2.5 font-medium">Received</th>
                       <th className="sticky top-0 bg-shm-navy-900 px-4 py-2.5 font-medium">Topic</th>
                       <th className="sticky top-0 bg-shm-navy-900 px-4 py-2.5 font-medium">Payload</th>
@@ -387,7 +385,6 @@ export default function DataDownloadPage() {
         <Reveal delay={60}>
           <Card>
             <CardHeader>
-              <SectionLabel index="31" label="Date & time" className="mb-2" />
               <CardTitle className="flex items-center gap-2">
                 <DownloadCloud className="h-5 w-5 text-shm-navy-700" strokeWidth={1.75} />
                 Select Range (HH:MM:SS)
@@ -396,7 +393,7 @@ export default function DataDownloadPage() {
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <label className="text-[13px] font-medium text-slate-700">From</label>
+                  <label className="text-[0.8125rem] font-medium text-slate-700">From</label>
                   <Input
                     type="date"
                     value={fromDate}
@@ -412,7 +409,7 @@ export default function DataDownloadPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[13px] font-medium text-slate-700">To</label>
+                  <label className="text-[0.8125rem] font-medium text-slate-700">To</label>
                   <Input
                     type="date"
                     value={toDate}
@@ -463,7 +460,6 @@ export default function DataDownloadPage() {
         <Reveal delay={120}>
           <Card>
             <CardHeader>
-              <SectionLabel index="32" label="Export" className="mb-2" />
               <CardTitle className="flex items-center gap-2">
                 <FileSpreadsheet className="h-5 w-5 text-shm-navy-700" strokeWidth={1.75} />
                 Download as Excel
@@ -475,7 +471,7 @@ export default function DataDownloadPage() {
                 with one row per captured message. JSON payloads are flattened into extra columns
                 alongside the receive time and topic.
               </p>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-3 font-mono text-[11px] leading-relaxed text-slate-500">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-3 font-mono text-[0.6875rem] leading-relaxed text-slate-500">
                 <p>shm-sensor-data_YYYY-MM-DD_HH-MM-SS.xlsx</p>
                 <p className="mt-1 text-slate-400">
                   Header: Timestamp (UTC) · Timestamp (Local) · Date · Time · Topic · Payload · …
@@ -508,7 +504,6 @@ export default function DataDownloadPage() {
       <Reveal delay={200}>
         <Card>
           <CardHeader>
-            <SectionLabel index="33" label="Cloud" className="mb-2" />
             <CardTitle className="flex items-center gap-2">
               <DownloadCloud className="h-5 w-5 text-shm-navy-700" strokeWidth={1.75} />
               Export historical field data (CSV)
@@ -519,7 +514,7 @@ export default function DataDownloadPage() {
               Pull the telemetry that ESP32 nodes / Raspberry Pi gateways already sent to
               the cloud out of <span className="font-medium text-slate-800">PostgreSQL</span>.
               Readings were stored via live MQTT ingestion or{" "}
-              <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-500">
+              <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[0.6875rem] text-slate-500">
                 POST /api/beamDeviceData
               </code>
               .
@@ -580,7 +575,7 @@ export default function DataDownloadPage() {
             <p className="text-xs text-slate-500">
               Leave device on “All devices” and the range empty to export the most recent
               100,000 stored records. Larger exports are capped server-side by
-              <code className="font-mono text-[11px]">TELEMETRY_EXPORT_ROW_LIMIT</code>.
+              <code className="font-mono text-[0.6875rem]">TELEMETRY_EXPORT_ROW_LIMIT</code>.
             </p>
           </CardContent>
         </Card>

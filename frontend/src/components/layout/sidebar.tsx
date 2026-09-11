@@ -61,7 +61,11 @@ const MENU_SECTION: Record<UserRole, { label: string; items: MenuItem[] }[]> = {
       label: "Workspace",
       items: [
         { href: "/projects", label: "Projects", icon: Projector },
-        { href: "/structures", label: "Structures", icon: Building2 },
+        // Structures and Subscription are deliberately absent for a platform
+        // operator. An operator administers the platform rather than working
+        // inside one organization's survey data or paying one organization's
+        // bill, so both entries pointed at screens that were not theirs to act
+        // on. The pages themselves still exist for the roles that own them.
         { href: "/reports", label: "Reports", icon: BarChart3 },
         { href: "/exports", label: "Exports", icon: FileDown },
         { href: "/data-download", label: "Data Download", icon: DownloadCloud },
@@ -72,7 +76,6 @@ const MENU_SECTION: Record<UserRole, { label: string; items: MenuItem[] }[]> = {
       items: [
         { href: "/users", label: "Users", icon: Users },
         { href: "/audit", label: "Audit Log", icon: ShieldCheck },
-        { href: "/subscription", label: "Subscription", icon: CreditCard },
       ],
     },
   ],
@@ -179,7 +182,12 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile }: SidebarProps) 
         mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       )}
     >
-      <div className={cn("flex items-center gap-3 px-4 py-5", collapsed && "lg:justify-center lg:px-0")}>
+      <div
+        className={cn(
+          "flex flex-col gap-2 px-4 py-4",
+          collapsed && "lg:items-center lg:gap-0 lg:px-0"
+        )}
+      >
         {collapsed ? (
           <div className="hidden h-9 w-9 items-center justify-center rounded-lg bg-shm-navy-900 font-bold text-white lg:flex">
             SH
@@ -188,21 +196,28 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile }: SidebarProps) 
           <>
             {/* A small, fixed-size local asset: next/image would add a loader
                 and layout machinery for no benefit at this size.
-                max-w and shrink-0 are load-bearing — the supplied logo is a
-                wide lockup, and at `w-auto` it grew past its share of the
-                sidebar and rendered underneath the wordmark. */}
+
+                Stacked above the wordmark rather than beside it. The supplied
+                asset is a wide lockup (599x126, ~4.75:1); sharing a 224px row
+                with the wordmark left it capped at 96px, where the company
+                name shrank to an illegible smudge. On its own row it renders
+                ~176px wide and reads properly.
+
+                The PNG, not the JPEG: both are the same artwork, but the JPEG
+                is opaque white and painted a white block on the lavender
+                sidebar, while the PNG carries a real alpha channel. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/brand/company-logo.jpeg"
-              alt=""
-              className="h-8 w-auto max-w-[96px] shrink-0 object-contain"
+              src="/brand/company-logo.png"
+              alt="Cloudglance Sensinglab Pvt Ltd"
+              className="h-auto w-full max-w-[176px] object-contain"
             />
             <div className="min-w-0 leading-none">
-              <p className="truncate text-[13px] font-semibold tracking-tight text-shm-navy-900">
+              <p className="truncate text-[0.8125rem] font-semibold tracking-tight text-shm-navy-900">
                 SHM Console
               </p>
-              <p className="mt-1 truncate font-mono text-[9.5px] uppercase tracking-[0.24em] text-shm-navy-700">
-                Structural Monitor
+              <p className="mt-0.5 truncate text-[0.75rem] text-shm-navy-700">
+                Structural monitoring
               </p>
             </div>
           </>
@@ -213,7 +228,7 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile }: SidebarProps) 
         {sections.map((section) => (
           <div key={section.label} className="space-y-0.5">
             {!collapsed && (
-              <p className="px-3 pb-1.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.24em] text-shm-navy-600">
+              <p className="px-3 pb-1.5 text-[0.71875rem] font-medium text-shm-navy-700/70">
                 {section.label}
               </p>
             )}
@@ -227,7 +242,7 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile }: SidebarProps) 
                   onClick={onCloseMobile}
                   aria-current={isActive ? "page" : undefined}
                   className={cn(
-                    "group relative flex items-center gap-3 rounded-md px-3 py-2.5 text-[13.5px] font-medium transition-colors duration-200",
+                    "group relative flex items-center gap-3 rounded-md px-3 py-2.5 text-[0.84375rem] font-medium transition-colors duration-200",
                     isActive
                       ? "bg-white text-shm-navy-900 shadow-[0_1px_2px_rgba(26,18,37,0.10)]"
                       : "text-shm-navy-800 hover:bg-white/60 hover:text-shm-navy-900",
@@ -262,7 +277,7 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile }: SidebarProps) 
           href="/profile"
           onClick={onCloseMobile}
           className={cn(
-            "group flex items-center gap-3 rounded-md px-3 py-2.5 text-[13.5px] font-medium text-shm-navy-800 transition-colors duration-200 hover:bg-white/[0.05] hover:text-white",
+            "group flex items-center gap-3 rounded-md px-3 py-2.5 text-[0.84375rem] font-medium text-shm-navy-800 transition-colors duration-200 hover:bg-white/[0.05] hover:text-white",
             collapsed && "lg:justify-center lg:px-0"
           )}
           title={collapsed ? "Settings" : undefined}
@@ -273,7 +288,7 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile }: SidebarProps) 
         <button
           onClick={logout}
           className={cn(
-            "flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-[13.5px] font-medium text-red-300/90 transition-colors duration-200 hover:bg-shm-red/15 hover:text-red-200 cursor-pointer",
+            "flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-[0.84375rem] font-medium text-red-300/90 transition-colors duration-200 hover:bg-shm-red/15 hover:text-red-200 cursor-pointer",
             collapsed && "lg:justify-center lg:px-0"
           )}
           title={collapsed ? "Logout" : undefined}

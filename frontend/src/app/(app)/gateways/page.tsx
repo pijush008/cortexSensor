@@ -1,5 +1,8 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+
 import { useState } from "react";
 import { Plus, Server } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
@@ -74,6 +77,7 @@ function lastSeenLabel(gateway: Gateway): string {
 }
 
 export default function GatewaysPage() {
+  const router = useRouter();
   const query = useGateways();
   const [showAdd, setShowAdd] = useState(false);
 
@@ -131,26 +135,37 @@ export default function GatewaysPage() {
                 {data.items.map((g) => (
                   <tr
                     key={g.id}
-                    className="border-b border-slate-100 last:border-0 transition-colors hover:bg-slate-50/70"
+                    // The row is the click target because that is where anyone
+                    // aims; the key cell is ALSO a real link so the row can be
+                    // reached and opened from the keyboard, which a bare
+                    // onClick on a <tr> cannot be.
+                    onClick={() => router.push(`/gateways/${g.id}`)}
+                    className="cursor-pointer border-b border-slate-100 last:border-0 transition-colors hover:bg-slate-50/70"
                   >
-                    <td className="px-4 py-3 font-mono text-[12px] font-semibold text-slate-800">
-                      {g.gatewayKey}
+                    <td className="px-4 py-3 font-mono text-[0.75rem] font-semibold text-slate-800">
+                      <Link
+                        href={`/gateways/${g.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="underline-offset-2 hover:underline"
+                      >
+                        {g.gatewayKey}
+                      </Link>
                     </td>
                     <td className="px-4 py-3 text-slate-700">{g.name}</td>
                     <td className="px-4 py-3 text-slate-500">
                       {g.hardwareModel ?? "—"}
                     </td>
-                    <td className="px-4 py-3 font-mono text-[12px] text-slate-500">
+                    <td className="px-4 py-3 font-mono text-[0.75rem] text-slate-500">
                       {g.firmwareVersion ?? "—"}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-[12px] tabular-nums text-slate-600">
+                    <td className="px-4 py-3 text-right font-mono text-[0.75rem] tabular-nums text-slate-600">
                       {g.deviceCount}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-[12px] tabular-nums text-slate-600">
+                    <td className="px-4 py-3 text-right font-mono text-[0.75rem] tabular-nums text-slate-600">
                       {/* Unknown ≠ empty for a store-and-forward buffer. */}
                       {g.bufferedCount ?? "—"}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-[12px] tabular-nums text-slate-500">
+                    <td className="px-4 py-3 text-right font-mono text-[0.75rem] tabular-nums text-slate-500">
                       {lastSeenLabel(g)}
                     </td>
                     <td className="px-4 py-3">
@@ -188,7 +203,7 @@ function Th({
   return (
     <th
       scope="col"
-      className={`px-4 py-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400 ${className}`}
+      className={`px-4 py-2.5 font-mono text-[0.75rem] font-medium text-slate-500 ${className}`}
     >
       {children}
     </th>
@@ -247,7 +262,7 @@ function RegisterGatewayModal({
         {formError && (
           <p
             role="alert"
-            className="rounded-lg border border-shm-red/25 bg-shm-red/5 px-3 py-2 text-[13px] text-shm-red"
+            className="rounded-lg border border-shm-red/25 bg-shm-red/5 px-3 py-2 text-[0.8125rem] text-shm-red"
           >
             {formError}
           </p>
@@ -283,7 +298,7 @@ function RegisterGatewayModal({
           />
         </div>
 
-        <p className="text-[12px] leading-relaxed text-slate-400">
+        <p className="text-[0.75rem] leading-relaxed text-slate-400">
           A newly registered gateway stays in Provisioning until its first
           heartbeat arrives. Health figures appear only once the gateway
           actually reports them.

@@ -56,14 +56,14 @@ function Field({
   const missing = value === null || value === undefined || value === "";
   return (
     <div className="border-t border-slate-100 py-2.5 first:border-t-0">
-      <dt className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+      <dt className="font-mono text-[0.75rem] font-medium text-slate-500">
         {label}
       </dt>
       <dd
         className={
           missing
-            ? "mt-1 text-[13px] italic text-slate-400"
-            : "mt-1 text-[13.5px] text-slate-800"
+            ? "mt-1 text-[0.8125rem] italic text-slate-400"
+            : "mt-1 text-[0.84375rem] text-slate-800"
         }
       >
         {missing ? "Not recorded" : `${value}${unit ? ` ${unit}` : ""}`}
@@ -129,7 +129,7 @@ export default function StructureDetailPage({
 
             <div className="grid gap-6 lg:grid-cols-3">
               <section className="rounded-xl border border-slate-200/90 bg-white p-5 lg:col-span-1">
-                <h2 className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+                <h2 className="font-mono text-[0.625rem] font-semibold uppercase tracking-[0.22em] text-slate-400">
                   Asset record
                 </h2>
                 <dl className="mt-3">
@@ -158,10 +158,10 @@ export default function StructureDetailPage({
               <section className="lg:col-span-2">
                 <div className="mb-3 flex items-end justify-between gap-3">
                   <div>
-                    <h2 className="text-[15px] font-semibold tracking-tight text-slate-900">
+                    <h2 className="text-[0.9375rem] font-semibold tracking-tight text-slate-900">
                       Monitoring locations
                     </h2>
-                    <p className="mt-0.5 text-[13px] text-slate-500">
+                    <p className="mt-0.5 text-[0.8125rem] text-slate-500">
                       Points on this structure where instruments are installed.
                     </p>
                   </div>
@@ -221,19 +221,19 @@ function LocationTable({
         <caption className="sr-only">Monitoring locations on this structure</caption>
         <thead>
           <tr className="border-b border-slate-200 text-left">
-            <th scope="col" className="px-4 py-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+            <th scope="col" className="px-4 py-2.5 font-mono text-[0.75rem] font-medium text-slate-500">
               Point
             </th>
-            <th scope="col" className="px-4 py-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+            <th scope="col" className="px-4 py-2.5 font-mono text-[0.75rem] font-medium text-slate-500">
               Description
             </th>
-            <th scope="col" className="px-4 py-2.5 text-right font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+            <th scope="col" className="px-4 py-2.5 text-right font-mono text-[0.75rem] font-medium text-slate-500">
               Station
             </th>
-            <th scope="col" className="px-4 py-2.5 text-right font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+            <th scope="col" className="px-4 py-2.5 text-right font-mono text-[0.75rem] font-medium text-slate-500">
               Elevation
             </th>
-            <th scope="col" className="px-4 py-2.5 text-right font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+            <th scope="col" className="px-4 py-2.5 text-right font-mono text-[0.75rem] font-medium text-slate-500">
               <span className="sr-only">Actions</span>
             </th>
           </tr>
@@ -245,20 +245,20 @@ function LocationTable({
               className="border-b border-slate-100 last:border-0 transition-colors hover:bg-slate-50/70"
             >
               <td className="px-4 py-3">
-                <span className="font-mono text-[12px] font-semibold text-slate-800">
+                <span className="font-mono text-[0.75rem] font-semibold text-slate-800">
                   {loc.code}
                 </span>
-                <span className="mt-0.5 block text-[13px] text-slate-600">
+                <span className="mt-0.5 block text-[0.8125rem] text-slate-600">
                   {loc.name}
                 </span>
               </td>
-              <td className="px-4 py-3 text-[13px] text-slate-500">
+              <td className="px-4 py-3 text-[0.8125rem] text-slate-500">
                 {loc.description ?? "—"}
               </td>
-              <td className="px-4 py-3 text-right font-mono text-[12px] tabular-nums text-slate-600">
+              <td className="px-4 py-3 text-right font-mono text-[0.75rem] tabular-nums text-slate-600">
                 {loc.stationMetres == null ? "—" : `${loc.stationMetres} m`}
               </td>
-              <td className="px-4 py-3 text-right font-mono text-[12px] tabular-nums text-slate-600">
+              <td className="px-4 py-3 text-right font-mono text-[0.75rem] tabular-nums text-slate-600">
                 {loc.elevationMetres == null ? "—" : `${loc.elevationMetres} m`}
               </td>
               <td className="px-4 py-3 text-right">
@@ -266,7 +266,7 @@ function LocationTable({
                   // Destructive actions confirm inline rather than acting on
                   // the first click (§64).
                   <span className="inline-flex items-center gap-2">
-                    <span className="text-[12px] text-slate-500">Remove?</span>
+                    <span className="text-[0.75rem] text-slate-500">Remove?</span>
                     <Button
                       size="sm"
                       variant="destructive"
@@ -359,7 +359,7 @@ function AddLocationModal({
         {formError && (
           <p
             role="alert"
-            className="rounded-lg border border-shm-red/25 bg-shm-red/5 px-3 py-2 text-[13px] text-shm-red"
+            className="rounded-lg border border-shm-red/25 bg-shm-red/5 px-3 py-2 text-[0.8125rem] text-shm-red"
           >
             {formError}
           </p>

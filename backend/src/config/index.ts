@@ -96,6 +96,13 @@ export const config = {
    * and take out most of the suite.
    */
   registerRateLimitMax: Number(process.env.REGISTER_RATE_LIMIT_MAX ?? 5),
+  /**
+   * Requests per quarter-hour, per address, to any route that accepts a mailed
+   * code — password reset, sign-in codes, invitation acceptance. Configurable
+   * because it is a ceiling on legitimate use too: a site onboarding a dozen
+   * contractors from one office NATs them all to a single address.
+   */
+  otpRateLimitMax: Number(process.env.OTP_RATE_LIMIT_MAX ?? 10),
   billing: {
     /** Master switch; billing endpoints refuse rather than pretend when off. */
     enabled: process.env.BILLING_ENABLED === "true",

@@ -31,7 +31,7 @@ import type {
  */
 
 /** Unwraps the API's `{ data: { currentData: T[] } }` pagination envelope. */
-function unwrapPaginated<T>(payload: unknown): T[] {
+export function unwrapPaginated<T>(payload: unknown): T[] {
   const page = payload as { currentData?: T[] } | null | undefined;
   return page?.currentData ?? [];
 }

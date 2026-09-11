@@ -73,10 +73,10 @@ export default function LiveFeedPage() {
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-shm-red" />
           <div>
-            <p className="text-[13px] font-medium text-shm-red">
+            <p className="text-[0.8125rem] font-medium text-shm-red">
               Live stream unavailable
             </p>
-            <p className="mt-0.5 text-[12.5px] text-slate-500">
+            <p className="mt-0.5 text-[0.78125rem] text-slate-500">
               The connection could not be established. Existing measurements are
               unaffected — this only interrupts real-time updates.
             </p>
@@ -132,32 +132,32 @@ export default function LiveFeedPage() {
                   key={`${e.sensorId}-${e.ts}-${i}`}
                   className="border-b border-slate-100 last:border-0"
                 >
-                  <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[11.5px] text-slate-500">
+                  <td className="whitespace-nowrap px-4 py-2.5 font-mono text-[0.71875rem] text-slate-500">
                     {new Date(e.ts).toLocaleTimeString()}
                   </td>
-                  <td className="px-4 py-2.5 font-mono text-[12px] text-slate-700">
+                  <td className="px-4 py-2.5 font-mono text-[0.75rem] text-slate-700">
                     #{e.sensorId}
                   </td>
                   <td
-                    className={`px-4 py-2.5 text-right font-mono text-[12px] tabular-nums ${
+                    className={`px-4 py-2.5 text-right font-mono text-[0.75rem] tabular-nums ${
                       e.value === null ? "italic text-slate-400" : "text-slate-800"
                     }`}
                   >
                     {formatValue(e.value)}
                     {e.unit && e.value !== null ? ` ${e.unit}` : ""}
                   </td>
-                  <td className="px-4 py-2.5 text-right font-mono text-[12px] tabular-nums text-slate-500">
+                  <td className="px-4 py-2.5 text-right font-mono text-[0.75rem] tabular-nums text-slate-500">
                     {e.rawValue === null ? "—" : e.rawValue}
                   </td>
                   <td className="px-4 py-2.5">
                     {e.qualityFlags.length === 0 ? (
-                      <span className="text-[12px] text-slate-400">OK</span>
+                      <span className="text-[0.75rem] text-slate-400">OK</span>
                     ) : (
                       <span className="flex flex-wrap gap-1">
                         {e.qualityFlags.map((f) => (
                           <span
                             key={f}
-                            className="rounded bg-shm-yellow/15 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-amber-700"
+                            className="rounded bg-shm-yellow/15 px-1.5 py-0.5 font-mono text-[0.625rem] font-semibold uppercase tracking-wide text-amber-700"
                           >
                             {f.replace(/_/g, " ")}
                           </span>
@@ -185,7 +185,7 @@ function Th({
   return (
     <th
       scope="col"
-      className={`px-4 py-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400 ${className}`}
+      className={`px-4 py-2.5 font-mono text-[0.75rem] font-medium text-slate-500 ${className}`}
     >
       {children}
     </th>
@@ -207,11 +207,11 @@ function Metric({
     <div className="rounded-xl border border-slate-200/90 bg-white px-4 py-3">
       <div className="flex items-center gap-2">
         <Icon className="h-3.5 w-3.5 text-slate-400" strokeWidth={1.75} />
-        <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+        <span className="font-mono text-[0.75rem] font-medium text-slate-500">
           {label}
         </span>
       </div>
-      <p className={`mt-1.5 text-[15px] font-semibold tracking-tight ${tone}`}>
+      <p className={`mt-1.5 text-[0.9375rem] font-semibold tracking-tight ${tone}`}>
         {value}
       </p>
     </div>

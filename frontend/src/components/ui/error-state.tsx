@@ -87,7 +87,7 @@ export function ErrorState({
       ) : null}
 
       {showDetail && described.detail && (
-        <pre className="mt-3 max-w-full overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left font-mono text-[11px] leading-relaxed text-slate-600">
+        <pre className="mt-3 max-w-full overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left font-mono text-[0.6875rem] leading-relaxed text-slate-600">
           {described.status ? `${described.status} · ` : ""}
           {described.detail}
         </pre>

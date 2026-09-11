@@ -86,6 +86,20 @@ export interface DescribeOptions {
    * expired" and to "sign in again" is advice they are already following.
    */
   credentialAttempt?: boolean;
+  /**
+   * A submitted SECOND FACTOR — the emailed sign-in code.
+   *
+   * Distinct from credentialAttempt because the enumeration argument does not
+   * apply here. By this point the password has already been accepted and the
+   * account is known, so naming the failure discloses nothing new — and the
+   * generic "Incorrect email or password" actively misleads, sending someone
+   * to re-check a password that was never the problem.
+   *
+   * The API states the precise reason ("That code is not correct", "That code
+   * has expired", "Request a new sign-in code"), so that reason is shown, the
+   * same way a 403 already defers to the server's explanation.
+   */
+  secondFactorAttempt?: boolean;
 }
 
 export function describeError(
@@ -122,6 +136,17 @@ export function describeError(
 
     switch (status) {
       case 401:
+        if (options.secondFactorAttempt) {
+          return {
+            kind: "unauthorized",
+            title: serverMessageOf(error) ?? "That code is not correct",
+            description:
+              "Check the code in your email and try again. Codes expire ten minutes after they are sent.",
+            detail,
+            status,
+            retryable: false,
+          };
+        }
         return options.credentialAttempt
           ? {
               kind: "unauthorized",
@@ -199,6 +224,16 @@ export function describeError(
       case 409:
       case 422: {
         const fromServer = serverMessageOf(error);
+        if (options.secondFactorAttempt && fromServer) {
+          return {
+            kind: "client",
+            title: fromServer,
+            description: "Request a new code and try again.",
+            detail,
+            status,
+            retryable: false,
+          };
+        }
         if (fromServer) {
           return {
             kind: "client",

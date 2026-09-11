@@ -116,20 +116,20 @@ export default function HomePage() {
             <div>
               {/* Set as a running head on a drawing, not a pill badge. */}
               <MotionOnLoad index={0}>
-                <p className="mb-8 flex items-center gap-3 font-mono text-[11.5px] text-sheet-ink/50">
+                <p className="mb-8 flex items-center gap-3 font-mono text-[0.71875rem] text-sheet-ink/50">
                   <span className="h-px w-10 bg-sheet-rust" />
                   Structural monitoring as a service
                 </p>
               </MotionOnLoad>
 
               <MotionOnLoad index={1}>
-                <h1 className="max-w-[15ch] text-[44px] font-bold leading-[1.02] tracking-[-0.035em] text-sheet-ink sm:text-[58px] lg:text-[66px]">
+                <h1 className="max-w-[15ch] text-[2.75rem] font-bold leading-[1.02] tracking-[-0.035em] text-sheet-ink sm:text-[3.625rem] lg:text-[4.125rem]">
                   Every structure is already telling you something.
                 </h1>
               </MotionOnLoad>
 
               <MotionOnLoad index={2}>
-                <p className="mt-7 max-w-[54ch] text-[17px] leading-[1.62] text-sheet-ink/75">
+                <p className="mt-7 max-w-[54ch] text-[1.0625rem] leading-[1.62] text-sheet-ink/75">
                   Strain, vibration and deflection, measured continuously at the
                   structure and carried to engineers who can act on them. The
                   platform records what was measured, when, and by which
@@ -161,7 +161,7 @@ export default function HomePage() {
                   kind of statement a buyer verifies. */}
               {/* Also above the fold, so the cascade is CSS-only. The index
                   continues the hero's sequence rather than restarting it. */}
-              <ul className="mt-10 flex flex-col gap-x-8 gap-y-3 border-t border-sheet-ink/15 pt-6 text-[13.5px] text-sheet-ink/70 sm:flex-row">
+              <ul className="mt-10 flex flex-col gap-x-8 gap-y-3 border-t border-sheet-ink/15 pt-6 text-[0.84375rem] text-sheet-ink/70 sm:flex-row">
                 {[
                   { icon: Lock, text: "Tenant isolation enforced in the database" },
                   { icon: Globe, text: "Per-device credentials, not a shared key" },
@@ -203,7 +203,7 @@ export default function HomePage() {
               <h2 className="mt-5 text-3xl font-semibold tracking-tight text-sheet-ink sm:text-4xl">
                 One platform. Three planes. End-to-end.
               </h2>
-              <p className="mt-4 text-[15px] leading-relaxed text-sheet-ink/55">
+              <p className="mt-4 text-[0.9375rem] leading-relaxed text-sheet-ink/55">
                 Control, application, and edge planes operate independently yet
                 integrate for continuous structural monitoring.
               </p>
@@ -260,7 +260,7 @@ export default function HomePage() {
                   <div
                     className={`flex items-center justify-between bg-gradient-to-r ${plane.tone} px-5 py-3`}
                   >
-                    <span className="font-mono text-[10px] tracking-[0.22em] text-white/70">
+                    <span className="font-mono text-[0.625rem] tracking-[0.22em] text-white/70">
                       PLANE {plane.index}
                     </span>
                     <plane.icon
@@ -269,17 +269,17 @@ export default function HomePage() {
                     />
                   </div>
                   <CardContent className="p-5">
-                    <h3 className="text-[15px] font-semibold tracking-tight text-sheet-ink">
+                    <h3 className="text-[0.9375rem] font-semibold tracking-tight text-sheet-ink">
                       {plane.title}
                     </h3>
-                    <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-sheet-ink/45">
+                    <p className="mt-0.5 font-mono text-[0.75rem] font-medium text-sheet-ink/60">
                       {plane.sub}
                     </p>
                     <ul className="mt-4 space-y-2.5">
                       {plane.items.map((item) => (
                         <li
                           key={item}
-                          className="flex items-start gap-2.5 text-[13px] leading-snug text-sheet-ink/70"
+                          className="flex items-start gap-2.5 text-[0.8125rem] leading-snug text-sheet-ink/70"
                         >
                           <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-shm-navy-400" />
                           {item}
@@ -296,10 +296,10 @@ export default function HomePage() {
           <Motion variant="rise" index={2}>
             <div className="mt-10 rounded-xl border border-sheet-ink/15 bg-white p-5">
               <div className="mb-4 flex items-center justify-between">
-                <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-sheet-ink/55">
+                <span className="font-mono text-[0.625rem] font-semibold uppercase tracking-[0.22em] text-sheet-ink/55">
                   Data flow
                 </span>
-                <span className="font-mono text-[10px] text-sheet-ink/45">
+                <span className="font-mono text-[0.625rem] text-sheet-ink/45">
                   SENSOR → INGEST → ANALYZE
                 </span>
               </div>
@@ -389,7 +389,7 @@ export default function HomePage() {
               <h2 className="mt-5 text-3xl font-semibold tracking-tight text-sheet-ink sm:text-4xl">
                 Twelve capabilities, one instrumented truth.
               </h2>
-              <p className="mt-4 text-[15px] leading-relaxed text-sheet-ink/55">
+              <p className="mt-4 text-[0.9375rem] leading-relaxed text-sheet-ink/55">
                 From IoT ingestion to damage localization, every module is built
                 for production-grade structural monitoring.
               </p>
@@ -489,14 +489,14 @@ export default function HomePage() {
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sheet-paper text-sheet-ink transition-colors duration-300 group-hover:bg-sheet-ink group-hover:text-white">
                       <m.icon className="h-4.5 w-4.5" strokeWidth={1.75} />
                     </div>
-                    <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-sheet-ink/45">
+                    <span className="font-mono text-[0.5625rem] font-semibold uppercase tracking-[0.2em] text-sheet-ink/45">
                       {m.tag}
                     </span>
                   </div>
-                  <h3 className="text-[14.5px] font-semibold tracking-tight text-sheet-ink">
+                  <h3 className="text-[0.90625rem] font-semibold tracking-tight text-sheet-ink">
                     {m.title}
                   </h3>
-                  <p className="mt-1.5 text-[12.5px] leading-relaxed text-sheet-ink/55">
+                  <p className="mt-1.5 text-[0.78125rem] leading-relaxed text-sheet-ink/55">
                     {m.description}
                   </p>
                 </div>
@@ -515,7 +515,7 @@ export default function HomePage() {
               <h2 className="mt-5 text-3xl font-semibold tracking-tight text-sheet-ink sm:text-4xl">
                 Role-based access, fully audited.
               </h2>
-              <p className="mt-4 text-[15px] leading-relaxed text-sheet-ink/55">
+              <p className="mt-4 text-[0.9375rem] leading-relaxed text-sheet-ink/55">
                 Five distinct roles with permission-based access. Every action
                 is recorded.
               </p>
@@ -566,21 +566,21 @@ export default function HomePage() {
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sheet-ink text-white transition-transform duration-300 group-hover:scale-105">
                       <r.icon className="h-4.5 w-4.5" strokeWidth={1.75} />
                     </div>
-                    <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-sheet-ink/45">
+                    <span className="font-mono text-[0.5625rem] font-semibold uppercase tracking-[0.18em] text-sheet-ink/45">
                       {r.tag}
                     </span>
                   </div>
-                  <h3 className="text-[14.5px] font-semibold tracking-tight text-sheet-ink">
+                  <h3 className="text-[0.90625rem] font-semibold tracking-tight text-sheet-ink">
                     {r.role}
                   </h3>
-                  <p className="mt-1.5 text-[12px] leading-relaxed text-sheet-ink/55">
+                  <p className="mt-1.5 text-[0.75rem] leading-relaxed text-sheet-ink/55">
                     {r.desc}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-1">
                     {r.items.map((item) => (
                       <span
                         key={item}
-                        className="rounded bg-slate-100 px-2 py-0.5 font-mono text-[9.5px] text-sheet-ink/55"
+                        className="rounded bg-slate-100 px-2 py-0.5 font-mono text-[0.59375rem] text-sheet-ink/55"
                       >
                         {item}
                       </span>
@@ -602,7 +602,7 @@ export default function HomePage() {
               <h2 className="mt-5 text-3xl font-semibold tracking-tight text-sheet-ink sm:text-4xl">
                 Pricing by scale, not by structure.
               </h2>
-              <p className="mt-4 text-[15px] leading-relaxed text-sheet-ink/55">
+              <p className="mt-4 text-[0.9375rem] leading-relaxed text-sheet-ink/55">
                 Entitlement-based plans that grow with your infrastructure
                 footprint.
               </p>
@@ -668,26 +668,26 @@ export default function HomePage() {
                   }`}
                 >
                   {plan.featured && (
-                    <span className="absolute -top-3 left-6 rounded-full bg-sheet-ink px-3 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-white">
+                    <span className="absolute -top-3 left-6 rounded-full bg-sheet-ink px-3 py-1 font-mono text-[0.5625rem] font-semibold uppercase tracking-[0.18em] text-white">
                       Most deployed
                     </span>
                   )}
                   <div className="flex items-baseline justify-between">
-                    <h3 className="text-[16px] font-semibold tracking-tight text-sheet-ink">
+                    <h3 className="text-[1rem] font-semibold tracking-tight text-sheet-ink">
                       {plan.name}
                     </h3>
-                    <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-sheet-ink/45">
+                    <span className="font-mono text-[0.5625rem] uppercase tracking-[0.18em] text-sheet-ink/45">
                       TIER 0{i + 1}
                     </span>
                   </div>
-                  <p className="mt-1 text-[12.5px] text-sheet-ink/55">
+                  <p className="mt-1 text-[0.78125rem] text-sheet-ink/55">
                     {plan.desc}
                   </p>
                   <div className="mt-5 flex items-baseline gap-1">
                     <span className="text-3xl font-semibold tracking-tight text-sheet-ink">
                       {plan.price}
                     </span>
-                    <span className="text-[12px] text-sheet-ink/45">
+                    <span className="text-[0.75rem] text-sheet-ink/45">
                       {plan.period}
                     </span>
                   </div>
@@ -695,7 +695,7 @@ export default function HomePage() {
                     {plan.features.map((f) => (
                       <li
                         key={f}
-                        className="flex items-start gap-2 text-[13px] text-sheet-ink/70"
+                        className="flex items-start gap-2 text-[0.8125rem] text-sheet-ink/70"
                       >
                         <CheckMark />
                         {f}
@@ -721,13 +721,13 @@ export default function HomePage() {
         <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-transparent blur-3xl" />
         <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
           <Motion variant="rise">
-            <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.24em] text-sheet-rule">
+            <p className="mb-4 font-mono text-[0.6875rem] uppercase tracking-[0.24em] text-sheet-rule">
               Ready when you are
             </p>
             <h2 className="mb-5 text-3xl font-semibold tracking-tight text-white sm:text-5xl">
               Protect your infrastructure before it signals.
             </h2>
-            <p className="mx-auto mb-8 max-w-xl text-[15px] leading-relaxed text-sheet-paper/70">
+            <p className="mx-auto mb-8 max-w-xl text-[0.9375rem] leading-relaxed text-sheet-paper/70">
               Start monitoring in minutes. Live telemetry, engineering analysis,
               and alerts that reach the right person at the right time.
             </p>
@@ -763,10 +763,10 @@ export default function HomePage() {
                 height={LOGO.height}
                 className="h-9 w-auto"
               />
-              <p className="mt-3 font-mono text-[8.5px] uppercase tracking-[0.22em] text-sheet-ink/45">
+              <p className="mt-3 font-mono text-[0.53125rem] uppercase tracking-[0.22em] text-sheet-ink/45">
                 {TAGLINE}
               </p>
-              <p className="mt-4 text-[13px] leading-relaxed text-sheet-ink/55">
+              <p className="mt-4 text-[0.8125rem] leading-relaxed text-sheet-ink/55">
                 Continuous structural health monitoring — IoT edge nodes, cloud
                 analytics, physics-informed AI, and a full multi-tenant SaaS
                 platform.
@@ -792,10 +792,10 @@ export default function HomePage() {
               },
             ].map((col) => (
               <div key={col.title}>
-                <h4 className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-sheet-ink">
+                <h4 className="mb-3 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.2em] text-sheet-ink">
                   {col.title}
                 </h4>
-                <ul className="space-y-2 text-[13px] text-sheet-ink/55">
+                <ul className="space-y-2 text-[0.8125rem] text-sheet-ink/55">
                   {col.links.map((l) => (
                     <li key={l}>
                       <span className="mo-link cursor-pointer transition-colors hover:text-sheet-ink">
@@ -808,12 +808,12 @@ export default function HomePage() {
             ))}
           </div>
           <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-sheet-ink/15 pt-6 sm:flex-row">
-            <p className="font-mono text-[11px] text-sheet-ink/45">
+            <p className="font-mono text-[0.6875rem] text-sheet-ink/45">
               {/* Derived from the clock, so the notice does not silently go
                   stale on 1 January. */}
               © {new Date().getFullYear()} {COMPANY}
             </p>
-            <div className="flex gap-5 font-mono text-[11px] text-sheet-ink/45">
+            <div className="flex gap-5 font-mono text-[0.6875rem] text-sheet-ink/45">
               <span className="cursor-pointer transition-colors hover:text-sheet-ink/70">
                 PRIVACY
               </span>

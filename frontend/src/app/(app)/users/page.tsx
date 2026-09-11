@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useParamFilter } from "@/hooks/use-param-filter";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -9,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Reveal } from "@/components/ui/reveal";
-import { SectionLabel } from "@/components/ui/section-label";
 import { Modal } from "@/components/ui/modal";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { LoadingState } from "@/components/ui/loading-state";
@@ -34,12 +34,17 @@ const EMPTY_FORM = {
 
 type Tab = UserRole;
 
+/** Registries reachable via ?tab, validated so a bad value falls back. */
+const USER_TABS = ["admin", "contractor", "authority"] as const satisfies readonly Tab[];
+
 export default function UsersPage() {
   const { userType, userId } = useAuthStore();
   const router = useRouter();
   const isSuperAdmin = userType === "superadmin";
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<Tab>("admin");
+  // Seeded from ?tab so the dashboard's Admins/Contractors/Authorities tiles
+  // land on the matching registry rather than always on Admins.
+  const [tab, setTab] = useParamFilter<Tab>("tab", USER_TABS, "admin");
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -150,7 +155,6 @@ export default function UsersPage() {
           <CardHeader>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <SectionLabel index={isSuperAdmin ? "20" : "21"} label={`${userTypeShown} registry`} className="mb-2" />
                 <CardTitle>{capitalize(userTypeShown)} List</CardTitle>
               </div>
               <Input
@@ -174,7 +178,7 @@ export default function UsersPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-left text-[10px] uppercase tracking-[0.14em] text-slate-500">
+                  <tr className="border-b border-slate-200 text-left text-[0.75rem] font-medium text-slate-500">
                     <th className="pb-3 pr-4 font-medium">Name</th>
                     <th className="pb-3 pr-4 font-medium">Email</th>
                     <th className="pb-3 pr-4 font-medium">Phone</th>

@@ -182,7 +182,7 @@ export default function StructuresPage() {
                       <td className="px-4 py-3">
                         <Link
                           href={`/structures/${s.id}`}
-                          className="font-mono text-[12px] font-semibold text-shm-navy-700 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-shm-navy-500"
+                          className="font-mono text-[0.75rem] font-semibold text-shm-navy-700 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-shm-navy-500"
                         >
                           {s.code}
                         </Link>
@@ -190,7 +190,7 @@ export default function StructuresPage() {
                       <td className="px-4 py-3">
                         <span className="font-medium text-slate-800">{s.name}</span>
                         {s.siteAddress && (
-                          <span className="mt-0.5 flex items-center gap-1 text-[11.5px] text-slate-400">
+                          <span className="mt-0.5 flex items-center gap-1 text-[0.71875rem] text-slate-400">
                             <MapPin className="h-3 w-3" strokeWidth={1.75} />
                             {s.siteAddress}
                           </span>
@@ -200,13 +200,13 @@ export default function StructuresPage() {
                       <td className="px-4 py-3 text-slate-600">
                         {s.projectName ?? "—"}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono text-[12px] tabular-nums text-slate-600">
+                      <td className="px-4 py-3 text-right font-mono text-[0.75rem] tabular-nums text-slate-600">
                         {metres(s.lengthMetres)}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono text-[12px] tabular-nums text-slate-600">
+                      <td className="px-4 py-3 text-right font-mono text-[0.75rem] tabular-nums text-slate-600">
                         {s.spanCount ?? "—"}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono text-[12px] tabular-nums text-slate-600">
+                      <td className="px-4 py-3 text-right font-mono text-[0.75rem] tabular-nums text-slate-600">
                         {s.locationCount}
                       </td>
                       <td className="px-4 py-3">
@@ -246,7 +246,7 @@ function Th({
   return (
     <th
       scope="col"
-      className={`px-4 py-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400 ${className}`}
+      className={`px-4 py-2.5 font-mono text-[0.75rem] font-medium text-slate-500 ${className}`}
     >
       {children}
     </th>
@@ -318,7 +318,7 @@ function CreateStructureModal({
           {formError && (
             <p
               role="alert"
-              className="rounded-lg border border-shm-red/25 bg-shm-red/5 px-3 py-2 text-[13px] text-shm-red"
+              className="rounded-lg border border-shm-red/25 bg-shm-red/5 px-3 py-2 text-[0.8125rem] text-shm-red"
             >
               {formError}
             </p>
@@ -403,7 +403,7 @@ function CreateStructureModal({
             />
           </div>
 
-          <p className="text-[12px] leading-relaxed text-slate-400">
+          <p className="text-[0.75rem] leading-relaxed text-slate-400">
             Leave a field blank if the value is not known. Blank is recorded as
             unsurveyed, which is different from zero.
           </p>

@@ -66,3 +66,10 @@ process.env.REGISTER_RATE_LIMIT_MAX = "100000";
 // Keep the ingest path on its documented default so the contract tests and the
 // legacy-key deprecation path behave predictably.
 process.env.MQTT_INGEST_ENABLED = process.env.MQTT_INGEST_ENABLED ?? "false";
+
+// Effectively unlimited code-bearing requests during a test run, for the same
+// reason REGISTER_RATE_LIMIT_MAX is raised above: one process, one in-memory
+// limiter store and one source address mean the production ceiling of 10 per
+// quarter-hour is reached partway through the invitation suite and every later
+// request 429s. The limiter's own behaviour is covered in isolation instead.
+process.env.OTP_RATE_LIMIT_MAX = "100000";

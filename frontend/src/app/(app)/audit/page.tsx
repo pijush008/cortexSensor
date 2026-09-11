@@ -190,42 +190,51 @@ function Row({ entry }: { entry: AuditEntry }) {
   const Icon = ACTION_ICON[entry.action] ?? ScrollText;
   const tone = ACTION_TONE[entry.action] ?? "text-slate-600 bg-slate-100";
   const detail = summarize(entry.newValue);
+  // An audit entry has no sub-resources, so a detail PAGE would just be this
+  // row again. What is actually hidden is the truncated payload and the user
+  // agent, so the row expands in place to show them.
+  const [open, setOpen] = useState(false);
 
   return (
-    <tr className="border-b border-slate-100 last:border-0 align-top">
-      <td className="whitespace-nowrap px-4 py-3 font-mono text-[11.5px] text-slate-500">
+    <>
+    <tr
+      onClick={() => setOpen((v) => !v)}
+      aria-expanded={open}
+      className="cursor-pointer border-b border-slate-100 align-top last:border-0 hover:bg-slate-50/70"
+    >
+      <td className="whitespace-nowrap px-4 py-3 font-mono text-[0.71875rem] text-slate-500">
         {new Date(entry.createdAt).toLocaleString()}
       </td>
       <td className="px-4 py-3">
         {entry.actor ? (
           <>
-            <span className="block text-[13px] text-slate-800">
+            <span className="block text-[0.8125rem] text-slate-800">
               {entry.actor.name || entry.actor.email}
             </span>
-            <span className="block font-mono text-[11px] text-slate-400">
+            <span className="block font-mono text-[0.6875rem] text-slate-400">
               {entry.actor.email}
             </span>
           </>
         ) : (
           // Never invented. A row with no actor is shown as unattributed.
-          <span className="text-[13px] italic text-slate-400">Unattributed</span>
+          <span className="text-[0.8125rem] italic text-slate-400">Unattributed</span>
         )}
       </td>
       <td className="px-4 py-3">
         <span
-          className={`inline-flex items-center gap-1.5 rounded px-2 py-1 font-mono text-[10.5px] font-semibold uppercase tracking-wide ${tone}`}
+          className={`inline-flex items-center gap-1.5 rounded px-2 py-1 font-mono text-[0.65625rem] font-semibold uppercase tracking-wide ${tone}`}
         >
           <Icon className="h-3 w-3" strokeWidth={2} />
           {entry.action}
         </span>
       </td>
-      <td className="px-4 py-3 font-mono text-[12px] text-slate-700">
+      <td className="px-4 py-3 font-mono text-[0.75rem] text-slate-700">
         {entry.entity}
         {entry.entityId !== null && (
           <span className="text-slate-400"> #{entry.entityId}</span>
         )}
       </td>
-      <td className="max-w-[280px] px-4 py-3 font-mono text-[11.5px] text-slate-500">
+      <td className="max-w-[280px] px-4 py-3 font-mono text-[0.71875rem] text-slate-500">
         {detail ? (
           <span className="block truncate" title={detail}>
             {detail}
@@ -234,10 +243,50 @@ function Row({ entry }: { entry: AuditEntry }) {
           "—"
         )}
       </td>
-      <td className="px-4 py-3 font-mono text-[11.5px] text-slate-400">
+      <td className="px-4 py-3 font-mono text-[0.71875rem] text-slate-400">
         {entry.ipAddress ?? "—"}
       </td>
     </tr>
+    {open && (
+      <tr className="border-b border-slate-100 bg-slate-50/60">
+        <td colSpan={6} className="px-4 py-4">
+          <dl className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <dt className="font-mono text-[0.75rem] font-medium text-slate-500">
+                User agent
+              </dt>
+              <dd className="mt-1 break-words font-mono text-[0.71875rem] text-slate-600">
+                {entry.userAgent ?? "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="font-mono text-[0.75rem] font-medium text-slate-500">
+                Entity
+              </dt>
+              <dd className="mt-1 font-mono text-[0.71875rem] text-slate-600">
+                {entry.entity}
+                {entry.entityId !== null && ` #${entry.entityId}`}
+              </dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="font-mono text-[0.75rem] font-medium text-slate-500">
+                Recorded value
+              </dt>
+              <dd className="mt-1">
+                {entry.newValue === null || entry.newValue === undefined ? (
+                  <span className="text-[0.71875rem] text-slate-400">—</span>
+                ) : (
+                  <pre className="max-h-64 overflow-auto rounded-lg border border-slate-200 bg-white p-3 font-mono text-[0.71875rem] leading-relaxed text-slate-700">
+                    {JSON.stringify(entry.newValue, null, 2)}
+                  </pre>
+                )}
+              </dd>
+            </div>
+          </dl>
+        </td>
+      </tr>
+    )}
+    </>
   );
 }
 
@@ -245,7 +294,7 @@ function Th({ children }: { children: React.ReactNode }) {
   return (
     <th
       scope="col"
-      className="px-4 py-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400"
+      className="px-4 py-2.5 font-mono text-[0.75rem] font-medium text-slate-500"
     >
       {children}
     </th>

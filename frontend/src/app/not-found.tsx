@@ -17,7 +17,7 @@ export default function NotFound() {
         <Compass className="h-6 w-6" strokeWidth={1.5} />
       </span>
 
-      <p className="mt-4 font-mono text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+      <p className="mt-4 font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.22em] text-slate-400">
         Error 404
       </p>
       <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">

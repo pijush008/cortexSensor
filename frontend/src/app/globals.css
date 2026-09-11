@@ -191,6 +191,9 @@
      above stays for dots and fills, where the 3:1 non-text threshold applies. */
   --color-shm-green-text: #2a7a36;
   --color-shm-red: #cc1c16;
+  /* Background tint for the exceedance state — the one place this interface
+     raises its voice. Light enough to carry ink text above it. */
+  --color-shm-red-soft: #fdeceb;
   --color-shm-peach: #ce514c;
   --color-shm-yellow: #f7a707;
   --color-shm-zinc: #898989;
@@ -228,6 +231,35 @@
 }
 
 @layer base {
+  /*
+   * Smooth scrolling was never enabled — scroll-behavior appeared in this file
+   * only inside the reduced-motion guard, where it is forced back to `auto`.
+   * So in-page jumps (anchors, "back to top", scrollIntoView) landed instantly.
+   *
+   * scroll-padding-top keeps a target from landing underneath the sticky
+   * console header, which is the usual reason a smooth scroll "works" but
+   * leaves the reader looking at the wrong thing.
+   */
+  html {
+    /* The one knob for type size across the console.
+     *
+     * Every text size in the app is expressed in rem — the Tailwind scale
+     * already was, and the 318 arbitrary values that were hardcoded in pixels
+     * were converted to match. So this single declaration scales all of it,
+     * and changing it again later is a one-line edit rather than another sweep
+     * through 48 files.
+     *
+     * 17px rather than the browser's default 16px: the console leans on 11-13px
+     * labels and table text, which is tight on a large monitor at arm's length.
+     *
+     * Expressing text in rem also means a reader who has raised their browser's
+     * font size gets a larger console, which pixel values silently ignore.
+     */
+    font-size: 17px;
+    scroll-behavior: smooth;
+    scroll-padding-top: 5rem;
+  }
+
   body {
     background: var(--background);
     color: var(--foreground);

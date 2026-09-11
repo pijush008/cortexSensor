@@ -110,7 +110,7 @@ export default function ExportsPage() {
         <Reveal>
           <Card>
             <CardHeader>
-              <SectionLabel index="18" label="Backups" className="mb-2" />
+              <SectionLabel label="Backups" className="mb-2" />
               <div className="flex items-center gap-2">
                 <FileSpreadsheet className="h-5 w-5 text-shm-navy-700" strokeWidth={1.75} />
                 <CardTitle>Download Data</CardTitle>
@@ -188,7 +188,7 @@ export default function ExportsPage() {
         <Reveal delay={80}>
           <Card>
             <CardHeader>
-              <SectionLabel index="19" label="Exchange" className="mb-2" />
+              <SectionLabel label="Exchange" className="mb-2" />
               <div className="flex items-center gap-2">
                 <UploadCloud className="h-5 w-5 text-shm-navy-700" strokeWidth={1.75} />
                 <CardTitle>Project CSV Exchange</CardTitle>

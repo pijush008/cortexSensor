@@ -8,17 +8,19 @@ import { Input } from "@/components/ui/input";
 import { LoadingState } from "@/components/ui/loading-state";
 import { Modal } from "@/components/ui/modal";
 import { Reveal } from "@/components/ui/reveal";
-import { SectionLabel } from "@/components/ui/section-label";
 import { Select } from "@/components/ui/select";
 import { StatCard } from "@/components/ui/stat-card";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
-import { useProjects } from "@/hooks/use-data";
+import { unwrapPaginated, useProjects } from "@/hooks/use-data";
 import { api, type ApiResponse } from "@/lib/api";
+import { describeError, type DescribedError } from "@/lib/errors";
 import { formatDate } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FolderKanban, Pause, Play, Plus, Square, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useParamFilter } from "@/hooks/use-param-filter";
 
 const PROJECT_IMG: Record<string, string> = {
   "Bandra–Worli Sea Link SHM": "/images/structures/cable-stayed.jpg",
@@ -42,38 +44,135 @@ const STATUS_META: Record<string, { label: string; tone: StatusTone }> = {
 const EMPTY_FORM = {
   projectName: "",
   projectLocation: "",
-  projectUniqueID: "",
   startDate: "",
   endDate: "",
+  // Assigning a stakeholder by address. Nobody is attached to the project by
+  // typing here — an invitation goes out, and the assignment happens when the
+  // person accepts it.
+  contractorEmail: "",
+  authorityEmail: "",
+  // The monitoring hardware. Optional: a project can be set up before its
+  // cabinet is on site, and a device can be attached later.
+  deviceId: "",
 };
 
+interface DeviceOption {
+  id: number;
+  deviceName: string;
+  /** The serial printed on the unit; what distinguishes two similar cabinets. */
+  deviceId: string | null;
+}
+
+interface InvitationOutcome {
+  role: string;
+  emailId: string;
+  sent: boolean;
+  message: string;
+}
+
+interface CreateProjectResponse extends ApiResponse {
+  projectId: number;
+  invitations?: InvitationOutcome[];
+}
+
+/** The statuses the list can be filtered to, shared by the Select and ?status. */
+const PROJECT_STATUSES = [
+  "all",
+  "start",
+  "not_start",
+  "pause",
+  "end",
+  // Spans not_start AND end. The "Not started / ended" tile counts both, so
+  // without a filter value meaning the same thing the tile could only drill to
+  // half of what its own number claims.
+  "inactive",
+] as const;
+
+type ProjectStatusFilter = (typeof PROJECT_STATUSES)[number];
+
 export default function ProjectsPage() {
+  const router = useRouter();
   const { userId, userType } = useAuthStore();
   const adminId = userType === "superadmin" || !userType ? 0 : (userId ?? 0);
   const queryClient = useQueryClient();
   const { data: projects = [], isLoading } = useProjects(adminId);
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  // Seeded from ?status so the dashboard's Running/Paused/Upcoming tiles land
+  // here already filtered rather than on the full list.
+  const [statusFilter, setStatusFilter] = useParamFilter(
+    "status",
+    PROJECT_STATUSES,
+    "all",
+  );
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<DescribedError | null>(null);
+  /** Per-role outcome of the invitations a submitted form asked for. */
+  const [inviteResults, setInviteResults] = useState<InvitationOutcome[]>([]);
+
+
+  // Devices this project could actually use: not already claimed by a live
+  // project, and with sensors assigned. The organization is settled by the
+  // server from the session — the creator's own, or the operator organization
+  // for a platform operator — so there is nothing for the client to pass.
+  const devicesQuery = useQuery({
+    queryKey: ["devices", "availableForProject"],
+    queryFn: async () => {
+      const { data } = await api.get<ApiResponse<unknown>>("/device", {
+        params: { availableForProject: "1", limit: 100 },
+      });
+      return unwrapPaginated<DeviceOption>(data.data);
+    },
+    enabled: showModal,
+  });
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["projects"] });
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const { data } = await api.post<ApiResponse>("/project", form);
+      const { data } = await api.post<CreateProjectResponse>("/project", form);
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       invalidate();
-      setShowModal(false);
       setForm(EMPTY_FORM);
+
+      // Show the list the new project is actually in.
+      //
+      // A new project is always NOT STARTED, and this page arrives already
+      // filtered when it is reached from a dashboard tile —
+      // /projects?status=start is the "Running" drill-through. Creating a
+      // project from that view left it filtered out the moment it was made:
+      // created, returned by the API, and invisible, with nothing on screen
+      // explaining why. A stale search term hides it just as effectively.
+      //
+      // Clearing both is safe: useParamFilter re-seeds from the URL only when
+      // the parameter itself changes, so a filter chosen here is not undone by
+      // the query string that is still in the address bar.
+      setStatusFilter("all");
+      setSearch("");
+
+      // The project exists either way. An invitation that could not be sent is
+      // reported instead of silently swallowed, because the administrator is
+      // the only one who can do anything about it — they can resend from the
+      // project page once they have fixed the address.
+      const failed = (data.invitations ?? []).filter((i) => !i.sent);
+      if (failed.length > 0) {
+        setInviteResults(data.invitations ?? []);
+      } else {
+        setShowModal(false);
+        setInviteResults([]);
+      }
     },
     onError: (err) =>
-      setError((err as Error).message || "Failed to create project"),
+      // describeError, not err.message: on a rejected request the latter is
+      // axios's own "Request failed with status code 400", which tells someone
+      // filling in this form nothing. The API answers a rejected creation with
+      // a sentence written for them — "Project Name already exists" — and
+      // describeError is what surfaces it.
+      setError(describeError(err)),
   });
 
   const startMutation = useMutation({
@@ -99,7 +198,11 @@ export default function ProjectsPage() {
       !search ||
       p.projectName.toLowerCase().includes(search.toLowerCase()) ||
       (p.projectUniqueID || "").toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === "all" || p.status === statusFilter;
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "inactive"
+        ? p.status !== "start" && p.status !== "pause"
+        : p.status === statusFilter);
     return matchesSearch && matchesStatus;
   });
 
@@ -112,6 +215,8 @@ export default function ProjectsPage() {
           <Button
             onClick={() => {
               setForm(EMPTY_FORM);
+              setInviteResults([]);
+              setError(null);
               setShowModal(true);
             }}
           >
@@ -127,7 +232,7 @@ export default function ProjectsPage() {
           icon={FolderKanban}
           accent="navy"
           delta="monitored structures"
-          className="anim-fade-up"
+          onClick={() => setStatusFilter("all")}
         />
         <StatCard
           title="Running"
@@ -135,7 +240,7 @@ export default function ProjectsPage() {
           icon={Play}
           accent="green"
           delta="collecting telemetry"
-          className="anim-fade-up [animation-delay:80ms]"
+          onClick={() => setStatusFilter("start")}
         />
         <StatCard
           title="Paused"
@@ -143,7 +248,7 @@ export default function ProjectsPage() {
           icon={Pause}
           accent="yellow"
           delta="on hold"
-          className="anim-fade-up [animation-delay:160ms]"
+          onClick={() => setStatusFilter("pause")}
         />
         <StatCard
           title="Not started / ended"
@@ -153,8 +258,8 @@ export default function ProjectsPage() {
           }
           icon={Square}
           accent="blue"
+          onClick={() => setStatusFilter("inactive")}
           delta="inactive"
-          className="anim-fade-up [animation-delay:240ms]"
         />
       </div>
 
@@ -163,7 +268,6 @@ export default function ProjectsPage() {
           <CardHeader>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <SectionLabel index="16" label="Programme" className="mb-2" />
                 <CardTitle>Project List</CardTitle>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row">
@@ -175,13 +279,16 @@ export default function ProjectsPage() {
                 />
                 <Select
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
+                  onChange={(e) =>
+                    setStatusFilter(e.target.value as ProjectStatusFilter)
+                  }
                   options={[
                     { value: "all", label: "All statuses" },
                     { value: "start", label: "Running" },
                     { value: "not_start", label: "Not Started" },
                     { value: "pause", label: "Paused" },
                     { value: "end", label: "Ended" },
+                    { value: "inactive", label: "Not started / ended" },
                   ]}
                 />
               </div>
@@ -200,7 +307,7 @@ export default function ProjectsPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-200 text-left text-[10px] uppercase tracking-[0.14em] text-slate-500">
+                    <tr className="border-b border-slate-200 text-left text-[0.75rem] font-medium text-slate-500">
                       <th className="pb-3 pr-4 font-medium">Structure</th>
                       <th className="pb-3 pr-4 font-medium">Project Name</th>
                       <th className="pb-3 pr-4 font-medium">Project ID</th>
@@ -218,8 +325,11 @@ export default function ProjectsPage() {
                         STATUS_META[p.status] ?? STATUS_META.not_start;
                       return (
                         <tr
-                          key={p.id}
-                          className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
+                          key={p.projectId ?? p.id}
+                          onClick={() =>
+                            router.push(`/projects/${p.projectId ?? p.id}`)
+                          }
+                          className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-slate-50"
                         >
                           <td className="py-3 pr-4">
                             <div className="flex items-center gap-3">
@@ -258,7 +368,7 @@ export default function ProjectsPage() {
                           <td className="py-3 pr-4">
                             <StatusBadge label={meta.label} tone={meta.tone} />
                           </td>
-                          <td className="py-3">
+                          <td className="py-3" onClick={(e) => e.stopPropagation()}>
                             <div className="flex gap-1">
                               {p.status === "not_start" && (
                                 <Button
@@ -349,8 +459,12 @@ export default function ProjectsPage() {
         title="New Project"
       >
         {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
-            {error}
+          <div
+            role="alert"
+            className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600"
+          >
+            <p className="font-medium">{error.title}</p>
+            <p className="mt-0.5 text-red-600/85">{error.description}</p>
           </div>
         )}
         <form
@@ -375,13 +489,10 @@ export default function ProjectsPage() {
             }
             required
           />
-          <Input
-            label="Project Unique ID"
-            value={form.projectUniqueID}
-            onChange={(e) =>
-              setForm({ ...form, projectUniqueID: e.target.value })
-            }
-          />
+          <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[0.8125rem] text-slate-600">
+            A unique Project ID is generated automatically when the project is
+            created. It cannot be edited afterwards.
+          </p>
           <div className="grid grid-cols-2 gap-4">
             <Input
               label="Start Date"
@@ -396,13 +507,98 @@ export default function ProjectsPage() {
               onChange={(e) => setForm({ ...form, endDate: e.target.value })}
             />
           </div>
+
+          {(() => {
+            const devices = devicesQuery.data ?? [];
+            const label = (d: DeviceOption) =>
+              d.deviceId ? `${d.deviceName} · ${d.deviceId}` : d.deviceName;
+
+            return (
+              <div>
+                <Select
+                  label="Device (optional)"
+                  value={form.deviceId}
+                  disabled={devices.length === 0}
+                  onChange={(e) =>
+                    setForm({ ...form, deviceId: e.target.value })
+                  }
+                  options={[
+                    { value: "", label: "No device yet" },
+                    ...devices.map((d) => ({
+                      value: String(d.id),
+                      label: label(d),
+                    })),
+                  ]}
+                />
+                <p className="mt-1.5 text-[0.78125rem] text-slate-500">
+                  {devicesQuery.isLoading
+                    ? "Loading devices…"
+                    : devices.length === 0
+                      ? "No device is available. Only devices that are free and have sensors assigned can be used."
+                      : "A device serves one running project at a time, and is released when the project ends."}
+                </p>
+              </div>
+            );
+          })()}
+
+          <div className="space-y-4 rounded-lg border border-slate-200 p-4">
+            <div>
+              <h3 className="text-sm font-medium text-slate-800">
+                Assign stakeholders
+              </h3>
+              <p className="mt-1 text-[0.8125rem] text-slate-600">
+                We email each person a verification code. They set their own
+                password, and are assigned to the project once they accept.
+                Optional — you can assign them later.
+              </p>
+            </div>
+            <Input
+              label="Contractor email"
+              type="email"
+              placeholder="contractor@example.com"
+              value={form.contractorEmail}
+              onChange={(e) =>
+                setForm({ ...form, contractorEmail: e.target.value })
+              }
+            />
+            <Input
+              label="Authority email"
+              type="email"
+              placeholder="authority@example.com"
+              value={form.authorityEmail}
+              onChange={(e) =>
+                setForm({ ...form, authorityEmail: e.target.value })
+              }
+            />
+          </div>
+
+          {inviteResults.length > 0 && (
+            <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[0.8125rem]">
+              <p className="font-medium text-amber-900">
+                The project was created, but not every invitation went out.
+              </p>
+              <ul className="space-y-1 text-amber-800">
+                {inviteResults.map((r) => (
+                  <li key={`${r.role}-${r.emailId}`}>
+                    <span className="capitalize">{r.role}</span>: {r.message}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-amber-800">
+                You can resend from the project page.
+              </p>
+            </div>
+          )}
           <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"
               variant="secondary"
-              onClick={() => setShowModal(false)}
+              onClick={() => {
+                setShowModal(false);
+                setInviteResults([]);
+              }}
             >
-              Cancel
+              {inviteResults.length > 0 ? "Close" : "Cancel"}
             </Button>
             <Button type="submit" disabled={createMutation.isPending}>
               {createMutation.isPending ? "Creating…" : "Create Project"}

@@ -141,7 +141,7 @@ export default function UserDetailPage() {
                   <Eye className="mr-1.5 h-4 w-4" />
                   {startImpersonation.isPending ? "Opening…" : "View as this user"}
                 </Button>
-                <p className="text-[13px] text-slate-500">
+                <p className="text-[0.8125rem] text-slate-500">
                   {data.user.isPlatformAdmin
                     ? "A platform operator cannot be viewed as."
                     : !data.user.isActive
@@ -151,7 +151,7 @@ export default function UserDetailPage() {
               </div>
 
               {startImpersonation.isError && (
-                <p className="mt-2 text-[13px] text-shm-red">
+                <p className="mt-2 text-[0.8125rem] text-shm-red">
                   {describeError(startImpersonation.error).description}
                 </p>
               )}
@@ -165,7 +165,7 @@ export default function UserDetailPage() {
                 </h2>
 
                 {data.memberships.length === 0 ? (
-                  <p className="mt-3 text-[13px] text-slate-500">
+                  <p className="mt-3 text-[0.8125rem] text-slate-500">
                     {data.user.isPlatformAdmin
                       ? "A platform operator administers the product itself and belongs to no organization."
                       : "This user is not a member of any organization."}
@@ -178,10 +178,10 @@ export default function UserDetailPage() {
                         className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2"
                       >
                         <div>
-                          <p className="text-[13px] font-medium text-slate-800">
+                          <p className="text-[0.8125rem] font-medium text-slate-800">
                             {m.tenantName}
                           </p>
-                          <p className="font-mono text-[11px] text-slate-500">
+                          <p className="font-mono text-[0.6875rem] text-slate-500">
                             {m.role ?? "no role"}
                           </p>
                         </div>
@@ -199,13 +199,13 @@ export default function UserDetailPage() {
                 <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                   <ShieldCheck className="h-4 w-4 text-slate-400" />
                   Permissions
-                  <span className="ml-auto text-[11px] font-normal text-slate-500">
+                  <span className="ml-auto text-[0.6875rem] font-normal text-slate-500">
                     {data.permissions.length}
                   </span>
                 </h2>
 
                 {data.permissions.length === 0 ? (
-                  <p className="mt-3 text-[13px] text-slate-500">
+                  <p className="mt-3 text-[0.8125rem] text-slate-500">
                     {data.user.isPlatformAdmin
                       ? "Platform authority is not expressed as granular permissions — an operator is authorized by the platform-operator flag itself."
                       : "No permissions: this user holds no active membership."}
@@ -215,7 +215,7 @@ export default function UserDetailPage() {
                     {data.permissions.map((p) => (
                       <span
                         key={p}
-                        className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[11px] text-slate-600"
+                        className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[0.6875rem] text-slate-600"
                       >
                         {p}
                       </span>
@@ -229,20 +229,20 @@ export default function UserDetailPage() {
               <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                 <Monitor className="h-4 w-4 text-slate-400" />
                 Sign-in sessions
-                <span className="ml-auto text-[11px] font-normal text-slate-500">
+                <span className="ml-auto text-[0.6875rem] font-normal text-slate-500">
                   {activeSessions} active
                 </span>
               </h2>
 
               {data.sessions.length === 0 ? (
-                <p className="mt-3 text-[13px] text-slate-500">
+                <p className="mt-3 text-[0.8125rem] text-slate-500">
                   This user has never signed in.
                 </p>
               ) : (
                 <div className="mt-3 overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-slate-200 text-left text-[10px] uppercase tracking-[0.14em] text-slate-500">
+                      <tr className="border-b border-slate-200 text-left text-[0.75rem] font-medium text-slate-500">
                         <th className="pb-2 pr-4 font-medium">Signed in</th>
                         <th className="pb-2 pr-4 font-medium">Expires</th>
                         <th className="pb-2 font-medium">State</th>
@@ -274,25 +274,25 @@ export default function UserDetailPage() {
               <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                 <KeyRound className="h-4 w-4 text-slate-400" />
                 Activity
-                <span className="ml-auto text-[11px] font-normal text-slate-500">
+                <span className="ml-auto text-[0.6875rem] font-normal text-slate-500">
                   {data.activity.total} recorded
                 </span>
               </h2>
 
-              <p className="mt-1 text-[12px] text-slate-500">
+              <p className="mt-1 text-[0.75rem] text-slate-500">
                 Changes this user made. Reads and page views are not recorded, so
                 this is what they did — not what they looked at.
               </p>
 
               {data.activity.items.length === 0 ? (
-                <p className="mt-3 text-[13px] text-slate-500">
+                <p className="mt-3 text-[0.8125rem] text-slate-500">
                   Nothing recorded for this user yet.
                 </p>
               ) : (
                 <div className="mt-3 overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-slate-200 text-left text-[10px] uppercase tracking-[0.14em] text-slate-500">
+                      <tr className="border-b border-slate-200 text-left text-[0.75rem] font-medium text-slate-500">
                         <th className="pb-2 pr-4 font-medium">When</th>
                         <th className="pb-2 pr-4 font-medium">Action</th>
                         <th className="pb-2 pr-4 font-medium">Entity</th>
@@ -305,7 +305,7 @@ export default function UserDetailPage() {
                           <td className="py-2 pr-4 text-slate-700">
                             {formatDateTime(a.createdAt)}
                           </td>
-                          <td className="py-2 pr-4 font-mono text-[12px] text-slate-600">
+                          <td className="py-2 pr-4 font-mono text-[0.75rem] text-slate-600">
                             {a.action}
                           </td>
                           <td className="py-2 pr-4 text-slate-600">
@@ -314,7 +314,7 @@ export default function UserDetailPage() {
                               <span className="text-slate-400"> #{a.entityId}</span>
                             )}
                           </td>
-                          <td className="py-2 font-mono text-[12px] text-slate-500">
+                          <td className="py-2 font-mono text-[0.75rem] text-slate-500">
                             {a.ipAddress ?? "—"}
                           </td>
                         </tr>

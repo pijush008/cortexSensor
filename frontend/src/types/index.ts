@@ -78,6 +78,8 @@ export interface Project {
   offset: number;
   createdBy: number;
   deviceId: string | null;
+  /** Resolved from the device row by the list endpoint; absent on some shapes. */
+  deviceName?: string | null;
   sensorId: string | null;
   createdAt: string;
   contractorId: number | null;

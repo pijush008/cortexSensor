@@ -185,6 +185,7 @@ export default function DashboardPage() {
                     value={count(data?.upcomingProjects)}
                     accent="blue"
                     hint="Contracts in pipeline"
+                    href="/projects?status=not_start"
                   />
                 </Reveal>
                 <Reveal delay={60}>
@@ -194,6 +195,7 @@ export default function DashboardPage() {
                     value={count(data?.runningProjects)}
                     accent="green"
                     hint="Active structures"
+                    href="/projects?status=start"
                     delta={deltaOf(projectSeries)}
                     spark={sparkOf(projectSeries)}
                   />
@@ -205,6 +207,7 @@ export default function DashboardPage() {
                     value={count(data?.pausedProjects)}
                     accent="yellow"
                     hint="Awaiting permits"
+                    href="/projects?status=pause"
                   />
                 </Reveal>
                 <Reveal delay={180}>
@@ -214,6 +217,7 @@ export default function DashboardPage() {
                     value={count(data?.ongoingDevices ?? data?.totalDevices)}
                     accent="navy"
                     hint="Sensors + gateways"
+                    href="/devices"
                     delta={deltaOf(deviceSeries)}
                     spark={sparkOf(deviceSeries)}
                   />
@@ -250,6 +254,7 @@ export default function DashboardPage() {
                             title="Admins"
                             value={count(data?.adminCount)}
                             accent="navy"
+                            href="/users?tab=admin"
                           />
                         )}
                         <StatCard
@@ -257,12 +262,14 @@ export default function DashboardPage() {
                           title="Contractors"
                           value={count(data?.contractorCount)}
                           accent="red"
+                          href="/users?tab=contractor"
                         />
                         <StatCard
                           icon={HardHat}
                           title="Authorities"
                           value={count(data?.authorityCount)}
                           accent="purple"
+                          href="/users?tab=authority"
                         />
                       </div>
                     </Reveal>
@@ -313,12 +320,12 @@ export default function DashboardPage() {
                                     <PulseDot tone={tone} />
                                     <div className="min-w-0 flex-1">
                                       <div className="flex items-baseline justify-between gap-2">
-                                        <span className="truncate font-mono text-[11px] font-semibold text-slate-800">
+                                        <span className="truncate font-mono text-[0.6875rem] font-semibold text-slate-800">
                                           {n.gatewayDeviceId ??
                                             n.deviceName ??
                                             "Unknown node"}
                                         </span>
-                                        <span className="shrink-0 text-[10.5px] text-slate-400">
+                                        <span className="shrink-0 text-[0.65625rem] text-slate-400">
                                           {formatDateTime(n.createdAt)}
                                         </span>
                                       </div>
@@ -332,7 +339,7 @@ export default function DashboardPage() {
                                         />
                                       </div>
                                     </div>
-                                    <span className="flex shrink-0 items-center gap-1 font-mono text-[10px] tabular-nums text-slate-500">
+                                    <span className="flex shrink-0 items-center gap-1 font-mono text-[0.625rem] tabular-nums text-slate-500">
                                       <Battery
                                         className="h-3.5 w-3.5"
                                         strokeWidth={1.75}

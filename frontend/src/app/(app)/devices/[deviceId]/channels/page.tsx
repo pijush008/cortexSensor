@@ -16,7 +16,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Reveal } from "@/components/ui/reveal";
-import { SectionLabel } from "@/components/ui/section-label";
 import { Select } from "@/components/ui/select";
 import { LoadingState } from "@/components/ui/loading-state";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -215,7 +214,6 @@ export default function ChannelViewPage({
               <CardHeader>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <SectionLabel index="28" label="Channel map" className="mb-2" />
                     <CardTitle className="flex items-center gap-2">
                       <Cpu className="h-5 w-5 text-shm-navy-700" strokeWidth={1.75} />
                       Channels &amp; Assigned Sensors
@@ -242,7 +240,7 @@ export default function ChannelViewPage({
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-200 text-left text-[10px] uppercase tracking-[0.14em] text-slate-500">
+                    <tr className="border-b border-slate-200 text-left text-[0.75rem] font-medium text-slate-500">
                       <th className="pb-3 pr-4 font-medium">Channel</th>
                       <th className="pb-3 pr-4 font-medium">Assigned Sensor</th>
                       <th className="pb-3 pr-4 font-medium">Type</th>
@@ -390,7 +388,6 @@ export default function ChannelViewPage({
           <Reveal>
             <Card>
               <CardHeader>
-                <SectionLabel index="29" label="Reassign" className="mb-2" />
                 <CardTitle className="flex items-center gap-2">
                   <GitCompareArrows className="h-5 w-5 text-shm-navy-700" strokeWidth={1.75} />
                   Swap Channel Sensors

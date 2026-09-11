@@ -40,12 +40,30 @@ services:
       # container is nothing — every analysis run fails while the engine sits
       # healthy one hop away. Host-run tests hide it, because 8000 is published.
       SHM_ENGINE_URL: "http://python-shm:8000"
-      # Origin used to build links that are EMAILED to people — verification and
-      # password reset. Must be an address the recipient's browser can open, so
-      # it is the app's own origin rather than the backend's port: getBaseUrl()
-      # otherwise falls back to http://localhost:3001, which nobody browses.
-      BASE_URL: "http://localhost:3000"
-      APP_URL: "http://localhost:3000"
+      # Origin used to build links that are EMAILED to people — verification,
+      # password reset and project invitations. Must be an address the
+      # RECIPIENT'S browser can open, so it is the app's own origin rather than
+      # the backend's port: getBaseUrl() otherwise falls back to
+      # http://localhost:3001, which nobody browses.
+      #
+      # Read from the environment rather than written here, because the correct
+      # value is a property of the deployment, not of this file. Set APP_URL in
+      # a .env file next to this compose file (or export it) to point emailed
+      # links at a real host:
+      #
+      #   APP_URL=https://shm.example.com
+      #
+      # Both names are set from the ONE variable on purpose. They mean the same
+      # thing — the origin an emailed link should point at — and are read by
+      # different code paths (getBaseUrl in utils/helper for verification mail,
+      # config.appUrl for password resets, invitations and the Google redirect).
+      # Letting them drift would mean one kind of email working and another
+      # silently pointing somewhere nobody can reach.
+      #
+      # The fallback is the address this stack publishes locally, so an
+      # unconfigured checkout still behaves exactly as it did.
+      BASE_URL: "${APP_URL:-http://localhost:3000}"
+      APP_URL: "${APP_URL:-http://localhost:3000}"
       # Billing. The webhook verifies an HMAC over the raw body; with no secret
       # the endpoint refuses rather than accepting unsigned traffic.
       BILLING_ENABLED: "true"

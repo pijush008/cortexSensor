@@ -1,6 +1,9 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useParamFilter } from "@/hooks/use-param-filter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Pencil, Trash2, Gauge, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,7 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Reveal } from "@/components/ui/reveal";
-import { SectionLabel } from "@/components/ui/section-label";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -27,7 +29,13 @@ const EMPTY_FORM = {
   unit: "",
 };
 
+/** Calibration states the sensor list can be narrowed to. */
+const SENSOR_FILTERS = ["all", "calibrated", "uncalibrated"] as const;
+
+type SensorFilter = (typeof SENSOR_FILTERS)[number];
+
 export default function SensorsPage() {
+  const router = useRouter();
   const { userType } = useAuthStore();
   const isSuperAdmin = userType === "superadmin";
   const queryClient = useQueryClient();
@@ -38,6 +46,16 @@ export default function SensorsPage() {
   const { data: sensorTypes = [] } = useSensorTypes();
 
   const [search, setSearch] = useState("");
+  // The list had search only, so the Calibrated tile had nothing to drill into.
+  const [calibration, setCalibration] = useParamFilter(
+    "calibration",
+    SENSOR_FILTERS,
+    "all",
+  );
+  // Two tiles count reference/roll-up data rather than sensors, so their detail
+  // is a listing of their own rather than a filtered sensor list.
+  const [showTypeList, setShowTypeList] = useState(false);
+  const [showAdmins, setShowAdmins] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showTypeModal, setShowTypeModal] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -101,9 +119,33 @@ export default function SensorsPage() {
       setError((err as Error).message || "Failed to save sensor type"),
   });
 
-  const filtered = sensors.filter((s) =>
-    !search || s.sensorName.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = sensors.filter((s) => {
+    const matchesSearch =
+      !search || s.sensorName.toLowerCase().includes(search.toLowerCase());
+    const matchesCalibration =
+      calibration === "all" ||
+      (calibration === "calibrated"
+        ? s.calibrationValue != null
+        : s.calibrationValue == null);
+    return matchesSearch && matchesCalibration;
+  });
+
+  /** Distinct admins holding at least one sensor, with how many each holds. */
+  const adminLoad = Object.values(
+    sensors.reduce<Record<number, { id: number; name: string; count: number }>>(
+      (acc, s) => {
+        if (s.adminId == null) return acc;
+        acc[s.adminId] ??= {
+          id: s.adminId,
+          name: s.firstName ?? `User #${s.adminId}`,
+          count: 0,
+        };
+        acc[s.adminId].count += 1;
+        return acc;
+      },
+      {},
+    ),
+  ).sort((a, b) => b.count - a.count);
 
   const openAdd = () => {
     setEditing(null);
@@ -151,7 +193,10 @@ export default function SensorsPage() {
           icon={Gauge}
           accent="navy"
           delta="registered fleet"
-          className="anim-fade-up"
+          onClick={() => {
+            setCalibration("all");
+            setSearch("");
+          }}
         />
         <StatCard
           title="Sensor types"
@@ -159,7 +204,7 @@ export default function SensorsPage() {
           icon={Gauge}
           accent="blue"
           delta="available types"
-          className="anim-fade-up [animation-delay:80ms]"
+          onClick={() => setShowTypeList(true)}
         />
         <StatCard
           title="Calibrated"
@@ -167,7 +212,7 @@ export default function SensorsPage() {
           icon={Gauge}
           accent="green"
           delta="with calibration"
-          className="anim-fade-up [animation-delay:160ms]"
+          onClick={() => setCalibration("calibrated")}
         />
         <StatCard
           title="Admins assigned"
@@ -175,7 +220,7 @@ export default function SensorsPage() {
           icon={Gauge}
           accent="yellow"
           delta="managing sensors"
-          className="anim-fade-up [animation-delay:240ms]"
+          onClick={() => setShowAdmins(true)}
         />
       </div>
 
@@ -184,15 +229,27 @@ export default function SensorsPage() {
           <CardHeader>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <SectionLabel index="13" label="Sensor registry" className="mb-2" />
                 <CardTitle>Sensor List</CardTitle>
               </div>
-              <Input
-                placeholder="Search sensors…"
-                value={search}
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <Input
+                  placeholder="Search sensors…"
+                  value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="sm:w-64"
-              />
+                  className="sm:w-64"
+                />
+                <Select
+                  value={calibration}
+                  onChange={(e) =>
+                    setCalibration(e.target.value as SensorFilter)
+                  }
+                  options={[
+                    { value: "all", label: "All sensors" },
+                    { value: "calibrated", label: "Calibrated" },
+                    { value: "uncalibrated", label: "Not calibrated" },
+                  ]}
+                />
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -230,7 +287,7 @@ export default function SensorsPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-200 text-left text-[10px] uppercase tracking-[0.14em] text-slate-500">
+                    <tr className="border-b border-slate-200 text-left text-[0.75rem] font-medium text-slate-500">
                       <th className="pb-3 pr-4 font-medium">Sensor Name</th>
                       <th className="pb-3 pr-4 font-medium">Type</th>
                       <th className="pb-3 pr-4 font-medium">Calibration</th>
@@ -243,10 +300,17 @@ export default function SensorsPage() {
                   {filtered.map((s) => (
                     <tr
                       key={s.sensorId}
-                      className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
+                      onClick={() => router.push(`/sensors/${s.sensorId}`)}
+                      className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-slate-50"
                     >
                       <td className="py-3 pr-4 font-medium text-slate-800">
-                        {s.sensorName}
+                        <Link
+                          href={`/sensors/${s.sensorId}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="underline-offset-2 hover:underline"
+                        >
+                          {s.sensorName}
+                        </Link>
                       </td>
                       <td className="py-3 pr-4 text-slate-600">{s.sensorType}</td>
                       <td className="py-3 pr-4 font-mono text-slate-600">
@@ -259,7 +323,7 @@ export default function SensorsPage() {
                         {s.firstName ? `${s.firstName} (${s.adminId})` : "—"}
                       </td>
                       {isSuperAdmin && (
-                        <td className="py-3">
+                        <td className="py-3" onClick={(e) => e.stopPropagation()}>
                           <div className="flex gap-1">
                             <Button
                               variant="ghost"
@@ -291,6 +355,82 @@ export default function SensorsPage() {
         </CardContent>
       </Card>
       </Reveal>
+
+      <Modal
+        open={showTypeList}
+        onClose={() => setShowTypeList(false)}
+        title="Sensor types"
+        subtitle={`${sensorTypes.length} type${sensorTypes.length === 1 ? "" : "s"} available`}
+      >
+        {sensorTypes.length === 0 ? (
+          <p className="text-sm text-slate-500">No sensor types are configured.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-left font-mono text-[0.75rem] font-medium text-slate-500">
+                <th className="pb-2">Type</th>
+                <th className="pb-2">Unit</th>
+                <th className="pb-2">Calibration</th>
+                <th className="pb-2 text-right">Sensors</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sensorTypes.map((t: SensorType) => (
+                <tr key={t.id} className="border-b border-slate-100 last:border-0">
+                  <td className="py-2 font-medium text-slate-800">{t.sensorType}</td>
+                  <td className="py-2 text-slate-600">{t.unit ?? "—"}</td>
+                  <td className="py-2 font-mono text-xs text-slate-500">
+                    {t.calibrationValue || "—"}
+                  </td>
+                  <td className="py-2 text-right tabular-nums text-slate-600">
+                    {sensors.filter((x) => x.sensorTypeID === t.id).length}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Modal>
+
+      <Modal
+        open={showAdmins}
+        onClose={() => setShowAdmins(false)}
+        title="Admins assigned"
+        subtitle={`${adminLoad.length} admin${adminLoad.length === 1 ? "" : "s"} managing sensors`}
+      >
+        {adminLoad.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            No sensors are assigned to an admin yet.
+          </p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-left font-mono text-[0.75rem] font-medium text-slate-500">
+                <th className="pb-2">Admin</th>
+                <th className="pb-2 text-right">Sensors</th>
+              </tr>
+            </thead>
+            <tbody>
+              {adminLoad.map((a) => (
+                <tr key={a.id} className="border-b border-slate-100 last:border-0">
+                  <td className="py-2">
+                    <Link
+                      href={`/users/${a.id}`}
+                      className="font-medium text-shm-navy-700 underline-offset-2 hover:underline"
+                      onClick={() => setShowAdmins(false)}
+                    >
+                      {a.name}
+                    </Link>
+                  </td>
+                  <td className="py-2 text-right tabular-nums text-slate-600">
+                    {a.count}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Modal>
 
       <Modal
         open={showModal}

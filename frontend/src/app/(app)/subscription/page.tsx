@@ -15,7 +15,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Reveal } from "@/components/ui/reveal";
-import { SectionLabel } from "@/components/ui/section-label";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { LoadingState } from "@/components/ui/loading-state";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -322,7 +321,6 @@ export default function SubscriptionPage() {
       <Reveal>
         <Card>
           <CardHeader>
-            <SectionLabel index="23" label="Entitlements" className="mb-2" />
             <CardTitle>Plan Entitlements</CardTitle>
           </CardHeader>
           <CardContent>
@@ -347,7 +345,6 @@ export default function SubscriptionPage() {
       <Reveal>
         <Card>
           <CardHeader>
-            <SectionLabel index="24" label="Receipts" className="mb-2" />
             <CardTitle>Billing History</CardTitle>
           </CardHeader>
           <CardContent className={invoices.length ? "" : "py-6"}>
@@ -361,7 +358,7 @@ export default function SubscriptionPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-200 text-left text-[10px] uppercase tracking-[0.14em] text-slate-500">
+                    <tr className="border-b border-slate-200 text-left text-[0.75rem] font-medium text-slate-500">
                       <th className="pb-3 pr-4 font-medium">Invoice</th>
                       <th className="pb-3 pr-4 font-medium">Period</th>
                       <th className="pb-3 pr-4 font-medium">Amount</th>
@@ -405,7 +402,6 @@ export default function SubscriptionPage() {
       <Reveal>
         <Card>
           <CardHeader>
-            <SectionLabel index="25" label="Billing detail" className="mb-2" />
             <CardTitle>Payment Method</CardTitle>
           </CardHeader>
           <CardContent className="flex items-center justify-between">

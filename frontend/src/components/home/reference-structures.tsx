@@ -22,12 +22,12 @@ export function ReferenceStructures() {
       <div className="rule-spectrum" aria-hidden="true" />
       <div className="mx-auto max-w-[92rem] px-5 py-20 sm:px-8 lg:py-28">
         <Motion variant="rise" className="grid gap-8 lg:grid-cols-[minmax(0,30rem)_1fr] lg:items-end">
-          <h2 className="text-[30px] font-bold leading-[1.08] tracking-[-0.028em] text-sheet-ink sm:text-[40px]">
+          <h2 className="text-[1.875rem] font-bold leading-[1.08] tracking-[-0.028em] text-sheet-ink sm:text-[2.5rem]">
             Four structures.
             <br />
             One scale.
           </h2>
-          <p className="max-w-[62ch] text-[16px] leading-[1.65] text-sheet-ink/70 lg:justify-self-end lg:text-right">
+          <p className="max-w-[62ch] text-[1rem] leading-[1.65] text-sheet-ink/70 lg:justify-self-end lg:text-right">
             A rail arch in the Himalaya, a gravity dam on the Sutlej, a
             cable-stayed sea crossing, and a riveted cantilever from 1943. Drawn
             together, they stop being a list of bridges and become four
@@ -46,7 +46,7 @@ export function ReferenceStructures() {
             <ComparativePlate />
           </Motion>
         </div>
-        <p className="mt-3 font-mono text-[11px] text-sheet-ink/45 lg:hidden">
+        <p className="mt-3 font-mono text-[0.6875rem] text-sheet-ink/45 lg:hidden">
           Scroll the drawing sideways to compare
         </p>
 
@@ -58,30 +58,30 @@ export function ReferenceStructures() {
         >
           {REFERENCE_STRUCTURES.map((s) => (
             <li key={s.id}>
-              <h3 className="text-[15.5px] font-semibold tracking-[-0.01em] text-sheet-ink">
+              <h3 className="text-[0.96875rem] font-semibold tracking-[-0.01em] text-sheet-ink">
                 {s.name}
               </h3>
-              <p className="mt-1 text-[12.5px] text-sheet-ink/55">{s.place}</p>
+              <p className="mt-1 text-[0.78125rem] text-sheet-ink/55">{s.place}</p>
 
               <dl className="mt-4 space-y-1.5 border-t border-sheet-ink/12 pt-3">
                 {s.dimensions.map((d) => (
                   <div key={d.label} className="flex items-baseline justify-between gap-3">
-                    <dt className="text-[12.5px] text-sheet-ink/55">{d.label}</dt>
-                    <dd className="font-mono text-[13px] font-medium tabular-nums text-sheet-ink">
+                    <dt className="text-[0.78125rem] text-sheet-ink/55">{d.label}</dt>
+                    <dd className="font-mono text-[0.8125rem] font-medium tabular-nums text-sheet-ink">
                       {d.value}
                     </dd>
                   </div>
                 ))}
               </dl>
 
-              <p className="mt-4 text-[13.5px] leading-[1.6] text-sheet-ink/75">
+              <p className="mt-4 text-[0.84375rem] leading-[1.6] text-sheet-ink/75">
                 {s.question}
               </p>
             </li>
           ))}
         </Stagger>
 
-        <p className="mt-12 max-w-[76ch] border-l-2 border-sheet-rust/60 pl-4 text-[13px] leading-[1.6] text-sheet-ink/55">
+        <p className="mt-12 max-w-[76ch] border-l-2 border-sheet-rust/60 pl-4 text-[0.8125rem] leading-[1.6] text-sheet-ink/55">
           Dimensions are published figures, shown to illustrate the classes of
           structure this platform is built for. These are not Cloudglance
           installations, and no monitoring data is shown for them.

@@ -39,7 +39,7 @@ export function BrandLoader({ label = "Loading" }: { label?: string }) {
         </div>
         <p
           aria-hidden="true"
-          className="mt-3 text-center font-mono text-[11px] tracking-[0.14em] text-sheet-ink/45"
+          className="mt-3 text-center font-mono text-[0.6875rem] tracking-[0.14em] text-sheet-ink/45"
         >
           {label.toUpperCase()}
         </p>

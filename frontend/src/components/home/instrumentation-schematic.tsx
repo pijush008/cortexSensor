@@ -189,7 +189,7 @@ export function InstrumentationSchematic() {
         </g>
       </svg>
 
-      <figcaption className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-sheet-ink/12 pt-3 font-mono text-[11px] text-sheet-ink/55">
+      <figcaption className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-sheet-ink/12 pt-3 font-mono text-[0.6875rem] text-sheet-ink/55">
         <span>Typical instrumentation — schematic</span>
         <span className="flex flex-wrap gap-x-4">
           <span>S strain</span>

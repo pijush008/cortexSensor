@@ -1,6 +1,9 @@
 "use client";
 
+import Link from "next/link";
+
 import { useState } from "react";
+import { useParamFilter } from "@/hooks/use-param-filter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { Plus, Pencil, Trash2, Boxes, Cpu, SearchX } from "lucide-react";
@@ -9,7 +12,6 @@ import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Reveal } from "@/components/ui/reveal";
-import { SectionLabel } from "@/components/ui/section-label";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
@@ -36,6 +38,11 @@ const STATUS_TONE: Record<string, StatusTone> = {
   inactive: "slate",
 };
 
+/** Filter values shared by the Select, the stat tiles and ?status. */
+const DEVICE_STATUSES = ["all", "active", "inactive"] as const;
+
+type DeviceStatusFilter = (typeof DEVICE_STATUSES)[number];
+
 export default function DevicesPage() {
   const { userType } = useAuthStore();
   const isSuperAdmin = userType === "superadmin";
@@ -49,8 +56,16 @@ export default function DevicesPage() {
   const { data: deviceTypes = [] } = useDeviceTypes();
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  // Seeded from ?status so a link into this page can arrive pre-filtered.
+  const [statusFilter, setStatusFilter] = useParamFilter(
+    "status",
+    DEVICE_STATUSES,
+    "all",
+  );
   const [showModal, setShowModal] = useState(false);
+  // "Device types" counts reference data, not devices, so there is no list to
+  // filter — the detail behind that number is the set of types itself.
+  const [showTypes, setShowTypes] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [editing, setEditing] = useState<Device | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -141,7 +156,7 @@ export default function DevicesPage() {
           icon={Boxes}
           accent="navy"
           delta="fleet-wide"
-          className="anim-fade-up"
+          onClick={() => setStatusFilter("all")}
         />
         <StatCard
           title="Active"
@@ -149,7 +164,7 @@ export default function DevicesPage() {
           icon={Cpu}
           accent="green"
           delta="reporting telemetry"
-          className="anim-fade-up [animation-delay:80ms]"
+          onClick={() => setStatusFilter("active")}
         />
         <StatCard
           title="Inactive"
@@ -157,7 +172,7 @@ export default function DevicesPage() {
           icon={Cpu}
           accent="yellow"
           delta="not reporting"
-          className="anim-fade-up [animation-delay:160ms]"
+          onClick={() => setStatusFilter("inactive")}
         />
         <StatCard
           title="Device types"
@@ -165,7 +180,7 @@ export default function DevicesPage() {
           icon={Boxes}
           accent="blue"
           delta="available types"
-          className="anim-fade-up [animation-delay:240ms]"
+          onClick={() => setShowTypes(true)}
         />
       </div>
 
@@ -174,7 +189,6 @@ export default function DevicesPage() {
           <CardHeader>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <SectionLabel index="12" label="Fleet inventory" className="mb-2" />
                 <CardTitle>Device List</CardTitle>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row">
@@ -186,7 +200,9 @@ export default function DevicesPage() {
               />
               <Select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={(e) =>
+                  setStatusFilter(e.target.value as DeviceStatusFilter)
+                }
                 options={[
                   { value: "all", label: "All statuses" },
                   { value: "active", label: "Active" },
@@ -240,7 +256,7 @@ export default function DevicesPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-left text-[10px] uppercase tracking-[0.14em] text-slate-500">
+                  <tr className="border-b border-slate-200 text-left text-[0.75rem] font-medium text-slate-500">
                     <th className="pb-3 pr-4 font-medium">Device Name</th>
                     <th className="pb-3 pr-4 font-medium">Type</th>
                     <th className="pb-3 pr-4 font-medium">Device ID</th>
@@ -262,10 +278,17 @@ export default function DevicesPage() {
                     return (
                       <tr
                         key={d.id}
-                        className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
+                        onClick={() => router.push(`/devices/${d.id}`)}
+                        className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-slate-50"
                       >
                         <td className="py-3 pr-4 font-medium text-slate-800">
-                          {d.deviceName}
+                          <Link
+                            href={`/devices/${d.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="underline-offset-2 hover:underline"
+                          >
+                            {d.deviceName}
+                          </Link>
                         </td>
                         <td className="py-3 pr-4 text-slate-600">{typeName}</td>
                         <td className="py-3 pr-4 font-mono text-slate-600">
@@ -290,7 +313,7 @@ export default function DevicesPage() {
                           {d.assignedAdmin ? `#${d.assignedAdmin}` : "—"}
                         </td>
                         {isSuperAdmin && (
-                          <td className="py-3">
+                          <td className="py-3" onClick={(e) => e.stopPropagation()}>
                             <div className="flex gap-1">
                               <Button
                                 variant="ghost"
@@ -311,7 +334,7 @@ export default function DevicesPage() {
                             </div>
                           </td>
                         )}
-                        <td className="py-3">
+                        <td className="py-3" onClick={(e) => e.stopPropagation()}>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -335,6 +358,38 @@ export default function DevicesPage() {
         </CardContent>
       </Card>
       </Reveal>
+
+      <Modal
+        open={showTypes}
+        onClose={() => setShowTypes(false)}
+        title="Device types"
+        subtitle={`${deviceTypes.length} type${deviceTypes.length === 1 ? "" : "s"} available`}
+      >
+        {deviceTypes.length === 0 ? (
+          <p className="text-sm text-slate-500">No device types are configured.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-left font-mono text-[0.75rem] font-medium text-slate-500">
+                <th className="pb-2">Type</th>
+                <th className="pb-2">ID</th>
+                <th className="pb-2 text-right">Devices</th>
+              </tr>
+            </thead>
+            <tbody>
+              {deviceTypes.map((t: DeviceType) => (
+                <tr key={t.deviceTypeId} className="border-b border-slate-100 last:border-0">
+                  <td className="py-2 font-medium text-slate-800">{t.deviceType}</td>
+                  <td className="py-2 font-mono text-xs text-slate-500">{t.deviceTypeId}</td>
+                  <td className="py-2 text-right tabular-nums text-slate-600">
+                    {devices.filter((d) => d.deviceType === t.deviceTypeId).length}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Modal>
 
       <Modal
         open={showModal}

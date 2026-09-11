@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Menu, Bell, ChevronRight } from "lucide-react";
+import { Menu, ChevronRight } from "lucide-react";
 import { ImpersonationBanner } from "./impersonation-banner";
+import { NotificationsBell } from "./notifications-bell";
 import { Avatar } from "@/components/ui/avatar";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "./sidebar";
@@ -11,6 +12,21 @@ import { PulseDot } from "@/components/ui/pulse-dot";
 import { useAuthStore } from "@/stores/auth-store";
 import { useMe } from "@/hooks/use-me";
 import { capitalize } from "@/lib/utils";
+
+/**
+ * The identity tile for a platform operator.
+ *
+ * A platform admin belongs to no organization, so `tenant` is null and there is
+ * no logo to show — the tile fell back to the first letter of "superadmin". The
+ * platform itself is the operator's organization, so it wears the Cloudglance
+ * mark instead.
+ *
+ * The isolated cloud, not the full lockup: the tile is 28px square, and the
+ * lockup is a 4.75:1 wordmark that object-contain would shrink to an
+ * unreadable 28x6 sliver.
+ */
+const PLATFORM_LOGO = "/brand/cloudglance-mark.png";
+const PLATFORM_NAME = "Cloudglance Sensinglab Pvt Ltd";
 
 const ROUTE_LABELS: Record<string, string> = {
   dashboard: "Operations",
@@ -102,43 +118,45 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Menu className="h-5 w-5" />
             </Button>
             {/* breadcrumb */}
-            <div className="hidden min-w-0 items-center gap-1.5 font-mono text-[11px] sm:flex">
-              <span className="font-semibold uppercase tracking-[0.18em] text-shm-navy-600">
-                SHM
-              </span>
+            <div className="hidden min-w-0 items-center gap-1.5 text-[0.78125rem] sm:flex">
+              <span className="font-medium text-shm-navy-700">SHM</span>
               <ChevronRight className="h-3 w-3 text-slate-300" />
-              <span className="truncate uppercase tracking-[0.18em] text-slate-400">
-                {moduleLabel}
-              </span>
+              <span className="truncate text-slate-500">{moduleLabel}</span>
             </div>
             <PulseDot tone="green" className="sm:hidden" />
           </div>
 
           <div className="flex shrink-0 items-center gap-2.5">
             {/* live clock */}
-            <div className="hidden items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-mono text-[11px] text-slate-500 md:flex">
+            <div className="hidden items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-mono text-[0.6875rem] text-slate-500 md:flex">
               <PulseDot tone="green" />
               <span className="tabular-nums tracking-wide">{utc}</span>
             </div>
 
-            <Button variant="ghost" size="icon" className="relative text-slate-500" aria-label="Notifications">
-              <Bell className="h-[18px] w-[18px]" strokeWidth={1.75} />
-              <span className="absolute right-2 top-2 flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-shm-red opacity-60" style={{ animationDuration: "2.4s" }} />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-shm-red" />
-              </span>
-            </Button>
+            <NotificationsBell />
 
             <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white pl-1 pr-2.5 py-1">
+              {/* Keyed off the SERVER's isPlatformAdmin, for the same reason
+                  userType is: during a view-as session the API answers as the
+                  impersonated user, whose isPlatformAdmin is false, so the tile
+                  correctly shows that tenant rather than the operator's. */}
               <Avatar
-                src={me.data?.tenant?.logoUrl}
-                name={me.data?.tenant?.name}
+                src={
+                  me.data?.isPlatformAdmin
+                    ? PLATFORM_LOGO
+                    : me.data?.tenant?.logoUrl
+                }
+                name={
+                  me.data?.isPlatformAdmin
+                    ? PLATFORM_NAME
+                    : me.data?.tenant?.name
+                }
                 fallback={userType}
                 size="sm"
               />
               <div className="hidden leading-tight sm:block">
                 <p className="text-xs font-medium text-slate-800 capitalize">{capitalize(userType)}</p>
-                <p className="font-mono text-[9.5px] text-slate-400">ID: {userId}</p>
+                <p className="font-mono text-[0.59375rem] text-slate-400">ID: {userId}</p>
               </div>
             </div>
           </div>

@@ -51,11 +51,11 @@ export function PendingCapability({
         <div className="min-w-0">
           <h2
             id="pending-capability-heading"
-            className="text-[15px] font-semibold tracking-tight text-slate-900"
+            className="text-[0.9375rem] font-semibold tracking-tight text-slate-900"
           >
             Not available yet
           </h2>
-          <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-slate-500">
+          <p className="mt-1 max-w-2xl text-[0.8125rem] leading-relaxed text-slate-500">
             {summary}
           </p>
         </div>
@@ -63,36 +63,36 @@ export function PendingCapability({
 
       <div className="grid gap-x-10 gap-y-6 px-6 py-5 sm:grid-cols-2">
         <div>
-          <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+          <p className="font-mono text-[0.625rem] font-semibold uppercase tracking-[0.22em] text-slate-400">
             Requires
           </p>
           <ul className="mt-3 space-y-2">
             {requires.map((item) => (
               <li
                 key={item}
-                className="flex items-baseline gap-2.5 text-[13px] text-slate-600"
+                className="flex items-baseline gap-2.5 text-[0.8125rem] text-slate-600"
               >
                 <span
                   aria-hidden
                   className="h-1 w-1 shrink-0 translate-y-[-2px] rounded-full bg-slate-300"
                 />
-                <span className="font-mono text-[12px]">{item}</span>
+                <span className="font-mono text-[0.75rem]">{item}</span>
               </li>
             ))}
           </ul>
         </div>
 
         <div>
-          <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+          <p className="font-mono text-[0.625rem] font-semibold uppercase tracking-[0.22em] text-slate-400">
             Why this is blank
           </p>
-          <p className="mt-3 max-w-sm text-[13px] leading-relaxed text-slate-600">
+          <p className="mt-3 max-w-sm text-[0.8125rem] leading-relaxed text-slate-600">
             This screen shows no data rather than sample data. Displaying
             representative values here would be indistinguishable from real
             measurements once the platform is monitoring live structures.
           </p>
           {plannedIn && (
-            <p className="mt-3 text-[12px] leading-relaxed text-slate-400">
+            <p className="mt-3 text-[0.75rem] leading-relaxed text-slate-400">
               {plannedIn}
             </p>
           )}

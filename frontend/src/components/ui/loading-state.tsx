@@ -10,7 +10,7 @@ export function LoadingState({ label = "Loading" }: { label?: string }) {
           />
         ))}
       </div>
-      <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-slate-400">{label}</p>
+      <p className="font-mono text-[0.6875rem] uppercase tracking-[0.2em] text-slate-400">{label}</p>
     </div>
   );
 }

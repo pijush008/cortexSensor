@@ -18,6 +18,7 @@ import sensorsRoutes from "./modules/sensors/sensors.routes";
 import sensorTypesRoutes from "./modules/sensors/sensorTypes.routes";
 import assignRoutes from "./modules/sensors/assign.routes";
 import projectsRoutes from "./modules/projects/projects.routes";
+import invitationsRoutes from "./modules/invitations/invitations.routes";
 import dashboardRoutes from "./modules/dashboard/dashboard.routes";
 import reportsRoutes from "./modules/reports/reports.routes";
 import exportsRoutes from "./modules/exports/exports.routes";
@@ -138,6 +139,7 @@ for (const base of API_MOUNTS) {
   app.use(`${base}/sensorType`, sensorTypesRoutes);
   app.use(base, assignRoutes);
   app.use(base, projectsRoutes);
+  app.use(base, invitationsRoutes);
   app.use(`${base}/dashboard`, dashboardRoutes);
   app.use(base, reportsRoutes);
   app.use(base, exportsRoutes);

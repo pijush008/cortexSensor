@@ -113,20 +113,31 @@ export default function AlertsPage() {
           <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {(["critical", "high", "medium", "low", "info"] as AlertSeverity[]).map(
               (s) => (
-                <div
+                <button
                   key={s}
-                  className="rounded-xl border border-slate-200/90 bg-white px-4 py-3"
+                  type="button"
+                  // The page already filters by severity; these counts were the
+                  // obvious way to reach that filter and did nothing. Clicking
+                  // the severity already applied clears it, so the tiles work
+                  // as a toggle rather than trapping the list on one severity.
+                  onClick={() => setSeverity(severity === s ? "" : s)}
+                  aria-pressed={severity === s}
+                  className={`rounded-xl border bg-white px-4 py-3 text-left transition-colors hover:border-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-shm-navy-500 focus-visible:ring-offset-2 ${
+                    severity === s
+                      ? "border-shm-navy-500 ring-1 ring-shm-navy-500"
+                      : "border-slate-200/90"
+                  }`}
                 >
                   <div className="flex items-center gap-2">
                     <span className={`h-2 w-2 rounded-full ${SEVERITY_BAR[s]}`} />
-                    <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                    <span className="font-mono text-[0.75rem] font-medium text-slate-500">
                       {s}
                     </span>
                   </div>
-                  <p className="mt-1.5 font-mono text-[20px] font-semibold tabular-nums text-slate-900">
+                  <p className="mt-1.5 font-mono text-[1.25rem] font-semibold tabular-nums text-slate-900">
                     {summary.bySeverity[s] ?? 0}
                   </p>
-                </div>
+                </button>
               ),
             )}
           </div>
@@ -149,7 +160,7 @@ export default function AlertsPage() {
             ]}
           />
         </div>
-        <label className="flex items-center gap-2 pb-2.5 text-[13px] text-slate-600">
+        <label className="flex items-center gap-2 pb-2.5 text-[0.8125rem] text-slate-600">
           <input
             type="checkbox"
             checked={activeOnly}
@@ -211,7 +222,7 @@ function AlertRow({
               tone={SEVERITY_TONE[alert.severity]}
             />
             {/* Category sits beside severity, never folded into it. */}
-            <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+            <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 font-mono text-[0.625rem] font-semibold uppercase tracking-wide text-slate-500">
               {alert.category === "sensor_health" ? (
                 <Wrench className="h-3 w-3" />
               ) : (
@@ -222,11 +233,11 @@ function AlertRow({
             <StatusBadge label={alert.status} tone={STATUS_TONE[alert.status]} />
           </span>
 
-          <span className="mt-1.5 block text-[14px] font-medium text-slate-800">
+          <span className="mt-1.5 block text-[0.875rem] font-medium text-slate-800">
             {alert.title}
           </span>
 
-          <span className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5 font-mono text-[11.5px] text-slate-500">
+          <span className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5 font-mono text-[0.71875rem] text-slate-500">
             {alert.evidence.observedValue !== undefined && (
               <span>
                 observed {alert.evidence.observedValue} vs limit{" "}
@@ -301,10 +312,10 @@ function AlertDrawer({ id, onClose }: { id: number | null; onClose: () => void }
           {/* Evidence: the numbers behind the claim, so an engineer can check
               it rather than take it on trust. */}
           <section>
-            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+            <p className="font-mono text-[0.75rem] font-medium text-slate-500">
               Evidence
             </p>
-            <dl className="mt-2 space-y-1.5 text-[13px]">
+            <dl className="mt-2 space-y-1.5 text-[0.8125rem]">
               <Row label="Rule" value={alert.evidence.rule} />
               <Row
                 label="Limit"
@@ -333,7 +344,7 @@ function AlertDrawer({ id, onClose }: { id: number | null; onClose: () => void }
               />
             </dl>
             {alert.evidence.severityRationale && (
-              <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-[12px] leading-relaxed text-slate-600">
+              <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-[0.75rem] leading-relaxed text-slate-600">
                 <span className="font-semibold">Severity derivation: </span>
                 {alert.evidence.severityRationale}
               </p>
@@ -342,25 +353,25 @@ function AlertDrawer({ id, onClose }: { id: number | null; onClose: () => void }
 
           {/* Timeline: who knew what, when. */}
           <section>
-            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+            <p className="font-mono text-[0.75rem] font-medium text-slate-500">
               History
             </p>
             <ol className="mt-2 space-y-2">
               {alert.events.map((e) => (
                 <li key={e.id} className="border-l-2 border-slate-200 pl-3">
-                  <p className="text-[12.5px] text-slate-700">
+                  <p className="text-[0.78125rem] text-slate-700">
                     {e.fromStatus ? `${e.fromStatus} → ` : ""}
                     <span className="font-medium">{e.toStatus}</span>
                     {e.isAutomatic && (
-                      <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] uppercase text-slate-500">
+                      <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[0.625rem] uppercase text-slate-500">
                         detector
                       </span>
                     )}
                   </p>
                   {e.note && (
-                    <p className="mt-0.5 text-[12px] text-slate-500">{e.note}</p>
+                    <p className="mt-0.5 text-[0.75rem] text-slate-500">{e.note}</p>
                   )}
-                  <p className="mt-0.5 font-mono text-[10.5px] text-slate-400">
+                  <p className="mt-0.5 font-mono text-[0.65625rem] text-slate-400">
                     {new Date(e.createdAt).toLocaleString()}
                   </p>
                 </li>
@@ -371,7 +382,7 @@ function AlertDrawer({ id, onClose }: { id: number | null; onClose: () => void }
           {alert.status !== "resolved" && alert.status !== "closed" && (
             <section className="space-y-2 border-t border-slate-100 pt-4">
               {error && (
-                <p role="alert" className="text-[12.5px] text-shm-red">
+                <p role="alert" className="text-[0.78125rem] text-shm-red">
                   {error}
                 </p>
               )}
@@ -402,10 +413,10 @@ function AlertDrawer({ id, onClose }: { id: number | null; onClose: () => void }
 
           {alert.resolutionNote && (
             <section className="rounded-lg border border-shm-green/25 bg-shm-green/5 px-3 py-2">
-              <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-shm-green-text">
+              <p className="font-mono text-[0.625rem] font-semibold uppercase tracking-[0.18em] text-shm-green-text">
                 Resolution
               </p>
-              <p className="mt-1 text-[13px] text-slate-700">{alert.resolutionNote}</p>
+              <p className="mt-1 text-[0.8125rem] text-slate-700">{alert.resolutionNote}</p>
             </section>
           )}
         </div>

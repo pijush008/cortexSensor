@@ -17,7 +17,7 @@ export function Select({ options, label, error, className, ...props }: SelectPro
   return (
     <div className="w-full">
       {label && (
-        <label className="mb-1.5 block text-[13px] font-medium text-slate-700">
+        <label className="mb-1.5 block text-[0.8125rem] font-medium text-slate-700">
           {label}
         </label>
       )}

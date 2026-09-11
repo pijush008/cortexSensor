@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Reveal } from "@/components/ui/reveal";
-import { SectionLabel } from "@/components/ui/section-label";
 import { Select } from "@/components/ui/select";
 import { LoadingState } from "@/components/ui/loading-state";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -81,7 +80,6 @@ export default function ReportsPage() {
       <Reveal>
         <Card>
           <CardHeader>
-            <SectionLabel index="17" label="Report configuration" className="mb-2" />
             <CardTitle>Report Configuration</CardTitle>
           </CardHeader>
           <CardContent>

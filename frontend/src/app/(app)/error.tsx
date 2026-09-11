@@ -41,7 +41,7 @@ export default function AppError({
       </p>
 
       {error.digest && (
-        <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.18em] text-slate-400">
+        <p className="mt-3 font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-slate-400">
           Reference {error.digest}
         </p>
       )}

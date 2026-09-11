@@ -18,7 +18,7 @@ export function PageHeader({ title, subtitle, actions, eyebrow, className }: Pag
               <SectionLabel label={eyebrow} />
             </div>
           )}
-          <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-slate-900 sm:text-[30px]">
+          <h1 className="text-[1.625rem] font-semibold leading-tight tracking-tight text-slate-900 sm:text-[1.875rem]">
             {title}
           </h1>
           {subtitle && (
