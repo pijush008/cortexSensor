@@ -303,14 +303,14 @@ export default function RegisterPage() {
             someone re-registering and hitting "Email already exists". */}
         {checkoutError && (
           <div className="mt-6 rounded-lg border border-shm-red/25 bg-shm-red/5 p-3.5">
-            <p className="text-[13px] font-medium text-shm-red">
+            <p className="text-[0.8125rem] font-medium text-shm-red">
               Your account was created, but the payment page could not be
               opened.
             </p>
-            <p className="mt-1 text-[13px] text-slate-600">
+            <p className="mt-1 text-[0.8125rem] text-slate-600">
               {checkoutError.description}
             </p>
-            <p className="mt-2 text-[12px] text-slate-500">
+            <p className="mt-2 text-[0.75rem] text-slate-500">
               Do not register again — the account already exists. Sign in once
               payment has been completed, or contact support.
             </p>
@@ -322,16 +322,16 @@ export default function RegisterPage() {
             on a machine with no SMTP account. */}
         {devVerifyUrl && (
           <div className="mt-6 rounded-lg border border-dashed border-shm-navy-300 bg-shm-navy-50/60 p-3.5">
-            <p className="text-[12px] font-medium uppercase tracking-[0.14em] text-shm-navy-700">
+            <p className="text-[0.75rem] font-medium uppercase tracking-[0.14em] text-shm-navy-700">
               Development only
             </p>
-            <p className="mt-1 text-[13px] text-slate-600">
+            <p className="mt-1 text-[0.8125rem] text-slate-600">
               Mail is not configured, so the verification link is shown here
               instead of being emailed.
             </p>
             <a
               href={devVerifyUrl}
-              className="mt-2 inline-block break-all font-mono text-[12px] text-shm-navy-700 underline"
+              className="mt-2 inline-block break-all font-mono text-[0.75rem] text-shm-navy-700 underline"
             >
               {devVerifyUrl}
             </a>
@@ -359,7 +359,7 @@ export default function RegisterPage() {
             is what is charged. */}
         {plans.length > 0 && (
           <fieldset className="space-y-2">
-            <legend className="mb-2 text-[13px] font-medium text-shm-navy-900">
+            <legend className="mb-2 text-[0.8125rem] font-medium text-shm-navy-900">
               Choose a plan
             </legend>
             <div className="grid gap-2 sm:grid-cols-2">
@@ -384,15 +384,15 @@ export default function RegisterPage() {
                       className="sr-only"
                     />
                     <span className="flex items-baseline justify-between">
-                      <span className="text-[14px] font-semibold text-shm-navy-900">
+                      <span className="text-[0.875rem] font-semibold text-shm-navy-900">
                         {p.name}
                       </span>
-                      <span className="font-mono text-[13px] text-shm-navy-800">
+                      <span className="font-mono text-[0.8125rem] text-shm-navy-800">
                         {formatAmount(p.amountPaise, p.currency)}
-                        <span className="text-[11px] text-slate-500">/mo</span>
+                        <span className="text-[0.6875rem] text-slate-500">/mo</span>
                       </span>
                     </span>
-                    <span className="mt-1.5 block text-[12px] leading-relaxed text-slate-600">
+                    <span className="mt-1.5 block text-[0.75rem] leading-relaxed text-slate-600">
                       {[
                         p.maxStructures && `${p.maxStructures} structures`,
                         p.maxSensors && `${p.maxSensors} sensors`,
@@ -411,7 +411,7 @@ export default function RegisterPage() {
         {error && (
           <div
             role="alert"
-            className="rounded-lg border border-shm-red/20 bg-shm-red/5 px-3.5 py-2.5 text-[13px] text-shm-red"
+            className="rounded-lg border border-shm-red/20 bg-shm-red/5 px-3.5 py-2.5 text-[0.8125rem] text-shm-red"
           >
             <p className="font-medium">{error.title}</p>
             <p className="mt-0.5 text-shm-red/85">{error.description}</p>
@@ -447,7 +447,7 @@ export default function RegisterPage() {
             one gives no preview, and seeing the mark before submitting is the
             whole point of choosing it. */}
         <div className="space-y-1.5">
-          <label className="text-[13px] font-medium text-slate-700">
+          <label className="text-[0.8125rem] font-medium text-slate-700">
             Company logo
           </label>
           <div className="flex items-center gap-3 rounded-lg border border-slate-300 bg-white p-2.5">
@@ -459,7 +459,7 @@ export default function RegisterPage() {
               className="h-12 w-12 rounded-md text-base"
             />
             <div className="min-w-0 flex-1">
-              <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-slate-300 px-2.5 py-1 text-[12.5px] font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50">
+              <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-slate-300 px-2.5 py-1 text-[0.78125rem] font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50">
                 <Upload className="h-3.5 w-3.5" aria-hidden="true" />
                 {companyLogo ? "Change" : "Choose file"}
                 <input
@@ -469,7 +469,7 @@ export default function RegisterPage() {
                   className="sr-only"
                 />
               </label>
-              <p className="mt-1 truncate text-[11.5px] text-slate-500">
+              <p className="mt-1 truncate text-[0.71875rem] text-slate-500">
                 {logoName || `PNG, JPG or WebP · up to ${MAX_LOGO_BYTES / 1024} KB`}
               </p>
             </div>
@@ -527,7 +527,7 @@ export default function RegisterPage() {
           Create account
         </Button>
 
-        <p className="text-center text-[12.5px] text-slate-500">
+        <p className="text-center text-[0.78125rem] text-slate-500">
           Already have an account?{" "}
           <Link href="/login" className="text-shm-navy-600 hover:underline">
             Sign in
@@ -556,10 +556,10 @@ function Shell({
           alt="Cloudglance Sensinglab Pvt Ltd"
           className="h-8 w-auto"
         />
-        <h1 className="mt-6 text-[22px] font-semibold tracking-tight text-slate-900">
+        <h1 className="mt-6 text-[1.375rem] font-semibold tracking-tight text-slate-900">
           {title}
         </h1>
-        <p className="mt-1 text-[13px] text-slate-500">{subtitle}</p>
+        <p className="mt-1 text-[0.8125rem] text-slate-500">{subtitle}</p>
         <div className="mt-6">{children}</div>
       </div>
     </div>
@@ -581,11 +581,11 @@ function Step({
         <Icon className="h-4 w-4 text-shm-navy-700" strokeWidth={1.75} />
       </span>
       <div>
-        <p className="flex items-center gap-1.5 text-[14px] font-medium text-slate-900">
+        <p className="flex items-center gap-1.5 text-[0.875rem] font-medium text-slate-900">
           <CheckCircle2 className="hidden h-3.5 w-3.5" aria-hidden="true" />
           {title}
         </p>
-        <p className="mt-0.5 text-[13px] leading-relaxed text-slate-600">{body}</p>
+        <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-slate-600">{body}</p>
       </div>
     </li>
   );

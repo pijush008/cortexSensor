@@ -12,6 +12,11 @@ import { BrandLoader } from "@/components/ui/brand-loader";
  * person following an emailed reset link is BY DEFINITION signed out. Left off
  * this list, the gate bounced them to /login and the link could never be used.
  * /register is here for the same reason — nobody signing up has a session yet.
+ *
+ * /accept-invite was here too, until project invitations stopped having an
+ * invitee-facing page at all: an administrator now enters the code the invitee
+ * read back to them and records the account themselves, so there is nothing for
+ * a signed-out stranger to visit.
  */
 const PUBLIC_PATHS = ["/login", "/reset-password", "/register"];
 

@@ -18,7 +18,8 @@ export type AuditEntity =
   | "structure"
   | "location"
   | "sensorData"
-  | "subscription";
+  | "subscription"
+  | "projectInvitation";
 
 export type AuditAction =
   | "create"

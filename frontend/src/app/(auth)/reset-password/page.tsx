@@ -36,7 +36,7 @@ function ResetForm() {
   if (!token) {
     return (
       <div className="space-y-4">
-        <p className="text-[13px] text-slate-600">
+        <p className="text-[0.8125rem] text-slate-600">
           This link is incomplete. Reset links expire after an hour and can be
           used once — request a new one and use the most recent email.
         </p>
@@ -52,7 +52,7 @@ function ResetForm() {
   if (done) {
     return (
       <div className="space-y-4">
-        <p className="flex items-start gap-2 text-[13px] text-slate-700">
+        <p className="flex items-start gap-2 text-[0.8125rem] text-slate-700">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-shm-green" />
           <span>
             Your password has been changed, and any other sessions on your
@@ -94,7 +94,7 @@ function ResetForm() {
       {error && (
         <div
           role="alert"
-          className="rounded-lg border border-shm-red/20 bg-shm-red/5 px-3.5 py-2.5 text-[13px] text-shm-red"
+          className="rounded-lg border border-shm-red/20 bg-shm-red/5 px-3.5 py-2.5 text-[0.8125rem] text-shm-red"
         >
           <p className="font-medium">{error.title}</p>
           <p className="mt-0.5 text-shm-red/85">{error.description}</p>
@@ -131,7 +131,7 @@ function ResetForm() {
         Set new password
       </Button>
 
-      <p className="text-center text-[12.5px] text-slate-500">
+      <p className="text-center text-[0.78125rem] text-slate-500">
         <Link href="/login" className="hover:underline">
           Back to sign in
         </Link>
@@ -150,10 +150,10 @@ export default function ResetPasswordPage() {
           alt="Cloudglance Sensinglab Pvt Ltd"
           className="h-8 w-auto"
         />
-        <h1 className="mt-6 text-[22px] font-semibold tracking-tight text-slate-900">
+        <h1 className="mt-6 text-[1.375rem] font-semibold tracking-tight text-slate-900">
           Choose a new password
         </h1>
-        <p className="mt-1 text-[13px] text-slate-500">
+        <p className="mt-1 text-[0.8125rem] text-slate-500">
           Pick something you don&apos;t use anywhere else.
         </p>
 

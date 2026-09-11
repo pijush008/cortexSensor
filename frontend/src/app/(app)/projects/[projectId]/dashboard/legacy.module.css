@@ -1,0 +1,546 @@
+/*
+ * The legacy project dashboard's own look, scoped to this route.
+ *
+ * These values are lifted from the Flutter app's theme_colors.dart and
+ * project_dashboard.dart rather than eyeballed from a screenshot, so the page
+ * matches the tool people already use. They live in a CSS module, not in the
+ * global tokens, because the rest of the console is deliberately a different
+ * design — without the scope these colours would leak into it.
+ */
+
+.root {
+  --legacy-ground: #f2f3f5;
+  --legacy-navy: #041e42;
+  --legacy-navy-800: #062e64;
+  --legacy-steel: rgb(91, 91, 91);
+  --legacy-navy-blue: rgb(67, 67, 91);
+  --legacy-negative: rgb(175, 0, 0);
+  --legacy-green: rgb(55, 151, 69);
+  --legacy-border: rgba(0, 0, 0, 0.25);
+
+  background: var(--legacy-ground);
+  min-height: 100%;
+  margin: -1.5rem;
+  padding: 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: #fff;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.headerIcons {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+/* The emblem row: admin, contractor, authority and the platform operator. */
+.emblem {
+  width: 50px;
+  height: 50px;
+  border-radius: 5px;
+  background: #fff;
+  box-shadow: 0 0 0.5px 0.5px rgba(0, 0, 0, 0.1);
+  object-fit: contain;
+  padding: 0.5px;
+}
+
+.emblemFallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--legacy-steel);
+}
+
+.deviceBadge {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 38px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  color: var(--legacy-navy-blue);
+  background: #fff;
+}
+
+.deviceDot {
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.runBtn,
+.stopBtn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+.runBtn {
+  background: #2196f3;
+}
+
+.stopBtn {
+  background: var(--legacy-negative);
+}
+
+.runBtn:disabled,
+.stopBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.body {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  padding: 0;
+}
+
+.imagesCol {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: #fff;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.imageSlot {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+}
+
+.editBtn {
+  width: 38px;
+  height: 38px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--legacy-steel);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.dashImage {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+.imagePlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 220px;
+  background: var(--legacy-ground);
+  color: var(--legacy-steel);
+  font-size: 13px;
+}
+
+/* Sensors panel. 758px expanded / 310px collapsed, 500px tall, 300ms — the
+   same numbers the Flutter AnimatedSize uses. */
+.sensorsWrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.sensorsPanel {
+  border: 1px solid var(--legacy-border);
+  background: #fff;
+  max-width: 758px;
+  width: 758px;
+  max-height: 500px;
+  overflow: auto;
+  padding: 15px 5px 5px;
+  transition: width 300ms ease;
+}
+
+.sensorsPanelCollapsed {
+  width: 310px;
+}
+
+.sensorsHead {
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.sensorsTitle {
+  font-weight: 700;
+  font-size: 16px;
+  color: #000;
+}
+
+.headActions {
+  position: absolute;
+  right: 8px;
+  display: flex;
+  gap: 10px;
+}
+
+.pill {
+  border-radius: 6px;
+  padding: 4px 14px;
+  font-size: 14px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.pillCancel {
+  border: 1px solid var(--legacy-negative);
+  color: var(--legacy-negative);
+}
+
+.pillDone {
+  border: 1px solid var(--legacy-green);
+  color: var(--legacy-green);
+}
+
+.pillEdit {
+  border: 1px solid var(--legacy-navy-blue);
+  color: var(--legacy-navy-blue);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table th,
+.table td {
+  border: 1px solid var(--legacy-border);
+  padding: 12px 8px;
+  text-align: center;
+  color: #000;
+}
+
+.table th {
+  background: var(--legacy-ground);
+  font-weight: 500;
+}
+
+.cellInput {
+  width: 80px;
+  border: none;
+  outline: none;
+  text-align: center;
+  font-size: 14px;
+  background: transparent;
+  color: #000;
+}
+
+.cellInput:disabled {
+  color: #000;
+}
+
+/* The chevron that collapses the images column, straddling the panel edge. */
+.sideButton {
+  position: absolute;
+  left: -18px;
+  top: 22px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--legacy-border);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--legacy-steel);
+  z-index: 2;
+}
+
+.channels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 20px;
+  padding: 20px;
+}
+
+.channelCard {
+  min-width: 0;
+  background: #fff;
+  border-radius: 5px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.chChip {
+  border: 1px solid var(--legacy-border);
+  border-radius: 4px;
+  padding: 8px 24px;
+  font-size: 15px;
+  background: #fff;
+  color: #000;
+}
+
+.graph {
+  height: 250px;
+  width: 100%;
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--legacy-steel);
+  font-size: 14px;
+}
+
+.valueRows {
+  width: 100%;
+  padding: 0 25px;
+  margin-top: 8px;
+}
+
+.valueRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #000;
+  padding: 6px 0;
+}
+
+.valueRow + .valueRow {
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+@media (max-width: 900px) {
+  .body {
+    flex-direction: column;
+  }
+  .sensorsPanel,
+  .sensorsPanelCollapsed {
+    width: 100%;
+    max-width: 100%;
+  }
+  .channels {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Media panels ─────────────────────────────────────────────────────────
+   The upper slot is a live video feed and the lower one the contractor's
+   project image, so both need a real body area rather than the bare <img>
+   the two interchangeable image slots used to be. */
+
+.mediaBody {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--legacy-ground);
+}
+
+.video {
+  width: 100%;
+  max-height: 320px;
+  background: #000;
+  display: block;
+}
+
+.mediaPlaceholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--legacy-steel);
+  font-size: 13px;
+  text-align: center;
+  padding: 24px;
+}
+
+/* Shown in place of the feed once monitoring has ended. */
+.projectDone {
+  flex: 1 1 auto;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--legacy-ground);
+  color: var(--legacy-green);
+}
+
+.projectDoneTitle {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--legacy-green);
+}
+
+.projectDoneNote {
+  font-size: 12.5px;
+  color: var(--legacy-steel);
+}
+
+.urlForm {
+  width: 100%;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.urlLabel {
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--legacy-steel);
+}
+
+.urlInput {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--legacy-border);
+  border-radius: 4px;
+  font-size: 13px;
+  background: #fff;
+  color: #000;
+}
+
+.urlActions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.uploadError {
+  padding: 8px 12px;
+  font-size: 12.5px;
+  color: var(--legacy-negative);
+  background: #fff;
+}
+
+/* ── Alert recipients ─────────────────────────────────────────────────────
+   Sits beneath the sensors table: the table sets the limits, this says who
+   hears about them being crossed. */
+
+.recipients {
+  border: 1px solid var(--legacy-border);
+  border-top: none;
+  background: #fff;
+  padding: 14px 16px 16px;
+  max-width: 758px;
+}
+
+.recipientsHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--legacy-navy-blue);
+}
+
+.recipientsTitle {
+  font-weight: 700;
+  font-size: 15px;
+  color: #000;
+}
+
+.recipientsNote {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--legacy-steel);
+}
+
+.recipientsEmpty {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--legacy-steel);
+}
+
+.recipientsList {
+  margin-top: 12px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.recipientRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.recipientToggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.recipientWho {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.recipientName {
+  font-size: 13.5px;
+  color: #000;
+}
+
+.recipientAddress {
+  font-size: 12px;
+  color: var(--legacy-steel);
+}
+
+.recipientRemove {
+  border: none;
+  background: none;
+  color: var(--legacy-negative);
+  cursor: pointer;
+  padding: 4px;
+  flex: 0 0 auto;
+}
+
+.recipientForm {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.recipientInput {
+  flex: 1 1 160px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--legacy-border);
+  border-radius: 4px;
+  font-size: 13px;
+  background: #fff;
+  color: #000;
+}

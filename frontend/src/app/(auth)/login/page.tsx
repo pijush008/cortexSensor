@@ -138,7 +138,7 @@ export default function LoginPage() {
       await verifyLoginOtp(otpUserId, otp);
       router.push("/dashboard");
     } catch (err) {
-      setError(describeError(err, { credentialAttempt: true }));
+      setError(describeError(err, { secondFactorAttempt: true }));
     } finally {
       setLoading(false);
     }
@@ -200,46 +200,38 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen bg-white">
       {/* Left editorial panel */}
-      <div className="bg-blueprint relative hidden w-1/2 flex-col justify-between overflow-hidden bg-shm-lavender p-12 lg:flex">
-        {/* Real civil-engineering structure photo, rendered monochrome */}
+      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden p-12 lg:flex">
+        {/* The photograph, shown plainly. It previously sat at 22% opacity
+            under a lavender gradient, a dot grid and a cyan blur — four
+            layers of colour over a real structure. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/images/structures/cable-stayed.jpg"
           alt=""
           aria-hidden
-          className="absolute inset-0 h-full w-full object-cover opacity-[0.22] mix-blend-multiply"
+          className="absolute inset-0 h-full w-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-shm-lavender/95 via-shm-lavender/70 to-shm-cyan-soft/50" />
-        <div
-          className="pointer-events-none absolute inset-0 opacity-60"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 25px 25px, rgba(26,18,37,0.12) 1px, transparent 0)",
-            backgroundSize: "44px 44px",
-          }}
-        />
-        <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-shm-cyan/30 blur-3xl" />
 
         <div className="relative flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/brand/company-logo.jpeg"
-            alt="SHM Console"
+            src="/brand/company-logo.png"
+            alt="Cloudglance Sensinglab Pvt Ltd"
             className="h-9 w-auto object-contain"
           />
-          <span className="font-mono text-[10px] uppercase tracking-[0.28em] text-shm-navy-700">
+          <span className="font-mono text-[0.625rem] uppercase tracking-[0.28em] text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.55)]">
             Console · v1.0
           </span>
         </div>
 
         <div className="relative max-w-lg">
-          <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.24em] text-shm-navy-700">
+          <p className="mb-4 font-mono text-[0.6875rem] uppercase tracking-[0.24em] text-white/90 [text-shadow:0_1px_3px_rgba(0,0,0,0.55)]">
             Structural monitoring
           </p>
-          <h2 className="font-display text-4xl font-semibold leading-[1.08] tracking-tight text-shm-navy-900">
+          <h2 className="font-display text-4xl font-semibold leading-[1.08] tracking-tight text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.55)]">
             See damage before it becomes a defect.
           </h2>
-          <p className="mt-5 text-[15px] leading-relaxed text-slate-700">
+          <p className="mt-5 text-[0.9375rem] leading-relaxed text-white/95 [text-shadow:0_1px_3px_rgba(0,0,0,0.55)]">
             Continuous strain, vibration and deflection telemetry from every
             structure you manage — instrumented, analyzed, and acted upon.
           </p>
@@ -248,7 +240,7 @@ export default function LoginPage() {
           <div className="mt-10 rounded-xl border border-shm-navy-900/12 bg-white/75 p-4 font-mono backdrop-blur">
             <div className="mb-3 flex items-center gap-2">
               <Radio className="h-3.5 w-3.5 text-shm-navy-700" />
-              <span className="text-[9px] uppercase tracking-[0.2em] text-slate-600">
+              <span className="text-[0.5625rem] uppercase tracking-[0.2em] text-slate-600">
                 Measurement pipeline · edge → cloud
               </span>
             </div>
@@ -256,12 +248,12 @@ export default function LoginPage() {
               {activePipeline.map((line) => (
                 <p
                   key={line}
-                  className="anim-tick-in truncate text-[11px] leading-relaxed text-shm-navy-800"
+                  className="anim-tick-in truncate text-[0.6875rem] leading-relaxed text-shm-navy-800"
                 >
                   <span className="text-shm-green-text">➜</span> {line}
                 </p>
               ))}
-              <p className="text-[11px] text-shm-navy-800">
+              <p className="text-[0.6875rem] text-shm-navy-800">
                 <span className="text-shm-green-text">➜</span> engineer
                 <span
                   className={cursor ? "text-shm-green-text" : "text-transparent"}
@@ -286,13 +278,13 @@ export default function LoginPage() {
                   className="h-4 w-4 text-shm-navy-700"
                   strokeWidth={1.75}
                 />
-                <span className="text-[12px] text-slate-700">{label}</span>
+                <span className="text-[0.75rem] text-slate-700">{label}</span>
               </div>
             ))}
           </div>
         </div>
 
-        <p className="relative font-mono text-[11px] text-shm-navy-700">
+        <p className="relative font-mono text-[0.6875rem] text-white/90 [text-shadow:0_1px_3px_rgba(0,0,0,0.55)]">
           © {new Date().getFullYear()} Cloudglance Sensinglab Pvt Ltd · All rights reserved
         </p>
       </div>
@@ -319,15 +311,15 @@ export default function LoginPage() {
 
           <Reveal>
             <div className="rounded-2xl border border-slate-200 bg-white p-7 shadow-[0_20px_60px_-28px_rgba(17,17,17,0.35)] sm:p-8">
-              <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-shm-navy-500">
+              <p className="font-mono text-[0.625rem] uppercase tracking-[0.24em] text-shm-navy-500">
                 {mode === "login" ? "Access console" : "Account recovery"}
               </p>
-              <h2 className="mt-2 text-[22px] font-semibold tracking-tight text-slate-900">
+              <h2 className="mt-2 text-[1.375rem] font-semibold tracking-tight text-slate-900">
                 {mode === "login" && "Welcome back"}
                 {mode === "forgot" && "Reset your password"}
                 {mode === "sent" && "Check your email"}
               </h2>
-              <p className="mt-1 text-[13px] text-slate-500">
+              <p className="mt-1 text-[0.8125rem] text-slate-500">
                 {mode === "login" && "Sign in to the monitoring console."}
                 {mode === "forgot" &&
                   "Enter your email address and we'll send you a link to choose a new password."}
@@ -341,7 +333,7 @@ export default function LoginPage() {
 
               {error && (
                 <div
-                  className="anim-tick-in mt-5 rounded-lg border border-shm-red/20 bg-shm-red/5 px-3.5 py-2.5 text-[13px] text-shm-red"
+                  className="anim-tick-in mt-5 rounded-lg border border-shm-red/20 bg-shm-red/5 px-3.5 py-2.5 text-[0.8125rem] text-shm-red"
                   role="alert"
                 >
                   <p className="font-medium">{error.title}</p>
@@ -354,7 +346,7 @@ export default function LoginPage() {
                   leaving those fields on screen invites re-submitting them. */}
               {otpUserId !== null ? (
                 <form onSubmit={handleOtp} className="mt-6 space-y-4">
-                  <p className="text-[13px] leading-relaxed text-slate-600">
+                  <p className="text-[0.8125rem] leading-relaxed text-slate-600">
                     A six-digit sign-in code has been emailed to{" "}
                     <span className="font-medium text-shm-navy-900">{username}</span>.
                     It expires in 10 minutes.
@@ -383,7 +375,7 @@ export default function LoginPage() {
                       setOtp("");
                       setError(null);
                     }}
-                    className="w-full text-[13px] text-slate-500 underline"
+                    className="w-full text-[0.8125rem] text-slate-500 underline"
                   >
                     Use a different account
                   </button>
@@ -432,7 +424,7 @@ export default function LoginPage() {
                 <>
                   <div className="my-5 flex items-center gap-3">
                     <span className="h-px flex-1 bg-slate-200" />
-                    <span className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                    <span className="text-[0.6875rem] uppercase tracking-[0.18em] text-slate-400">
                       or
                     </span>
                     <span className="h-px flex-1 bg-slate-200" />
@@ -459,7 +451,7 @@ export default function LoginPage() {
                       Continue with Google
                     </div>
                   )}
-                  <p className="mt-2 text-center text-[11.5px] text-slate-400">
+                  <p className="mt-2 text-center text-[0.71875rem] text-slate-400">
                     {googleAvailable
                       ? "Signs you in as a standard user."
                       : "Not configured yet — add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET. (Shown in development only.)"}
@@ -467,7 +459,7 @@ export default function LoginPage() {
                 </>
               )}
 
-              <div className="mt-6 space-y-2 text-center text-[13px]">
+              <div className="mt-6 space-y-2 text-center text-[0.8125rem]">
                 {mode === "login" && (
                   <button
                     onClick={() => {
@@ -505,7 +497,7 @@ export default function LoginPage() {
             </div>
           </Reveal>
 
-          <p className="mt-6 text-center font-mono text-[10.5px] uppercase tracking-[0.18em] text-slate-400">
+          <p className="mt-6 text-center font-mono text-[0.65625rem] uppercase tracking-[0.18em] text-slate-400">
             Infrahealth-sensing from anywhere
           </p>
         </div>

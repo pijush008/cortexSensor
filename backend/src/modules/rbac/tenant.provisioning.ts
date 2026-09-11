@@ -1,5 +1,5 @@
 import { randomBytes } from "crypto";
-import { MembershipStatus, RoleKey, TenantStatus } from "@prisma/client";
+import { MembershipStatus, Prisma, RoleKey, TenantStatus } from "@prisma/client";
 import prisma from "../../config/prisma";
 import { BadRequestError } from "../../utils/AppError";
 import { config } from "../../config";
@@ -175,4 +175,102 @@ export async function addMemberToAdminTenant(
   });
 
   return parentMembership.tenantId;
+}
+
+/**
+ * Place a user into a tenant named DIRECTLY, rather than one derived from
+ * another user's membership.
+ *
+ * addMemberToAdminTenant reads the tenant off a parent admin, which works when
+ * an admin adds a colleague but not when a PLATFORM OPERATOR invites someone:
+ * an operator deliberately holds no membership (rbac.service resolves their
+ * tenantId to null), so there is no parent row to read a tenant from. The
+ * caller has already established which tenant it is acting on and passes it.
+ */
+export async function addMemberToTenant(
+  userId: number,
+  tenantId: number,
+  roleKey: RoleKey = RoleKey.VIEWER,
+  /**
+   * The caller's transaction, when the membership must commit or fail together
+   * with whatever else that caller is writing. Project invitations need this:
+   * an acceptance that marked the invitation spent but left the invitee out of
+   * the tenant would be worse than one that failed outright.
+   */
+  client: Prisma.TransactionClient | typeof prisma = prisma,
+): Promise<number> {
+  const roleId = await roleIdFor(roleKey);
+
+  await client.membership.upsert({
+    where: { userId_tenantId: { userId, tenantId } },
+    // The role is set only when the membership is CREATED.
+    //
+    // Overwriting it on update looks harmless and is not: an organization's own
+    // admin who accepts a project invitation — as the authority on a job they
+    // run, say — already holds a membership, and rewriting its role would
+    // silently demote them from ORGANIZATION_ADMIN to VIEWER in their own
+    // organization. Joining a project is not a statement about someone's
+    // standing in the organization they are already part of.
+    //
+    // The status IS refreshed, so re-inviting somebody whose membership was
+    // disabled brings them back rather than leaving them locked out.
+    update: { status: MembershipStatus.active },
+    create: { userId, tenantId, roleId, status: MembershipStatus.active },
+  });
+
+  return tenantId;
+}
+
+/**
+ * The organization that holds a platform operator's own projects.
+ *
+ * An operator belongs to no organization — rbac.service resolves their tenantId
+ * to null on purpose, so that running the platform never quietly becomes being
+ * an admin inside one customer's organization. But a project must belong to
+ * somewhere: Tenant is the isolation root and Project.tenantId is NOT NULL.
+ *
+ * So the operator's work lives in an organization of its own, identified by a
+ * reserved slug rather than by giving the operator a Membership.
+ * resolveAuthContext short-circuits on isPlatformAdmin before it ever reads
+ * memberships, so a membership row would in fact be inert — but the code states
+ * plainly that an operator holds none, and a convention keeps that true instead
+ * of merely harmless.
+ *
+ * One organization, shared by every operator, not one per operator: two people
+ * administering the same deployment are running the same thing, and splitting
+ * their projects into private silos would hide each from the other.
+ */
+export const OPERATOR_TENANT_SLUG = "platform-operator";
+
+const OPERATOR_TENANT_NAME = "Cloudglance Sensinglab Pvt Ltd";
+
+export async function getOrCreateOperatorTenant(): Promise<number> {
+  const existing = await prisma.tenant.findUnique({
+    where: { slug: OPERATOR_TENANT_SLUG },
+    select: { id: true, status: true },
+  });
+
+  if (existing) {
+    // Reactivated rather than refused: an operator organization that somebody
+    // suspended would otherwise leave the platform's own projects uncreatable
+    // with no obvious cause.
+    if (existing.status !== TenantStatus.active) {
+      await prisma.tenant.update({
+        where: { id: existing.id },
+        data: { status: TenantStatus.active },
+      });
+    }
+    return existing.id;
+  }
+
+  const tenant = await prisma.tenant.create({
+    data: {
+      publicId: generateTenantPublicId(),
+      name: OPERATOR_TENANT_NAME,
+      slug: OPERATOR_TENANT_SLUG,
+      status: TenantStatus.active,
+    },
+  });
+
+  return tenant.id;
 }
