@@ -35,7 +35,6 @@ router.get(
 router.patch(
   "/project/:projectId",
   authenticate,
-  requirePermission("MANAGE_PROJECTS"),
   projectsController.updateProjectDetail,
 );
 router.delete(
@@ -68,6 +67,21 @@ router.put(
   authenticate,
   requirePermission("MANAGE_PROJECTS"),
   projectsController.projectSetupHandler,
+);
+
+// BEFORE "/project/:projectId/:offset", which would otherwise swallow this
+// path and try to parse "device" as a timezone offset.
+router.put(
+  "/project/:projectId/device",
+  authenticate,
+  requirePermission("MANAGE_PROJECTS"),
+  projectsController.setProjectDeviceHandler,
+);
+router.get(
+  "/project/:projectId/device-options",
+  authenticate,
+  requirePermission("VIEW_PROJECTS"),
+  projectsController.projectDeviceOptionsHandler,
 );
 
 router.put(

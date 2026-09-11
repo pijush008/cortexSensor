@@ -1,11 +1,15 @@
 import { Response } from "express";
 import { AuthRequest } from "../../middleware/auth";
 import * as projectsService from "./projects.service";
+import * as invitationsService from "../invitations/invitations.service";
+import { getOrCreateOperatorTenant } from "../rbac/tenant.provisioning";
 import { assertProjectAccess } from "./projects.service";
 import prisma from "../../config/prisma";
-import { BadRequestError } from "../../utils/AppError";
+import { BadRequestError, ForbiddenError, UnauthorizedError } from "../../utils/AppError";
 import { auditLogger } from "../../utils/audit";
 import { assertWithinLimits, resolveSubscriptionAdminId } from "../subscription/subscription.service";
+import { hasPermission } from "../../middleware/permissions";
+import { UserRole } from "@prisma/client";
 import {
   projectAddSchema,
   projectUpdateSchema,
@@ -18,6 +22,7 @@ import {
   emailSettingSchema,
   channelUpdateSchema,
   projectSetupSchema,
+  setProjectDeviceSchema,
 } from "./projects.types";
 
 function handleControllerError(res: Response, error: unknown) {
@@ -76,6 +81,76 @@ async function assertDeviceAccessByChannelId(
   }
 }
 
+/**
+ * Which organization a newly created project belongs to.
+ *
+ * The creator's own, always. Nothing in the request body is consulted:
+ * honouring a tenant id from a client would let anybody file a project inside
+ * an organization they do not belong to (§17), which is why the form has no
+ * such field and the endpoint would ignore one anyway.
+ *
+ * A PLATFORM OPERATOR has no organization of their own by design, so theirs is
+ * the operator organization — see getOrCreateOperatorTenant.
+ */
+async function resolveCreateTenantId(req: AuthRequest): Promise<number | null> {
+  if (req.auth?.isPlatformAdmin === true) {
+    return getOrCreateOperatorTenant();
+  }
+  return req.auth?.tenantId ?? null;
+}
+
+/**
+ * Turn the stakeholder emails on a project form into invitations.
+ *
+ * Deliberately non-fatal: the project has already been created and audited by
+ * the time this runs, so a bad address or an unreachable mail server must not
+ * turn a successful creation into an error the caller reads as "nothing
+ * happened". Each outcome is reported back per role instead, and the
+ * administrator can resend from the project page.
+ */
+async function issueStakeholderInvitations(
+  req: AuthRequest,
+  projectId: number,
+  input: { contractorEmail?: string | null; authorityEmail?: string | null },
+): Promise<Array<{ role: string; emailId: string; sent: boolean; message: string }>> {
+  const wanted: Array<{ role: "contractor" | "authority"; emailId: string }> = [];
+  if (input.contractorEmail?.trim()) {
+    wanted.push({ role: "contractor", emailId: input.contractorEmail.trim() });
+  }
+  if (input.authorityEmail?.trim()) {
+    wanted.push({ role: "authority", emailId: input.authorityEmail.trim() });
+  }
+  if (wanted.length === 0 || !req.user) return [];
+
+  const results = [];
+  for (const item of wanted) {
+    try {
+      const invitation = await invitationsService.createInvitation({
+        projectId,
+        role: item.role,
+        emailId: item.emailId,
+        invitedBy: req.user.id,
+      });
+      results.push({
+        role: item.role,
+        emailId: invitation.emailId,
+        sent: invitation.emailSent,
+        message: invitation.emailSent
+          ? `Invitation sent to ${invitation.emailId}`
+          : `Invitation created for ${invitation.emailId}, but email is not configured`,
+      });
+    } catch (err) {
+      results.push({
+        role: item.role,
+        emailId: item.emailId,
+        sent: false,
+        message: (err as Error).message,
+      });
+    }
+  }
+  return results;
+}
+
 export async function createNewProject(req: AuthRequest, res: Response) {
   try {
     const result = projectAddSchema.safeParse(req.body);
@@ -83,8 +158,7 @@ export async function createNewProject(req: AuthRequest, res: Response) {
       const errorMessage = result.error.errors[0].message.replace(/"/g, "");
       return res.status(400).json({ status_code: 400, message: errorMessage });
     }
-    // Tenant comes from the session, never the body (§17).
-    const tenantId = req.auth?.tenantId;
+    const tenantId = await resolveCreateTenantId(req);
     if (tenantId == null) {
       return res.status(403).json({
         status_code: 403,
@@ -94,7 +168,19 @@ export async function createNewProject(req: AuthRequest, res: Response) {
     // Enforce the tenant's billing plan before provisioning a new structure.
     const billingAdminId = await resolveSubscriptionAdminId(req.user!);
     await assertWithinLimits(billingAdminId, { structures: 1 });
-    const response = await projectsService.createProject(result.data, tenantId);
+    // The creator is WHOEVER IS SIGNED IN, never whoever the body names.
+    //
+    // createdBy used to be read straight from the request and fell back to 0
+    // when absent — and no user has id 0, so every creation from the UI (which
+    // sends no such field) died on a foreign key violation. Taking it from the
+    // session fixes that and closes the hole in the same move: a creator id
+    // from a body would let anyone file a project under another person's name,
+    // and createdBy is what assertProjectAccess uses to decide who administers
+    // the project.
+    const response = await projectsService.createProject(
+      { ...result.data, createdBy: String(req.user!.id) },
+      tenantId,
+    );
     const { ipAddress, userAgent } = auditLogger.requestContext(req);
     await auditLogger.audit({
       userId: req.user?.id,
@@ -105,7 +191,12 @@ export async function createNewProject(req: AuthRequest, res: Response) {
       ipAddress,
       userAgent,
     });
-    return res.status(200).json(response);
+    const invitations = await issueStakeholderInvitations(
+      req,
+      response.projectId,
+      result.data,
+    );
+    return res.status(200).json({ ...response, invitations });
   } catch (error) {
     return handleControllerError(res, error);
   }
@@ -138,16 +229,56 @@ export async function updateProject(req: AuthRequest, res: Response) {
       ipAddress,
       userAgent,
     });
-    return res.status(200).json(response);
+    const invitations = await issueStakeholderInvitations(
+      req,
+      Number(result.data.projectId) || response.projectId,
+      result.data,
+    );
+    return res.status(200).json({ ...response, invitations });
   } catch (error) {
     return handleControllerError(res, error);
   }
+}
+
+/**
+ * Who may change a project's dashboard media.
+ *
+ * The project image is the ASSIGNED CONTRACTOR's to upload, and "contractor" is
+ * not an RBAC role — the roles are ORGANIZATION_ADMIN, SHM_ENGINEER, TECHNICIAN
+ * and VIEWER. It is a per-project relationship, so a blanket
+ * requirePermission() on the route cannot express it: the check has to see
+ * which project is being changed.
+ *
+ * Admins keep access alongside the contractor, so a project is never stranded
+ * when its contractor leaves.
+ */
+async function assertMayEditProjectMedia(
+  req: AuthRequest,
+  projectId: number,
+): Promise<void> {
+  const userType = req.user?.userType as UserRole | undefined;
+  const userId = req.user?.id ?? req.auth?.userId;
+  if (!userType || userId === undefined) {
+    throw new UnauthorizedError("Unauthorized");
+  }
+  if (hasPermission(userType, "MANAGE_PROJECTS")) return;
+
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { contractorId: true },
+  });
+  if (project && project.contractorId === userId) return;
+
+  throw new ForbiddenError(
+    "Only this project's contractor or an administrator can change its dashboard media",
+  );
 }
 
 export async function updateProjectDetail(req: AuthRequest, res: Response) {
   try {
     const { projectId } = req.params;
     await assertProjectAccess(Number(projectId), req.user);
+    await assertMayEditProjectMedia(req, Number(projectId));
     const result = projectDetailUpdateSchema.safeParse(req.body);
     if (!result.success) {
       const errorMessage = result.error.errors[0].message.replace(/"/g, "");
@@ -301,6 +432,87 @@ export async function dashboardDataHandler(req: AuthRequest, res: Response) {
   }
 }
 
+/**
+ * Who may change a project's device.
+ *
+ * assertProjectAccess admits the project's contractor and authority too, which
+ * is right for reading a project and wrong for reassigning its hardware.
+ */
+function assertMayManageDevice(req: AuthRequest): void {
+  const type = req.user?.userType;
+  if (type !== "superadmin" && type !== "admin") {
+    const err = new Error(
+      "Only an administrator can change a project's device",
+    ) as Error & { statusCode: number };
+    err.statusCode = 403;
+    throw err;
+  }
+}
+
+export async function projectDeviceOptionsHandler(
+  req: AuthRequest,
+  res: Response,
+) {
+  try {
+    const projectId = Number(req.params.projectId);
+    await assertProjectAccess(projectId, req.user);
+    const data = await projectsService.projectDeviceOptions(projectId);
+    return res.status(200).json({ status_code: 200, message: "Success", data });
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+}
+
+export async function setProjectDeviceHandler(req: AuthRequest, res: Response) {
+  try {
+    assertMayManageDevice(req);
+    const projectId = Number(req.params.projectId);
+    await assertProjectAccess(projectId, req.user);
+
+    const parsed = setProjectDeviceSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({
+        status_code: 400,
+        message: parsed.error.errors[0].message.replace(/"/g, ""),
+      });
+    }
+
+    const before = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { deviceId: true },
+    });
+
+    const result = await projectsService.setProjectDevice(
+      projectId,
+      // The schema accepts a number too, because a <select> value and a JSON
+      // number are both reasonable things for a client to send.
+      parsed.data.deviceId == null ? null : String(parsed.data.deviceId),
+    );
+
+    const { ipAddress, userAgent } = auditLogger.requestContext(req);
+    await auditLogger.audit({
+      userId: req.user?.id,
+      action: "update",
+      entity: "project",
+      entityId: projectId,
+      oldValue: { deviceId: before?.deviceId ?? null },
+      newValue: { deviceId: result.deviceId },
+      ipAddress,
+      userAgent,
+    });
+
+    return res.status(200).json({
+      status_code: 200,
+      message: result.deviceId
+        ? "Device updated"
+        : "Device removed from this project",
+      data: result,
+    });
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+}
+
 export async function projectSetupHandler(req: AuthRequest, res: Response) {
   try {
     const { projectId } = req.params;
@@ -378,6 +590,12 @@ export async function updateEmailListHandler(req: AuthRequest, res: Response) {
       return res.status(400).json({ status_code: 400, message: errorMessage });
     }
     await assertProjectAccessByUniqueId(result.data.uniqueId, req.user);
+    const project = await prisma.project.findFirst({
+      where: { uniqueId: result.data.uniqueId },
+      select: { id: true },
+    });
+    if (!project) throw new BadRequestError("Project not found");
+    await assertMayEditProjectMedia(req, project.id);
     const response = await projectsService.updateEmailList(result.data);
     return res.status(200).json(response);
   } catch (error) {

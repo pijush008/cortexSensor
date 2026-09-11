@@ -129,6 +129,50 @@ function getFirstThreeLetters(name: string): string {
   return name.replace(/\s+/g, "").substring(0, 3).toUpperCase();
 }
 
+/**
+ * The project's visible identifier, built server-side.
+ *
+ * This used to come from the CLIENT: projectAddSchema accepted
+ * projectUniqueID, the create form had a free-text box for it, and the update
+ * branch overwrote it with whatever was sent. So the identifier people quote
+ * was neither guaranteed unique nor stable — two projects could carry the same
+ * code, and a project's code could change under anyone already using it.
+ *
+ * The format is the established business one. Segments for a contractor or an
+ * authority are OMITTED when that party is not assigned, rather than padded
+ * with a placeholder, so a code never implies a party that does not exist.
+ *
+ * The loop is what makes it unique: a collision advances the sequence and tries
+ * again, the same technique createProjectCode already used.
+ */
+async function buildProjectUniqueID(params: {
+  projectId: number;
+  adminName: string | null;
+  contractorName: string | null;
+  authorityName: string | null;
+}): Promise<string> {
+  const parts = [params.adminName, params.contractorName, params.authorityName]
+    .filter((n): n is string => Boolean(n && n.trim()))
+    .map(getFirstThreeLetters);
+
+  let sequence = params.projectId;
+  for (;;) {
+    const code = [
+      "CGSL",
+      ...parts,
+      getCurrentDateAndMonth(),
+      getCurrentFinancialYear(),
+      generateProjectCode(sequence),
+    ].join("/");
+
+    const clash = await prisma.project.count({
+      where: { projectUniqueID: code },
+    });
+    if (clash === 0) return code;
+    sequence += 1000;
+  }
+}
+
 async function generateUniqueId(length: number): Promise<string> {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let uniqueId: string;
@@ -174,7 +218,6 @@ export async function createProject(input: ProjectAddInput, tenantId: number) {
   const {
     projectId,
     projectName,
-    projectUniqueID,
     projectLocation,
     startDate,
     actualStartDate,
@@ -187,9 +230,22 @@ export async function createProject(input: ProjectAddInput, tenantId: number) {
   } = input;
 
   if (!projectId) {
+    // Unique WITHIN THE ORGANIZATION, not across the platform.
+    //
+    // This query had no tenantId, so a name taken by any customer anywhere
+    // blocked it for everyone: one organization monitoring a bridge it calls
+    // "Kolkata" stopped every other organization from using that name. It also
+    // answered a question nobody should be able to ask — whether some other
+    // company happens to use a given project name — which is the kind of
+    // cross-tenant disclosure tenantId exists to prevent (§17).
+    //
+    // It went unnoticed because the check also required isRegistered: true,
+    // and until projects began to be created registered it matched nothing at
+    // all.
     const existing = await prisma.project.findFirst({
       where: {
         projectName,
+        tenantId,
         isDelete: false,
         isRegistered: true,
       },
@@ -199,24 +255,35 @@ export async function createProject(input: ProjectAddInput, tenantId: number) {
       throw new BadRequestError("Project Name already exists");
     }
 
+    // A device is one cabinet in one place, so it serves one live project at a
+    // time. Both conditions are read here and the claim is written below in the
+    // SAME transaction as the project insert: checking availability in one
+    // statement and claiming in another lets two simultaneous creations both
+    // pass the check and both take the same hardware.
+    //
+    // This check could not fire at all before. It asked whether the device was
+    // isOngoing, and the only code that ever set that to true was
+    // `projectSetup` — the legacy "now attach a device" step the current
+    // frontend does not call — so the flag was released on project end and
+    // never once claimed.
+    let sensorIds: string | null = null;
     if (deviceId) {
-      const ongoingProject = await prisma.project.findFirst({
-        where: {
-          deviceId,
-          isDelete: false,
-          isRegistered: true,
-        } as never,
+      const device = await prisma.device.findUnique({
+        where: { id: Number(deviceId) },
+        select: { isOngoing: true, assignSensor: true },
       });
 
-      if (ongoingProject) {
-        const device = await prisma.device.findUnique({
-          where: { id: Number(deviceId) },
-          select: { isOngoing: true },
-        });
+      if (!device) {
+        throw new BadRequestError("Device not found");
+      }
 
-        if (device?.isOngoing) {
-          throw new BadRequestError("Device is already assigned to a project");
-        }
+      if (device.isOngoing) {
+        throw new BadRequestError("Device is already assigned to a project");
+      }
+
+      sensorIds = device.assignSensor ?? null;
+      if (!sensorIds || sensorIds.length === 0) {
+        throw new BadRequestError("No sensor IDs found for the specified device");
       }
     }
 
@@ -225,25 +292,14 @@ export async function createProject(input: ProjectAddInput, tenantId: number) {
       imagePath = await saveBase64Image(projectLogo, "project_logo", "uploads/project_logo");
     }
 
-    let sensorIds: string | null = null;
-    if (deviceId) {
-      const device = await prisma.device.findUnique({
-        where: { id: Number(deviceId) },
-        select: { assignSensor: true },
-      });
-      sensorIds = device?.assignSensor ?? null;
-
-      if (!sensorIds || sensorIds.length === 0) {
-        throw new BadRequestError("No sensor IDs found for the specified device");
-      }
-    }
-
     const uniqueId = await generateUniqueId(10);
 
-    const project = await prisma.project.create({
+    const project = await prisma.$transaction(async (tx) => {
+      const created = await tx.project.create({
       data: {
         projectName,
-        projectUniqueID: projectUniqueID || null,
+        // Assigned immediately below, once the row has an id to sequence from.
+        projectUniqueID: null,
         projectLocation,
         startDate: startDate ? new Date(startDate) : new Date(),
         actualStartDate: actualStartDate ? new Date(actualStartDate) : null,
@@ -258,12 +314,77 @@ export async function createProject(input: ProjectAddInput, tenantId: number) {
         uniqueId,
         status: "not_start",
         isDelete: false,
-        isRegistered: false,
+        // A created project is a real project.
+        //
+        // This was false, and every read path — the list, the dashboard, the
+        // scheduled status sweep, the duplicate-name and device-in-use checks —
+        // requires it to be true. The only code that ever set it is
+        // `projectSetup`, the legacy "now attach a device" step of a two-stage
+        // wizard that the current frontend does not have and never calls. So a
+        // project created from the UI was filed as a draft that no screen would
+        // show and no second step would ever complete: created successfully,
+        // invisible forever.
+        //
+        // There is no pending stage for a project created here to be waiting
+        // on, so it is registered on creation. `projectSetup` still sets it and
+        // remains harmless — setting true on a row that is already true.
+        isRegistered: true,
         offset: 0,
         csvData: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       },
+      });
+
+      // The claim, in the same transaction as the insert that depends on it.
+      // Released again when the project ends or is deleted.
+      if (deviceId) {
+        await tx.device.update({
+          where: { id: Number(deviceId) },
+          data: { isOngoing: true },
+        });
+      }
+
+      return created;
+    });
+
+    // Built after the insert because the sequence segment is the row's own id.
+    // The parties are read back from the database rather than taken from the
+    // request, so the code always describes who is actually on the project.
+    const [creator, contractor, authority] = await Promise.all([
+      project.createdBy
+        ? prisma.user.findUnique({
+            where: { id: project.createdBy },
+            select: { firstName: true, lastName: true },
+          })
+        : null,
+      project.contractorId
+        ? prisma.user.findUnique({
+            where: { id: project.contractorId },
+            select: { firstName: true, lastName: true },
+          })
+        : null,
+      project.authorityId
+        ? prisma.user.findUnique({
+            where: { id: project.authorityId },
+            select: { firstName: true, lastName: true },
+          })
+        : null,
+    ]);
+
+    const fullName = (u: { firstName: string | null; lastName: string | null } | null) =>
+      u ? [u.firstName, u.lastName].filter(Boolean).join(" ").trim() || null : null;
+
+    const generatedCode = await buildProjectUniqueID({
+      projectId: project.id,
+      adminName: fullName(creator),
+      contractorName: fullName(contractor),
+      authorityName: fullName(authority),
+    });
+
+    await prisma.project.update({
+      where: { id: project.id },
+      data: { projectUniqueID: generatedCode },
     });
 
     return {
@@ -271,6 +392,7 @@ export async function createProject(input: ProjectAddInput, tenantId: number) {
       message: "Project added successfully",
       projectId: project.id,
       uniqueId,
+      projectUniqueID: generatedCode,
     };
   } else {
     const existing = await prisma.project.findUnique({
@@ -288,8 +410,17 @@ export async function createProject(input: ProjectAddInput, tenantId: number) {
 
     let sensorIds: string | null = existing.sensorId;
     if (deviceId) {
-      const device = await prisma.device.findFirst({
-        where: { deviceId } as never,
+      // BY ROW ID, as the create branch does.
+      //
+      // This looked the device up with `where: { deviceId }`, which matches
+      // Device.deviceId — the SERIAL NUMBER. The value passed is
+      // Project.deviceId, which holds the device's row id as a string. So it
+      // searched for a device whose serial equalled an id, found none, and
+      // threw "No sensor IDs found" for every project that had a device.
+      // Unreachable from the UI, which has no edit form, but wrong wherever it
+      // is called from.
+      const device = await prisma.device.findUnique({
+        where: { id: Number(deviceId) },
         select: { assignSensor: true },
       });
       sensorIds = device?.assignSensor ?? null;
@@ -303,7 +434,9 @@ export async function createProject(input: ProjectAddInput, tenantId: number) {
       where: { id: Number(projectId) },
       data: {
         projectName,
-        projectUniqueID: projectUniqueID || existing.projectUniqueID,
+        // NOT updatable. The project ID is quoted in reports, correspondence
+        // and URLs; letting an edit change it would silently invalidate every
+        // existing reference to the project.
         projectLocation,
         startDate: startDate ? new Date(startDate) : existing.startDate,
         actualStartDate: actualStartDate ? new Date(actualStartDate) : existing.actualStartDate,
@@ -351,6 +484,14 @@ export async function updateProjectDetails(projectId: string, input: ProjectDeta
     data: {
       dashImage: dashImagePath,
       dashImage2: dashImage2Path,
+      // undefined leaves it untouched; an empty string clears it, which is how
+      // a feed is taken down without disturbing the project image.
+      liveVideoUrl:
+        input.liveVideoUrl === undefined || input.liveVideoUrl === null
+          ? undefined
+          : input.liveVideoUrl === ""
+            ? null
+            : input.liveVideoUrl,
       updatedAt: new Date(),
     },
   });
@@ -452,7 +593,7 @@ export async function getProjectDetail(projectId: string) {
     gatewayDeviceId: device?.gatewayDeviceId ?? null,
     updateHeartBeat: device?.updateHeartBeat ?? null,
     sensorList: device?.assignSensor ?? null,
-    contactorFirstName: project.contractor?.firstName ?? null,
+    contractorFirstName: project.contractor?.firstName ?? null,
     contractorLastName: project.contractor?.lastName ?? null,
     authorityFirstName: project.authority?.firstName ?? null,
     authorityLastName: project.authority?.lastName ?? null,
@@ -597,7 +738,7 @@ export async function getProjectList(adminId: string, query: ProjectListQuery) {
       status: p.status,
       createdAt: p.createdAt,
       contractorId: p.contractor?.id ?? null,
-      contactorFirstName: p.contractor?.firstName ?? null,
+      contractorFirstName: p.contractor?.firstName ?? null,
       contractorLastName: p.contractor?.lastName ?? null,
       authorityId: p.authority?.id ?? null,
       authorityFirstName: p.authority?.firstName ?? null,
@@ -773,6 +914,8 @@ export async function dashboardData(uniqueId: string) {
     channelCount: device?.channelCount ?? 0,
     dashImage: formatImageUrl(project.dashImage),
     dashImage2: formatImageUrl(project.dashImage2),
+    liveVideoUrl: project.liveVideoUrl,
+    contractorId: project.contractorId,
     contractorImg: formatImageUrl(project.contractor?.profileImage),
     authorityImg: formatImageUrl(project.authority?.profileImage),
     adminImg: formatImageUrl(project.creator?.profileImage),
@@ -1020,7 +1163,9 @@ export async function updateEmailList(input: EmailSettingInput) {
   });
 
   const existingIds = existingEmails.map((e) => e.id);
-  const incomingIds = emails.map((e) => e.emailId);
+  const incomingIds = emails
+    .map((e) => e.emailId)
+    .filter((id): id is number => typeof id === "number");
 
   const toDelete = existingIds.filter((id) => !incomingIds.includes(id));
 
@@ -1030,21 +1175,49 @@ export async function updateEmailList(input: EmailSettingInput) {
     });
   }
 
-  for (const email of emails) {
-    if (existingIds.includes(email.emailId)) {
+  for (const entry of emails) {
+    if (entry.emailId !== undefined && existingIds.includes(entry.emailId)) {
       await prisma.projectEmail.update({
-        where: { id: email.emailId },
-        data: { isEnable: email.isEnable },
-      });
-    } else {
-      await prisma.projectEmail.create({
+        where: { id: entry.emailId },
         data: {
-          email: String(email.emailId),
-          isEnable: email.isEnable,
-          projectId,
+          isEnable: entry.isEnable,
+          ...(entry.email ? { email: entry.email.trim() } : {}),
+          ...(entry.name !== undefined ? { name: entry.name?.trim() || null } : {}),
         },
       });
+      continue;
     }
+
+    // A new recipient. Without an address there is nothing deliverable to
+    // store, so the entry is skipped rather than written as a placeholder —
+    // this is exactly where the id used to be stored as the email.
+    const address = entry.email?.trim();
+    if (!address) continue;
+
+    // The same person twice would simply be mailed twice.
+    const duplicate = await prisma.projectEmail.findFirst({
+      where: { projectId, email: address },
+      select: { id: true },
+    });
+    if (duplicate) {
+      await prisma.projectEmail.update({
+        where: { id: duplicate.id },
+        data: {
+          isEnable: entry.isEnable,
+          ...(entry.name !== undefined ? { name: entry.name?.trim() || null } : {}),
+        },
+      });
+      continue;
+    }
+
+    await prisma.projectEmail.create({
+      data: {
+        email: address,
+        name: entry.name?.trim() || null,
+        isEnable: entry.isEnable,
+        projectId,
+      },
+    });
   }
 
   return { status_code: 200, message: "success", error: "" };
@@ -1315,4 +1488,142 @@ async function sendEmailStartEnd(projectId: string, statusType: string): Promise
     logger.error("Error sending project start/end email", err as Error);
     return false;
   }
+}
+
+/**
+ * The devices this project could be given.
+ *
+ * Scoped to the project's OWN organization, read from the project rather than
+ * named by the caller: a device chooser must never be able to list hardware
+ * belonging to a tenant the caller picked out of the air.
+ *
+ * Availability means the same thing it means on the create form — not already
+ * claimed by a live project, and carrying sensors — so a device offered here is
+ * one setProjectDevice will actually accept.
+ */
+export async function projectDeviceOptions(projectId: number) {
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, isDelete: false },
+    select: { tenantId: true },
+  });
+  if (!project) throw new NotFoundError("Project not found");
+
+  const devices = await prisma.device.findMany({
+    where: {
+      tenantId: project.tenantId,
+      status: "one" as never,
+      isDelete: "false_" as never,
+      isOngoing: false,
+      assignSensor: { not: null },
+      NOT: [{ assignSensor: "" }, { assignSensor: "[]" }],
+    } as never,
+    select: { id: true, deviceName: true, deviceId: true },
+    orderBy: { deviceName: "asc" },
+  });
+
+  return devices;
+}
+
+export interface SetProjectDeviceResult {
+  projectId: number;
+  deviceId: string | null;
+  releasedDeviceId: number | null;
+}
+
+/**
+ * Attach, swap or detach a project's device.
+ *
+ * Only while the project is NOT STARTED. Once readings are being collected the
+ * device is the source of them, and swapping the hardware underneath a running
+ * project would leave one project's series stitched together from two
+ * instruments with no record of where one ended and the other began.
+ *
+ * Release and claim happen in one transaction. Doing them in sequence outside
+ * one would leave a window where the old device is free and the new one is not
+ * yet taken — and, if the claim then failed, a project pointing at hardware
+ * nobody holds.
+ */
+export async function setProjectDevice(
+  projectId: number,
+  deviceId: string | null,
+): Promise<SetProjectDeviceResult> {
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, isDelete: false },
+    select: { id: true, status: true, deviceId: true, tenantId: true },
+  });
+  if (!project) throw new NotFoundError("Project not found");
+
+  if (project.status !== "not_start") {
+    throw new BadRequestError(
+      "A project's device can only be changed before the project starts",
+    );
+  }
+
+  const current = project.deviceId ? Number(project.deviceId) : null;
+  const next = deviceId ? Number(deviceId) : null;
+
+  if (next !== null && Number.isNaN(next)) {
+    throw new BadRequestError("Invalid device");
+  }
+
+  // Nothing to do, and doing it anyway would release and re-claim the same
+  // device for no reason.
+  if (current === next) {
+    return { projectId, deviceId: project.deviceId, releasedDeviceId: null };
+  }
+
+  let sensorIds: string | null = null;
+
+  if (next !== null) {
+    const device = await prisma.device.findUnique({
+      where: { id: next },
+      select: { id: true, tenantId: true, isOngoing: true, assignSensor: true },
+    });
+    if (!device) throw new BadRequestError("Device not found");
+
+    // The options endpoint already filters by organization; this is the rule
+    // itself, enforced where it cannot be bypassed by posting an id directly.
+    if (device.tenantId !== project.tenantId) {
+      throw new BadRequestError("That device belongs to another organization");
+    }
+    if (device.isOngoing) {
+      throw new BadRequestError("Device is already assigned to a project");
+    }
+
+    sensorIds = device.assignSensor ?? null;
+    if (!sensorIds || sensorIds.length === 0) {
+      throw new BadRequestError("No sensor IDs found for the specified device");
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (current !== null) {
+      await tx.device.update({
+        where: { id: current },
+        data: { isOngoing: false },
+      });
+    }
+    if (next !== null) {
+      await tx.device.update({
+        where: { id: next },
+        data: { isOngoing: true },
+      });
+    }
+    await tx.project.update({
+      where: { id: project.id },
+      data: {
+        deviceId: next === null ? null : String(next),
+        // The sensors belong to the device, so detaching one leaves the project
+        // with none rather than with the departed device's list.
+        sensorId: sensorIds,
+        updatedAt: new Date(),
+      },
+    });
+  });
+
+  return {
+    projectId,
+    deviceId: next === null ? null : String(next),
+    releasedDeviceId: current,
+  };
 }

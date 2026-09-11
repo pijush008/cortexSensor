@@ -1,6 +1,7 @@
 import { Response } from "express";
 import { AuthRequest } from "../../middleware/auth";
 import * as devicesService from "./devices.service";
+import { getOrCreateOperatorTenant } from "../rbac/tenant.provisioning";
 import { auditLogger } from "../../utils/audit";
 import {
   deviceAddSchema,
@@ -62,7 +63,21 @@ export async function devicesList(req: AuthRequest, res: Response) {
       scopedAdminId = user.id;
     }
 
-    const data = await devicesService.listDevices(query, scopedAdminId);
+    // A platform operator is unscoped on the devices screen, which is right:
+    // they administer every organization's hardware. But the PROJECT FORM asks
+    // a narrower question — which devices could this project use — and for an
+    // operator that means their own organization's, since that is where their
+    // projects are created. Offering every device on the deployment would put
+    // another customer's hardware in the chooser.
+    let scopedTenantId = query.tenantId;
+    if (scopedAdminId === undefined && query.availableForProject === "1") {
+      scopedTenantId = await getOrCreateOperatorTenant();
+    }
+
+    const data = await devicesService.listDevices(
+      { ...query, tenantId: scopedTenantId },
+      scopedAdminId,
+    );
     return res.status(200).json({ status_code: 200, message: null, data });
   } catch (error) {
     return handleControllerError(res, error);

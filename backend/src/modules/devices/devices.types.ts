@@ -46,6 +46,22 @@ export const deviceListQuerySchema = z.object({
   deviceStatus: z.string().optional(),
   searchTerm: z.string().optional(),
   deviceTypeList: z.string().optional(),
+  /**
+   * "1" narrows the list to devices a project could actually be created with:
+   * not already claimed by a live project, and with sensors assigned.
+   *
+   * A filter rather than a separate endpoint, because it answers the same
+   * question as the devices screen — which devices are there — with one extra
+   * condition, and the scoping rules that keep one organization's hardware out
+   * of another's list must not be written twice.
+   */
+  availableForProject: z.string().optional(),
+  /**
+   * The organization whose devices to list. Honoured ONLY for a platform
+   * operator, who belongs to none and must say which they are acting for;
+   * everybody else stays scoped to their own, whatever they send.
+   */
+  tenantId: z.coerce.number().int().positive().optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().default(10),
 });

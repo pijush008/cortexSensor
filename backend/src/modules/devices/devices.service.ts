@@ -44,6 +44,22 @@ export async function addDevice(input: DeviceAddInput) {
     throw new BadRequestError("Device already exists");
   }
 
+  // A serial identifies one physical unit, and the database enforces that. The
+  // check is repeated here so the answer is a sentence about serial numbers
+  // rather than a unique-constraint violation surfacing as "Something Went
+  // Wrong". The constraint remains the authority — this only phrases it.
+  if (input.deviceId) {
+    const sameSerial = await prisma.device.findUnique({
+      where: { deviceId: input.deviceId },
+      select: { id: true, deviceName: true },
+    });
+    if (sameSerial) {
+      throw new BadRequestError(
+        `Serial number ${input.deviceId} already belongs to "${sameSerial.deviceName}"`,
+      );
+    }
+  }
+
   const channelCount = parseInt(input.channelCount, 10);
 
   const device = await prisma.device.create({
@@ -84,7 +100,15 @@ export async function addDevice(input: DeviceAddInput) {
 }
 
 export async function listDevices(query: DeviceListQuery, scopedAdminId?: number) {
-  const { deviceStatus, searchTerm, deviceTypeList, page, limit } = query;
+  const {
+    deviceStatus,
+    searchTerm,
+    deviceTypeList,
+    availableForProject,
+    tenantId,
+    page,
+    limit,
+  } = query;
 
   const where: Record<string, unknown> = {
     status: "one" as never,
@@ -93,10 +117,23 @@ export async function listDevices(query: DeviceListQuery, scopedAdminId?: number
 
   if (scopedAdminId !== undefined) {
     where.assignedAdmin = scopedAdminId;
+  } else if (tenantId !== undefined) {
+    // Only reachable for a platform operator: the controller passes a
+    // scopedAdminId for everyone else, and that branch wins.
+    where.tenantId = tenantId;
   }
 
   if (deviceStatus && deviceStatus !== "all") {
     where.deviceStatus = deviceStatus;
+  }
+
+  if (availableForProject === "1") {
+    // Free, and able to produce readings. The second half matters as much as
+    // the first: createProject refuses a device with no sensors, so offering
+    // one would only turn a valid-looking choice into an error at submit time.
+    where.isOngoing = false;
+    where.assignSensor = { not: null };
+    where.NOT = [{ assignSensor: "" }, { assignSensor: "[]" }];
   }
 
   const rows = await prisma.device.findMany({
