@@ -3,6 +3,7 @@ import rateLimit from "express-rate-limit";
 import { rateLimitStore } from "../../config/redisStore";
 import { config } from "../../config";
 import { authenticate, optionalAuth, superAdminOnly } from "../../middleware/auth";
+import { otpLimiter } from "../../middleware/rate-limit";
 import * as authController from "./auth.controller";
 import * as mfaController from "./mfa.controller";
 
@@ -16,15 +17,6 @@ const loginLimiter = rateLimit({
   message: { status_code: 429, message: "Too many login attempts. Please try again later." },
   skipSuccessfulRequests: true,
   store: rateLimitStore("login"),
-});
-
-const otpLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { status_code: 429, message: "Too many OTP requests. Please try again later." },
-  store: rateLimitStore("otp"),
 });
 
 /**

@@ -16,6 +16,12 @@ export interface SessionInfo {
     firstName: string;
     lastName: string;
     email: string;
+    phoneNo: string | null;
+    /** The firm this person works for, as they recorded it themselves. */
+    companyName: string | null;
+    /** Relative path to their company logo, or null. Relative for the same
+     * reason tenant.logoUrl is — see toPublicImagePath on the server. */
+    companyLogoUrl: string | null;
     userType: string;
   };
   tenant: {

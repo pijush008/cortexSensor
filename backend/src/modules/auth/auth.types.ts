@@ -37,7 +37,13 @@ export const validateOtpSchema = z.object({
 
 export const changePasswordSchema = z.object({
   newPassword: z.string().min(1, "New password is required"),
-  userId: z.string().min(1, "User ID is required"),
+  /**
+   * Only meaningful on the RESET path, where there is no session to read the
+   * identity from — and even there the reset token names the user and is
+   * checked against it. A signed-in caller's id comes from their session and
+   * this is ignored, so the field is optional rather than required.
+   */
+  userId: z.string().min(1).optional(),
   oldPassword: z.string().nullable().optional(),
   resetToken: z.string().optional(),
 });

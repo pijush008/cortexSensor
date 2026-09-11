@@ -1,7 +1,9 @@
 import { Response, Router } from "express";
 import { authenticate, AuthRequest } from "../../middleware/auth";
 import prisma from "../../config/prisma";
+import { z } from "zod";
 import { toPublicImagePath } from "../../utils/helper";
+import { saveImageUpload } from "../../utils/image-upload";
 
 /**
  * The authenticated session's own identity and entitlements.
@@ -30,6 +32,14 @@ router.get("/me", authenticate, async (req: AuthRequest, res: Response) => {
   // limitation visible instead of silent.
   const memberships = await prisma.membership.count({
     where: { userId: req.user.id, status: "active" },
+  });
+
+  // req.user carries only what the auth middleware needs. The profile page
+  // edits more than that, and a field the client is never sent is a field it
+  // cannot render, so the editable columns are read here.
+  const profile = await prisma.user.findUnique({
+    where: { id: req.user.id },
+    select: { phoneNo: true, companyName: true, companyLogo: true },
   });
 
   const tenant = req.auth.tenantId
@@ -79,6 +89,11 @@ router.get("/me", authenticate, async (req: AuthRequest, res: Response) => {
         firstName: req.user.firstName,
         lastName: req.user.lastName,
         email: req.user.emailId,
+        phoneNo: profile?.phoneNo ?? null,
+        companyName: profile?.companyName ?? null,
+        // The stored path is a filesystem detail; the client gets something it
+        // can put straight in an <img src>.
+        companyLogoUrl: toPublicImagePath(profile?.companyLogo ?? null),
         /** Deprecated; retained while the client migrates to permissions. */
         userType: req.user.userType,
       },
@@ -101,6 +116,85 @@ router.get("/me", authenticate, async (req: AuthRequest, res: Response) => {
       impersonation,
     },
   });
+});
+
+/**
+ * Edit your own account.
+ *
+ * There is no id anywhere in this route — not in the path, not in the body.
+ * The row written is the session's own, which is the whole reason the endpoint
+ * exists separately from the admin-facing user routes: "your own" must be
+ * decided by the session, and an endpoint that cannot name anybody else cannot
+ * be tricked into editing them.
+ *
+ * Every field is optional: the page saves what changed, and omitting one leaves
+ * it alone rather than clearing it.
+ */
+const updateMeSchema = z.object({
+  firstName: z.string().trim().min(1).max(255).optional(),
+  lastName: z.string().trim().min(1).max(255).optional(),
+  phoneNo: z.string().trim().min(6).max(20).optional(),
+  companyName: z.string().trim().max(255).optional().nullable(),
+  /** A base64 data URI. Saved to disk and stored as a relative path. */
+  companyLogo: z.string().optional().nullable(),
+});
+
+router.patch("/me", authenticate, async (req: AuthRequest, res: Response) => {
+  if (!req.user) {
+    return res.status(401).json({ status_code: 401, message: "Unauthorized" });
+  }
+
+  const parsed = updateMeSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    return res.status(400).json({
+      status_code: 400,
+      message: parsed.error.errors[0].message.replace(/"/g, ""),
+    });
+  }
+
+  const { companyLogo, ...fields } = parsed.data;
+
+  try {
+    // Written to disk BEFORE the update but after validation, and the update is
+    // a single statement — so a rejected image cannot leave half the form
+    // saved, which is what an upload done afterwards would risk.
+    const logoPath =
+      typeof companyLogo === "string" && companyLogo.length > 0
+        ? await saveImageUpload(companyLogo, { dir: "uploads/users" })
+        : undefined;
+
+    const data: Record<string, unknown> = { ...fields, updatedAt: new Date() };
+    if (logoPath !== undefined) data.companyLogo = logoPath;
+    // An explicit null clears the logo; an omitted field leaves it as it was.
+    if (companyLogo === null) data.companyLogo = null;
+
+    const updated = await prisma.user.update({
+      where: { id: req.user.id },
+      data,
+      select: {
+        firstName: true,
+        lastName: true,
+        phoneNo: true,
+        companyName: true,
+        companyLogo: true,
+      },
+    });
+
+    return res.status(200).json({
+      status_code: 200,
+      message: "Profile updated",
+      data: {
+        ...updated,
+        companyLogoUrl: toPublicImagePath(updated.companyLogo),
+      },
+    });
+  } catch (error) {
+    const err = error as { statusCode?: number; message?: string };
+    return res.status(err.statusCode ?? 400).json({
+      status_code: err.statusCode ?? 400,
+      message: err.message ?? "Could not update your profile",
+    });
+  }
 });
 
 export default router;

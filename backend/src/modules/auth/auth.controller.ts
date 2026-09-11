@@ -274,8 +274,28 @@ export async function changeUserPassword(
       throw new ForbiddenError("You must be signed in to change your password");
     }
 
+    // WHOSE password, decided by the session — never by the body.
+    //
+    // This used to pass the body's userId straight through, checking only that
+    // somebody was signed in. The old password was still verified against the
+    // target, so it was not an outright takeover, but any account holder could
+    // aim attempts at any other account and read "Old password is incorrect" as
+    // an oracle telling them whether a guess was right. A signed-in caller can
+    // now only ever change their own.
+    //
+    // The reset path keeps taking the id from the body because there is no
+    // session to take it from; the reset token itself names the user and
+    // changePassword verifies the two agree.
+    const targetUserId = req.userId
+      ? String(req.userId)
+      : result.data.userId;
+
+    if (!targetUserId) {
+      throw new ForbiddenError("You must be signed in to change your password");
+    }
+
     const response = await authService.changePassword(
-      result.data.userId,
+      targetUserId,
       result.data.newPassword,
       result.data.oldPassword ?? null,
       result.data.resetToken,
