@@ -24,6 +24,9 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
+      # The same contract the engine serves, read-only. One .proto, two
+      # consumers, no generated copy to fall out of step.
+      - ./proto:/proto:ro
     environment:
       NODE_ENV: development
       NODE_OPTIONS: "--max-old-space-size=4096"
@@ -40,6 +43,13 @@ services:
       # container is nothing — every analysis run fails while the engine sits
       # healthy one hop away. Host-run tests hide it, because 8000 is published.
       SHM_ENGINE_URL: "http://python-shm:8000"
+      # The engine's gRPC address, and the switch that selects it.
+      #
+      # Both faces of the engine stay live, so reverting to JSON over HTTP is
+      # SHM_ENGINE_TRANSPORT=http and a restart — not a redeploy. The default is
+      # grpc because that is the path worth exercising.
+      SHM_ENGINE_GRPC_URL: "python-shm:50051"
+      SHM_ENGINE_TRANSPORT: "grpc"
       # Origin used to build links that are EMAILED to people — verification,
       # password reset and project invitations. Must be an address the
       # RECIPIENT'S browser can open, so it is the app's own origin rather than
@@ -134,11 +144,20 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+      # gRPC. The API tier reaches it as python-shm:50051 on the compose
+      # network; publishing it as well is for grpcurl from the host.
+      - "50051:50051"
     restart: unless-stopped
     environment:
       - PYTHONUNBUFFERED=1
+      - GRPC_PORT=50051
     volumes:
       - ./python_shm_service:/app
+      # The contract, shared with the backend. Mounted read-only into both so
+      # there is exactly one .proto and neither side can quietly edit the other's
+      # copy — a generated client that disagrees with the server is the failure
+      # this arrangement exists to prevent.
+      - ./proto:/proto:ro
     depends_on:
       - postgres
 

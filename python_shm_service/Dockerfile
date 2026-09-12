@@ -3,5 +3,6 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . /app
-EXPOSE 8000
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 8000 HTTP (health, debugging, fallback), 50051 gRPC (the path the API uses).
+EXPOSE 8000 50051
+ENTRYPOINT ["/app/entrypoint.sh"]

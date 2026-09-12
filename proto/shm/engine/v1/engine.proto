@@ -1,0 +1,129 @@
+syntax = "proto3";
+
+package shm.engine.v1;
+
+// The spectral estimation engine, as the API tier calls it.
+//
+// The wire format exists for one reason: the payload is a raw array of
+// doubles. JSON renders each one as text and parses it back, which measured
+// slower than the mathematics it carries — 62 ms of serialisation against
+// 22 ms of computation for a 60,000-sample window. Packed doubles are a
+// memcpy.
+//
+// This service holds no database credentials and no tenant context. It
+// receives samples and returns numbers; the API decides who was allowed to
+// ask. Nothing here should ever grow an identity or an authorisation concept.
+service Engine {
+  rpc Health(HealthRequest) returns (HealthResponse);
+  rpc Spectrum(SpectrumRequest) returns (SpectrumResponse);
+  rpc CompareToBaseline(CompareRequest) returns (CompareResponse);
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  string status = 1;
+  string service = 2;
+  string version = 3;
+}
+
+// Mirrors the window functions the engine actually implements. An enum rather
+// than a string so an unsupported value is a wire-level error instead of a
+// runtime one — the HTTP API had to validate this by hand.
+enum Window {
+  WINDOW_UNSPECIFIED = 0;  // treated as HANN, the engine's default
+  WINDOW_HANN = 1;
+  WINDOW_HAMMING = 2;
+  WINDOW_BLACKMAN = 3;
+  WINDOW_BOXCAR = 4;
+  WINDOW_FLATTOP = 5;
+}
+
+enum Detrend {
+  DETREND_UNSPECIFIED = 0;  // treated as LINEAR, the engine's default
+  DETREND_CONSTANT = 1;
+  DETREND_LINEAR = 2;
+  DETREND_NONE = 3;
+}
+
+message SpectrumRequest {
+  // Packed on the wire: 8 bytes per sample against roughly 20 as JSON text.
+  repeated double samples = 1 [packed = true];
+
+  // Required, not optional. Without it the frequency axis is meaningless, and
+  // a default would silently mislabel every peak.
+  double sample_rate_hz = 2;
+
+  Window window = 3;
+  Detrend detrend = 4;
+
+  // Absent means "let the engine choose". proto3 has no null, so the presence
+  // of the field is what distinguishes "unset" from a deliberate value —
+  // hence optional rather than a zero sentinel, since 0 is also invalid here.
+  optional uint32 segment_length = 5;
+  optional double overlap = 6;
+  optional uint32 max_peaks = 7;
+  optional double min_prominence_ratio = 8;
+}
+
+message Peak {
+  double frequency_hz = 1;
+  double magnitude = 2;
+  // How much the peak stands out from the local spectrum.
+  double prominence = 3;
+  // Half-power (-3 dB) bandwidth, the basis of the damping estimate. Absent
+  // when the bandwidth could not be resolved — which is NOT the same as zero.
+  optional double bandwidth_hz = 4;
+  // Absent for the same reason: an unresolved damping ratio is unknown, not 0.
+  optional double damping_ratio = 5;
+  // One FFT bin. A peak cannot be located more precisely than this.
+  double resolution_hz = 6;
+}
+
+message SpectrumResponse {
+  string engine_version = 1;
+  string method = 2;
+  double sample_rate_hz = 3;
+  string window = 4;
+  string detrend = 5;
+  uint32 segment_length = 6;
+  double overlap = 7;
+  double frequency_resolution_hz = 8;
+  uint32 sample_count = 9;
+  double duration_seconds = 10;
+  repeated double frequencies_hz = 11 [packed = true];
+  repeated double psd = 12 [packed = true];
+  repeated Peak peaks = 13;
+  // What this estimate cannot tell you. Carried with the result rather than
+  // documented elsewhere, so a stored run always states its own limits.
+  repeated string limitations = 14;
+  repeated string warnings = 15;
+}
+
+message CompareRequest {
+  repeated Peak current_peaks = 1;
+  repeated Peak baseline_peaks = 2;
+  optional double tolerance_hz = 3;
+}
+
+message MatchedPeak {
+  double baseline_frequency_hz = 1;
+  double current_frequency_hz = 2;
+  double shift_hz = 3;
+  double shift_percent = 4;
+  double resolution_hz = 5;
+  // The only judgement the engine makes: is the change larger than what the
+  // measurement can resolve? Anything smaller is noise.
+  bool exceeds_resolution = 6;
+}
+
+message CompareResponse {
+  string engine_version = 1;
+  repeated MatchedPeak matched = 2;
+  repeated double unmatched_current_hz = 3 [packed = true];
+  repeated double unmatched_baseline_hz = 4 [packed = true];
+  // Shipped with every comparison on purpose: a shift is reported, never
+  // diagnosed, and the caller must not be able to receive the numbers without
+  // the caveat.
+  string interpretation = 5;
+}

@@ -59,3 +59,9 @@ legacy-backup-*.tar.gz
 
 # Visual brainstorming companion scratch files
 .superpowers/
+
+# Generated from proto/shm/engine/v1/engine.proto by the engine's entrypoint at
+# container start. Deliberately not committed: a checked-in copy can disagree
+# with the .proto it came from, and regenerating costs under a second.
+python_shm_service/proto/engine_pb2.py
+python_shm_service/proto/engine_pb2_grpc.py

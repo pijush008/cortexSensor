@@ -69,6 +69,14 @@ export const config = {
   allowLegacyIngestKey: process.env.ALLOW_LEGACY_INGEST_KEY !== "false",
   /** The Python SHM engine (§74): spectral estimation lives out of process. */
   shmEngineUrl: process.env.SHM_ENGINE_URL || "http://localhost:8000",
+  shmEngineGrpcUrl: process.env.SHM_ENGINE_GRPC_URL || "localhost:50051",
+  /**
+   * "grpc" or "http". The engine serves both faces, so reverting to JSON over
+   * HTTP is this variable and a restart rather than a redeploy — worth keeping
+   * for as long as gRPC is the newer of the two paths.
+   */
+  shmEngineTransport:
+    process.env.SHM_ENGINE_TRANSPORT === "http" ? "http" : "grpc",
   shmEngineTimeoutMs: Number(process.env.SHM_ENGINE_TIMEOUT_MS) || 60_000,
   analysisQueueEnabled: process.env.ANALYSIS_QUEUE_ENABLED !== "false",
   /** Disable in the API process when a dedicated worker service runs it. */
