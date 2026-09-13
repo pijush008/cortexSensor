@@ -19,6 +19,13 @@ services:
       - redis_data:/data
 
   backend:
+    # Built from Dockerfile.dev rather than run straight from node:22, so the
+    # service runs as uid 1000 and everything it writes into the bind mount is
+    # owned by the developer. See that file for why the image has to pre-create
+    # node_modules.
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
     # Node 22, not 18.
     #
     # Node 18 reached end of life in April 2025, so it receives no security
@@ -29,7 +36,6 @@ services:
     #
     # 22 rather than 20, to match the frontend service and keep one Node
     # version across the stack.
-    image: node:22
     working_dir: /app
     volumes:
       - ./backend:/app
@@ -103,7 +109,9 @@ services:
     # SILENTLY SKIPS optional deps whose engines don't match the running Node.
     # On node:18 it is omitted with no install error, and the dev server then
     # fails every render with "Cannot find native binding" on globals.css.
-    image: node:22
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
     working_dir: /app
     volumes:
       - ./frontend:/app
@@ -187,7 +195,9 @@ services:
     # April 2025 and receives no security patches; this service simulates field
     # hardware publishing to the broker, so there is nothing here that pins it
     # to an older runtime.
-    image: node:22
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile.dev
     working_dir: /app
     volumes:
       - ./gateway:/app

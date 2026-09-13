@@ -1,0 +1,34 @@
+# Development image.
+#
+# It exists for ONE reason: ownership. The services bind-mount their source
+# from the host and keep node_modules (and .next) in anonymous volumes. Running
+# as root meant every file a container wrote into the bind mount — a Prisma
+# migration, a build artefact, an ad-hoc script — landed owned by root, and the
+# host user then could not delete or overwrite it. That blocked a branch switch
+# and an `npm audit fix` before this existed.
+#
+# Running as a non-root user fixes that, but only if the anonymous volumes are
+# writable by them: Docker creates a fresh anonymous volume with the ownership
+# of that path IN THE IMAGE, so the directories are created and chowned here,
+# before the volume is ever mounted over them. Without these mkdirs the volume
+# arrives root-owned and `npm ci` fails with EACCES.
+#
+# The stock node image already provides `node` at uid 1000, which matches the
+# developer account on this machine, so no user is created.
+FROM node:22
+
+# postgresql-client, for the pg_isready the entrypoint waits on.
+#
+# The entrypoint used to apt-get this at RUNTIME, which worked only because the
+# container ran as root. It belongs at build time regardless: installing a
+# package on every boot is slow, needs network, and silently degrades to a
+# container that waits forever when either is unavailable — which is exactly
+# what happened the first time this image ran as a non-root user.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends postgresql-client \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+RUN mkdir -p /app/node_modules /app/.next && chown -R node:node /app
+
+USER node
