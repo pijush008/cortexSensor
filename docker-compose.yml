@@ -183,7 +183,11 @@ services:
       - ./mosquitto/acl:/mosquitto/config/acl:ro
 
   node-gateway:
-    image: node:18
+    # Node 22, matching the backend and frontend. Node 18 went end of life in
+    # April 2025 and receives no security patches; this service simulates field
+    # hardware publishing to the broker, so there is nothing here that pins it
+    # to an older runtime.
+    image: node:22
     working_dir: /app
     volumes:
       - ./gateway:/app
