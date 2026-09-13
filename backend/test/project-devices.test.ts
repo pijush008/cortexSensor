@@ -314,6 +314,13 @@ describe("claiming a device", () => {
       });
     expect(created.status).toBe(200);
 
+    // A project must be running before it can end — the lifecycle refuses
+    // not_start -> end, and a survey that never began has nothing to end.
+    await request(app)
+      .get(`/api/projectStart/${created.body.projectId}`)
+      .query({ statusType: "start" })
+      .set("Cookie", adminCookie);
+
     const ended = await request(app)
       .get(`/api/projectStart/${created.body.projectId}`)
       .query({ statusType: "end" })
@@ -455,7 +462,7 @@ describe("changing a project's device", () => {
 
     const res = await setDevice(projectId, String(spare.id));
     expect(res.status).toBe(400);
-    expect(res.body.message).toMatch(/not started|before the project starts/i);
+    expect(res.body.message).toMatch(/not collecting|paused|before it starts/i);
 
     // Nothing moved.
     expect(
@@ -566,6 +573,39 @@ describe("changing a project's device", () => {
     expect([403, 404]).toContain(res.status);
     expect(
       (await prisma.device.findUnique({ where: { id: device.id } }))?.isOngoing,
+    ).toBe(true);
+  });
+
+  test("a paused project can still be given a device", async () => {
+    // A reopened project lands in paused with its device already released, so
+    // refusing paused would leave it unable to collect again, ever.
+    const device = await makeDevice({
+      serial: `ds-paused-${Date.now()}`,
+      adminId,
+      tenantId: adminTenantId,
+      sensors: "[1,2]",
+    });
+    const projectId = await projectWith(device);
+
+    await request(app)
+      .get(`/api/projectStart/${projectId}`)
+      .query({ statusType: "start" })
+      .set("Cookie", adminCookie);
+    await request(app)
+      .get(`/api/projectStart/${projectId}`)
+      .query({ statusType: "pause" })
+      .set("Cookie", adminCookie);
+
+    const spare = await makeDevice({
+      serial: `ds-paused-spare-${Date.now()}`,
+      adminId,
+      tenantId: adminTenantId,
+      sensors: "[3,4]",
+    });
+    const res = await setDevice(projectId, String(spare.id));
+    expect(res.status).toBe(200);
+    expect(
+      (await prisma.device.findUnique({ where: { id: spare.id } }))?.isOngoing,
     ).toBe(true);
   });
 });

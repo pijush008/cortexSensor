@@ -789,6 +789,47 @@ export async function getProjectStatus(projectId: string) {
   return { status_code: 200, message: "success", projectStatus: project.status };
 }
 
+/**
+ * What a project may do next, given where it is.
+ *
+ * The server accepted any transition from any state, which let a project be
+ * paused before it started, ended twice, or restarted after ending. The last
+ * mattered most: ending RELEASES THE DEVICE and clears deviceId, so a restarted
+ * project collects nothing and its hardware may already belong to another
+ * project. Ending also emails the stakeholders, so an end/start/end cycle mails
+ * them each time.
+ *
+ * "end -> pause" is the reopen path. It lands in PAUSED rather than running
+ * precisely because the device is gone: the project must be given hardware
+ * before it can collect again, and resuming straight to running would claim to
+ * be monitoring a structure while attached to nothing.
+ */
+const ALLOWED_TRANSITIONS: Record<string, readonly ProjectStartQuery["statusType"][]> = {
+  not_start: ["start"],
+  start: ["pause", "end"],
+  pause: ["start", "end"],
+  end: ["pause"],
+};
+
+/** Why a particular move is refused, in words the person can act on. */
+function transitionRefusal(from: string, to: string): string {
+  if (from === "not_start") {
+    return `This project has not started yet, so it cannot be ${to === "end" ? "ended" : "paused"}. Start it first.`;
+  }
+  if (from === "end") {
+    return to === "end"
+      ? "This project has already ended."
+      : "This project has ended. Reopen it first, then attach a device before starting it again.";
+  }
+  if (from === "start" && to === "start") {
+    return "This project is already running.";
+  }
+  if (from === "pause" && to === "pause") {
+    return "This project is already paused.";
+  }
+  return `A ${from} project cannot be moved to ${to}.`;
+}
+
 export async function projectStart(projectId: string, query: ProjectStartQuery) {
   const project = await prisma.project.findUnique({
     where: { id: Number(projectId) },
@@ -799,6 +840,13 @@ export async function projectStart(projectId: string, query: ProjectStartQuery) 
   }
 
   const { statusType } = query;
+
+  // Checked BEFORE anything is written or emailed: a refused move must leave
+  // the project exactly as it was, with no notification sent.
+  const allowed = ALLOWED_TRANSITIONS[project.status] ?? [];
+  if (!allowed.includes(statusType)) {
+    throw new BadRequestError(transitionRefusal(project.status, statusType));
+  }
 
   if (statusType === "pause") {
     await prisma.project.update({
@@ -1620,9 +1668,16 @@ export async function setProjectDevice(
   });
   if (!project) throw new NotFoundError("Project not found");
 
-  if (project.status !== "not_start") {
+  // While the project is not COLLECTING — which is "not started" or "paused".
+  //
+  // The rule began as "before the project starts", to stop a running project's
+  // series being stitched together from two instruments with no record of where
+  // one ended. A paused project is not collecting, so that reasoning does not
+  // reach it — and an ENDED project reopens to paused with its device already
+  // released, so refusing paused would leave it unable to take hardware again.
+  if (project.status !== "not_start" && project.status !== "pause") {
     throw new BadRequestError(
-      "A project's device can only be changed before the project starts",
+      "A project's device can only be changed while it is not collecting — before it starts, or while paused",
     );
   }
 

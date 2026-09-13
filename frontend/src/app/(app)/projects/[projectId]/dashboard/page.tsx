@@ -8,6 +8,7 @@ import {
   ChevronRight,
   FolderKanban,
   MonitorSmartphone,
+  Pause,
   Play,
   Square,
 } from "lucide-react";
@@ -44,6 +45,15 @@ import styles from "./legacy.module.css";
  * sensor the graph says "No Data Available" and the sensor value reads 0, which
  * is what the legacy screen does and what the data honestly supports.
  */
+
+/** "Ravi Kumar", or null when the slot is unfilled. */
+function personName(
+  first?: string | null,
+  last?: string | null,
+): string | null {
+  const name = `${first ?? ""} ${last ?? ""}`.trim();
+  return name || null;
+}
 
 export default function ProjectDashboardPage() {
   const params = useParams<{ projectId: string }>();
@@ -134,12 +144,28 @@ export default function ProjectDashboardPage() {
     },
   });
 
+  const [statusError, setStatusError] = useState<string | null>(null);
+
   const setStatus = useMutation({
-    mutationFn: async (next: "start" | "pause") => {
-      await api.patch(`/projectStatus/${projectIdNum}`, { status: next });
+    // PATCH /projectStatus was a 404: no such route has ever existed, and the
+    // mutation had no onError, so every press of Start and Pause failed
+    // silently and the screen simply refetched. The real endpoint is the one
+    // the projects list uses.
+    mutationFn: async (next: "start" | "pause" | "end") => {
+      await api.get(`/projectStart/${projectIdNum}`, {
+        params: { statusType: next },
+      });
     },
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["project-dashboard"] }),
+    onSuccess: () => {
+      setStatusError(null);
+      queryClient.invalidateQueries({ queryKey: ["project-dashboard"] });
+      // The list's status column reads from a different query.
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
+    // The server enforces which transitions are legal and says why one is not;
+    // showing that is the whole difference between a button that works and a
+    // button that appears to.
+    onError: (err) => setStatusError(describeError(err).description),
   });
 
   if (projectsQuery.isLoading || dashboard.isLoading) return <LoadingState />;
@@ -179,14 +205,33 @@ export default function ProjectDashboardPage() {
   // order the legacy ConImages row uses. The platform operator is deliberately
   // NOT among them: they are not a party to the work, and the legacy header
   // never showed them either.
+  //
+  // The name is carried alongside the image so the emblem can say WHO it is.
+  // A row of three unlabelled logos asks the reader to recognise companies they
+  // may never have seen, and the initials fallback ("AD", "CO") is worse still
+  // — it names the role and nothing else.
   const emblems = [
-    { src: d.adminImg, label: "Admin" },
-    { src: d.contractorImg, label: "Contractor" },
-    { src: d.authorityImg, label: "Authority" },
+    {
+      src: d.adminImg,
+      label: "Admin",
+      name: personName(d.adminFirstName, d.adminLastName),
+    },
+    {
+      src: d.contractorImg,
+      label: "Contractor",
+      name: personName(d.contractorFirstName, d.contractorLastName),
+    },
+    {
+      src: d.authorityImg,
+      label: "Authority",
+      name: personName(d.authorityFirstName, d.authorityLastName),
+    },
   ];
 
   const running = d.projectStatus === "start";
   const finished = d.projectStatus === "end";
+  const paused = d.projectStatus === "pause";
+  const notStarted = d.projectStatus === "not_start";
   // Mirrors the server's rule so the control is not offered where the API
   // would refuse it. The API remains the enforcement point.
   const isAdmin = userType === "superadmin" || userType === "admin";
@@ -217,26 +262,50 @@ export default function ProjectDashboardPage() {
             />
           </span>
 
-          {emblems.map((e) =>
-            e.src ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img key={e.label} src={e.src} alt={e.label} className={styles.emblem} />
-            ) : (
-              <span
-                key={e.label}
-                className={`${styles.emblem} ${styles.emblemFallback}`}
-                title={e.label}
-              >
-                {e.label.slice(0, 2).toUpperCase()}
+          {emblems.map((e) => {
+            // "Contractor — Acme Infra", or just "Contractor" where the slot is
+            // empty. The title is what a reader gets on hover for a logo they
+            // do not recognise.
+            const title = e.name ? `${e.label} — ${e.name}` : e.label;
+            return (
+              <span key={e.label} className={styles.emblemSlot} title={title}>
+                {e.src ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={e.src} alt={title} className={styles.emblem} />
+                ) : (
+                  <span
+                    className={`${styles.emblem} ${styles.emblemFallback}`}
+                    aria-label={title}
+                  >
+                    {/* Initials of the PERSON where there is one; the role's
+                        first two letters only when the slot is unfilled. */}
+                    {e.name
+                      ? e.name
+                          .split(/\s+/)
+                          .slice(0, 2)
+                          .map((w) => w[0])
+                          .join("")
+                          .toUpperCase()
+                      : e.label.slice(0, 2).toUpperCase()}
+                  </span>
+                )}
+                <span className={styles.emblemCaption}>{e.label}</span>
               </span>
-            ),
-          )}
+            );
+          })}
 
+          {/* Enabled exactly where the server allows the move, so the screen
+              stops offering transitions the API refuses:
+                not_start -> start
+                start     -> pause, end
+                pause     -> start (resume), end
+                end       -> pause (reopen)  */}
           <button
             type="button"
             className={styles.runBtn}
-            aria-label="Start project"
-            disabled={running || setStatus.isPending}
+            aria-label={paused ? "Resume project" : "Start project"}
+            title={paused ? "Resume project" : "Start project"}
+            disabled={!(notStarted || paused) || setStatus.isPending}
             onClick={() => setStatus.mutate("start")}
           >
             <Play size={18} fill="currentColor" />
@@ -244,14 +313,45 @@ export default function ProjectDashboardPage() {
           <button
             type="button"
             className={styles.stopBtn}
-            aria-label="Pause project"
-            disabled={!running || setStatus.isPending}
+            aria-label={finished ? "Reopen project" : "Pause project"}
+            title={finished ? "Reopen project" : "Pause project"}
+            disabled={!(running || finished) || setStatus.isPending}
             onClick={() => setStatus.mutate("pause")}
+          >
+            {/* A pause icon for a pause action; this was a stop square. */}
+            <Pause size={16} fill="currentColor" />
+          </button>
+          <button
+            type="button"
+            className={styles.endBtn}
+            aria-label="End project"
+            title="End project"
+            disabled={!(running || paused) || setStatus.isPending}
+            onClick={() => {
+              // Ending releases the device and emails the stakeholders, and the
+              // only way back is a reopen that lands paused with no hardware.
+              // Worth one question first.
+              if (
+                window.confirm(
+                  "End this project? Its device is released and the stakeholders are notified. You can reopen it later, but it will come back paused and without a device.",
+                )
+              ) {
+                setStatus.mutate("end");
+              }
+            }}
           >
             <Square size={16} fill="currentColor" />
           </button>
         </div>
       </header>
+
+      {/* The server decides which transitions are legal and explains a refusal;
+          without this the button simply appeared not to work. */}
+      {statusError && (
+        <div role="alert" className={styles.statusError}>
+          {statusError}
+        </div>
+      )}
 
       <div className={styles.body}>
         {expanded && (

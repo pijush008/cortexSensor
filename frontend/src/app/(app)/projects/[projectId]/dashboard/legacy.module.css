@@ -51,6 +51,25 @@
   padding: 0.5px;
 }
 
+/* Each emblem is a logo with the role named beneath it. The row previously
+   showed three bare images, which asked the reader to recognise companies by
+   sight alone. */
+.emblemSlot {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.emblemCaption {
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--legacy-steel);
+  white-space: nowrap;
+}
+
 .emblemFallback {
   display: flex;
   align-items: center;
@@ -83,7 +102,8 @@
 }
 
 .runBtn,
-.stopBtn {
+.stopBtn,
+.endBtn {
   width: 38px;
   height: 38px;
   border-radius: 50%;
@@ -97,6 +117,23 @@
 
 .runBtn {
   background: #2196f3;
+}
+
+.endBtn {
+  /* Ending releases the device and notifies the stakeholders, so it is not the
+     same weight as pausing. */
+  background: var(--legacy-red, #af0000);
+  color: #fff;
+}
+
+.statusError {
+  margin: 0 12px 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: rgba(175, 0, 0, 0.08);
+  border: 1px solid rgba(175, 0, 0, 0.25);
+  color: #8a0000;
+  font-size: 12px;
 }
 
 .stopBtn {
