@@ -2,6 +2,21 @@
 
 import { useEffect, useRef, useState, useCallback } from "react"
 
+/**
+ * The card's resting tilt in compact mode.
+ *
+ * A fixed diagonal lean at rest. While actively hovering, the tilt is a clean,
+ * symmetric swing around zero — NOT offset by this resting baseline, which was
+ * the bug: adding the baseline inside the live range made it swing from -28° to
+ * +2°, never symmetric, always biased toward one side.
+ *
+ * At module scope because they are constants, not state. Declared inside the
+ * component they were rebuilt on every render, which is why exhaustive-deps
+ * asked for them in a dependency array where they can never change.
+ */
+const BASE_ROTATE_Y = -13
+const BASE_ROTATE_X = 5
+
 // ─────────────────────────────────────────────────────────────
 // WHEREVER YOU RUN
 // A looping running video sits inside a square, floating "screen"
@@ -276,7 +291,6 @@ export default function MusicHero({
     }
     rafId = requestAnimationFrame(render)
     return () => cancelAnimationFrame(rafId)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [n])
 
   useEffect(() => {
@@ -352,13 +366,6 @@ export default function MusicHero({
     }
   }, [])
 
-  // A fixed diagonal lean at rest, in compact mode only. While actively
-  // hovering, the tilt is a clean, symmetric swing around zero — not
-  // offset by that resting baseline, which was the bug: adding the
-  // baseline inside the live range made it swing from -28° to +2°,
-  // never symmetric, always biased toward one side.
-  const BASE_ROTATE_Y = -13
-  const BASE_ROTATE_X = 5
 
   const onCardMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (isCoarsePointer || theme === "minimal") return
@@ -547,7 +554,6 @@ export default function MusicHero({
 
           <MobileTrackList
             listViewportRef={listViewportRef}
-            rowRefs={rowRefs}
             setRowRef={setRowRef}
             tracks={tracks}
             activeIndex={activeIndex}
@@ -1025,7 +1031,6 @@ function SeamlessLoopVideo({
     }
     rafId = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(rafId)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const base: React.CSSProperties = { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }
@@ -1275,14 +1280,12 @@ function TrackRow({
 
 function MobileTrackList({
   listViewportRef,
-  rowRefs,
   setRowRef,
   tracks,
   activeIndex,
   isPlaying,
 }: {
   listViewportRef: React.RefObject<HTMLDivElement | null>
-  rowRefs: React.MutableRefObject<(HTMLDivElement | null)[]>
   setRowRef: (i: number) => (el: HTMLDivElement | null) => void
   tracks: Track[]
   activeIndex: number
