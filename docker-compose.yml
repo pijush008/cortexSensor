@@ -19,7 +19,17 @@ services:
       - redis_data:/data
 
   backend:
-    image: node:18
+    # Node 22, not 18.
+    #
+    # Node 18 reached end of life in April 2025, so it receives no security
+    # patches of its own — and the fix for nodemailer's misrouting advisory
+    # (GHSA-mm7p-fcc7-pg87, which affects every version <= 9.1.0) is
+    # nodemailer 10, whose engines field requires Node >= 20. The runtime was
+    # the thing pinning a known-vulnerable mail library in place.
+    #
+    # 22 rather than 20, to match the frontend service and keep one Node
+    # version across the stack.
+    image: node:22
     working_dir: /app
     volumes:
       - ./backend:/app
