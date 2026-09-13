@@ -529,14 +529,30 @@ export async function getProjectDetail(projectId: string) {
     where: { id: Number(projectId) },
     include: {
       creator: {
-        select: { firstName: true, lastName: true, profileImage: true },
+        select: {
+          firstName: true,
+          lastName: true,
+          profileImage: true,
+          companyLogo: true,
+        },
       },
       contractor: {
-        select: { firstName: true, lastName: true },
+        select: {
+          firstName: true,
+          lastName: true,
+          profileImage: true,
+          companyLogo: true,
+        },
       },
       authority: {
-        select: { firstName: true, lastName: true },
+        select: {
+          firstName: true,
+          lastName: true,
+          profileImage: true,
+          companyLogo: true,
+        },
       },
+      tenant: { select: { logoPath: true } },
     },
   });
 
@@ -599,7 +615,12 @@ export async function getProjectDetail(projectId: string) {
     authorityLastName: project.authority?.lastName ?? null,
     adminFirstName: project.creator?.firstName ?? null,
     adminLastName: project.creator?.lastName ?? null,
-    adminImg: formatImageUrl(project.creator?.profileImage),
+    // The same rule the dashboard emblems use, and for the same reason: this
+    // mapping existing in two places is how one of them goes stale.
+    contractorImg: partyEmblem(project.contractor),
+    authorityImg: partyEmblem(project.authority),
+    adminImg:
+      partyEmblem(project.creator) ?? formatImageUrl(project.tenant?.logoPath),
     sensorDetails,
     offset: project.offset,
     csvData: project.csvData,
@@ -857,6 +878,24 @@ export async function projectOffsetById(projectId: string, input: ProjectOffsetI
   return { status_code: 200, message: "Success" };
 }
 
+/**
+ * The logo shown for one party to a project.
+ *
+ * companyLogo is what the platform actually records: the invitation flow
+ * collects it when an administrator sets up a contractor or authority, and the
+ * profile page edits it. profileImage predates it and is a PERSONAL avatar, so
+ * it is only a fallback for accounts that set one before company logos existed.
+ *
+ * Reading profileImage alone is what left every emblem on the dashboard showing
+ * initials while a perfectly good logo sat one column over.
+ */
+function partyEmblem(
+  party: { companyLogo?: string | null; profileImage?: string | null } | null | undefined,
+): string | null {
+  if (!party) return null;
+  return formatImageUrl(party.companyLogo ?? party.profileImage);
+}
+
 export async function dashboardData(uniqueId: string) {
   const project = await prisma.project.findFirst({
     where: {
@@ -866,14 +905,33 @@ export async function dashboardData(uniqueId: string) {
     },
     include: {
       creator: {
-        select: { firstName: true, lastName: true, profileImage: true },
+        select: {
+          firstName: true,
+          lastName: true,
+          profileImage: true,
+          companyLogo: true,
+        },
       },
       contractor: {
-        select: { firstName: true, lastName: true, profileImage: true },
+        select: {
+          firstName: true,
+          lastName: true,
+          profileImage: true,
+          companyLogo: true,
+        },
       },
       authority: {
-        select: { firstName: true, lastName: true, profileImage: true },
+        select: {
+          firstName: true,
+          lastName: true,
+          profileImage: true,
+          companyLogo: true,
+        },
       },
+      // The admin's last resort: an organization supplies a logo at
+      // registration, so an admin should not have to upload the same image
+      // twice for it to appear beside their own project.
+      tenant: { select: { logoPath: true } },
     },
   });
 
@@ -900,7 +958,7 @@ export async function dashboardData(uniqueId: string) {
 
   const superAdmin = await prisma.user.findFirst({
     where: { userType: "superadmin" },
-    select: { profileImage: true },
+    select: { profileImage: true, companyLogo: true },
   });
 
   const projectData = {
@@ -916,10 +974,19 @@ export async function dashboardData(uniqueId: string) {
     dashImage2: formatImageUrl(project.dashImage2),
     liveVideoUrl: project.liveVideoUrl,
     contractorId: project.contractorId,
-    contractorImg: formatImageUrl(project.contractor?.profileImage),
-    authorityImg: formatImageUrl(project.authority?.profileImage),
-    adminImg: formatImageUrl(project.creator?.profileImage),
-    superAdminImage: formatImageUrl(superAdmin?.profileImage),
+    // The emblem row at the top of the dashboard.
+    //
+    // companyLogo FIRST: that is the column the invitation flow writes and the
+    // profile page edits, so it is where a real logo lives. profileImage is the
+    // older personal avatar and is kept only as a fallback for accounts that
+    // set one before company logos existed. Reading profileImage alone left
+    // every emblem showing initials while a logo sat unused one column over.
+    contractorImg: partyEmblem(project.contractor),
+    authorityImg: partyEmblem(project.authority),
+    // The admin additionally falls back to their organization's logo.
+    adminImg:
+      partyEmblem(project.creator) ?? formatImageUrl(project.tenant?.logoPath),
+    superAdminImage: partyEmblem(superAdmin),
     sensorList: device?.assignSensor ?? null,
     deviceId: project.deviceId,
     gatewayDeviceId: device?.gatewayDeviceId ?? null,

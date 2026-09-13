@@ -1,7 +1,11 @@
-import { randomBytes } from "crypto";
+import fs from "fs";
+import fsp from "fs/promises";
+import path from "path";
+import { randomBytes, randomUUID } from "crypto";
 import { MembershipStatus, Prisma, RoleKey, TenantStatus } from "@prisma/client";
 import prisma from "../../config/prisma";
 import { BadRequestError } from "../../utils/AppError";
+import { logger } from "../../utils/logger";
 import { config } from "../../config";
 
 /**
@@ -244,13 +248,75 @@ export const OPERATOR_TENANT_SLUG = "platform-operator";
 
 const OPERATOR_TENANT_NAME = "Cloudglance Sensinglab Pvt Ltd";
 
+/**
+ * The company mark, copied into the uploads directory the first time the
+ * operator organization needs one.
+ *
+ * A customer's organization gets its logo because registration collects one.
+ * The operator organization is provisioned by code, so nobody ever uploads for
+ * it — and without this the Admin emblem is blank on every project a platform
+ * operator creates, sitting beside a contractor's and an authority's logos.
+ *
+ * Copied rather than referenced in place: Tenant.logoPath is served from
+ * backend/uploads, and pointing it at a file inside the frontend bundle would
+ * break the moment either side is deployed separately.
+ *
+ * Returns null rather than throwing if the asset is missing. A deployment
+ * without the brand assets should still be able to create projects; it simply
+ * falls back to initials, which is what it did before.
+ */
+async function seedOperatorLogo(): Promise<string | null> {
+  const candidates = [
+    process.env.OPERATOR_LOGO_SOURCE,
+    // Shipped with the API in backend/assets, deliberately NOT read from the
+    // frontend's public folder: the two are separately deployable and the
+    // backend container does not mount it.
+    path.resolve("assets/cloudglance-mark.png"),
+    path.resolve(__dirname, "../../../assets/cloudglance-mark.png"),
+  ].filter((p): p is string => Boolean(p));
+
+  const source = candidates.find((c) => fs.existsSync(c));
+  if (!source) {
+    logger.warn(
+      "Operator organization logo not seeded: cloudglance-mark.png was not found",
+    );
+    return null;
+  }
+
+  try {
+    const dir = "uploads/tenants";
+    await fsp.mkdir(dir, { recursive: true });
+    const target = path.join(dir, `${randomUUID()}.png`);
+    await fsp.copyFile(source, target);
+    return target;
+  } catch (err) {
+    logger.warn(
+      `Operator organization logo not seeded: ${(err as Error).message}`,
+    );
+    return null;
+  }
+}
+
 export async function getOrCreateOperatorTenant(): Promise<number> {
   const existing = await prisma.tenant.findUnique({
     where: { slug: OPERATOR_TENANT_SLUG },
-    select: { id: true, status: true },
+    select: { id: true, status: true, logoPath: true },
   });
 
   if (existing) {
+    // Backfills an organization created before it carried a logo. Only when it
+    // has none: re-seeding on every call would write a fresh copy of the same
+    // image for every project created.
+    if (!existing.logoPath) {
+      const logoPath = await seedOperatorLogo();
+      if (logoPath) {
+        await prisma.tenant.update({
+          where: { id: existing.id },
+          data: { logoPath },
+        });
+      }
+    }
+
     // Reactivated rather than refused: an operator organization that somebody
     // suspended would otherwise leave the platform's own projects uncreatable
     // with no obvious cause.
@@ -269,6 +335,7 @@ export async function getOrCreateOperatorTenant(): Promise<number> {
       name: OPERATOR_TENANT_NAME,
       slug: OPERATOR_TENANT_SLUG,
       status: TenantStatus.active,
+      logoPath: await seedOperatorLogo(),
     },
   });
 

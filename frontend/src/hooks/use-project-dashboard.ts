@@ -29,10 +29,22 @@ export interface ProjectDashboard {
   liveVideoUrl: string | null;
   /** The user who may upload the project image, alongside administrators. */
   contractorId: number | null;
+  /**
+   * The emblem for each party, resolved server-side: the person's company logo
+   * first, their older personal avatar as a fallback, and for the admin the
+   * organization's logo before giving up. Null means nothing to show.
+   */
   adminImg: string | null;
   contractorImg: string | null;
   authorityImg: string | null;
   superAdminImage: string | null;
+  /** Names the emblems are captioned with; the API has always sent these. */
+  adminFirstName: string | null;
+  adminLastName: string | null;
+  contractorFirstName: string | null;
+  contractorLastName: string | null;
+  authorityFirstName: string | null;
+  authorityLastName: string | null;
   deviceId: string | null;
   gatewayDeviceId: string | null;
   deviceName: string | null;
