@@ -572,8 +572,27 @@ export async function createNetworkDataFromDevice(input: BeamDeviceDataInput) {
     return { status_code: 200, message: "No active project found for device" };
   }
 
-  if (!isTodayBetweenOrEqualTo(project.startDate, project.endDate)) {
-    return { status_code: 200, message: "Project is not currently running" };
+  // The project's STATUS decides whether readings are kept — not the calendar.
+  //
+  // This was a date-window check, which made the dashboard controls misleading
+  // in both directions: pausing a project went on collecting, because pause
+  // touches no date, and a started project whose planned dates had passed
+  // silently dropped everything with no visible reason. Ending only appeared to
+  // work because it clears deviceId and the lookup above then finds no project
+  // — an accident that stopped being enough once a project could be reopened,
+  // since a reopened project sits paused with no device.
+  //
+  // Planned dates are now what they read like: a plan. Start collects, pause
+  // suspends, end stops.
+  //
+  // Returned as 200 rather than an error, exactly as before: a rejected payload
+  // makes a field gateway retry the same reading indefinitely, and a paused
+  // project is a deliberate state, not a fault.
+  if (project.status !== "start") {
+    return {
+      status_code: 200,
+      message: `Project is ${project.status === "pause" ? "paused" : "not running"}; reading discarded`,
+    };
   }
 
   const projectData = {
