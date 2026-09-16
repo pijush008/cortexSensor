@@ -47,6 +47,9 @@ services:
       NODE_ENV: development
       NODE_OPTIONS: "--max-old-space-size=4096"
       DATABASE_URL: "postgresql://shm:shm_pass@postgres:5432/shm_dev?schema=public"
+      # Required whenever the Prisma schema is loaded, because it declares
+      # `directUrl`. No pooler here, so it is the same connection string.
+      DIRECT_URL: "postgresql://shm:shm_pass@postgres:5432/shm_dev?schema=public"
       # Defaults to the local container so the dev stack costs nothing to
       # run. Export REDIS_URL (e.g. the Upstash endpoint) to point the
       # containers at a managed instance instead — worth doing

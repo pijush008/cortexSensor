@@ -57,6 +57,11 @@ jobs:
       - name: Install deps, prepare DB and run tests
         env:
           DATABASE_URL: postgresql://shm:shm_pass@localhost:5432/shm_ci?schema=public
+          # schema.prisma declares `directUrl`, so Prisma requires DIRECT_URL to
+          # exist in EVERY environment that loads the schema — not only the ones
+          # that talk to Supabase. Against a plain Postgres there is no pooler in
+          # between, so the two are the same connection.
+          DIRECT_URL: postgresql://shm:shm_pass@localhost:5432/shm_ci?schema=public
           # The gRPC client loads the contract at runtime and defaults to the
           # container's /proto mount, which does not exist on a CI runner.
           SHM_ENGINE_PROTO_PATH: ${{ github.workspace }}/proto/shm/engine/v1/engine.proto
