@@ -67,6 +67,16 @@ process.env.REGISTER_RATE_LIMIT_MAX = "100000";
 // legacy-key deprecation path behave predictably.
 process.env.MQTT_INGEST_ENABLED = process.env.MQTT_INGEST_ENABLED ?? "false";
 
+// PINNED, for the same reason as the webhook secrets above: the suite must not
+// depend on a developer's .env.
+//
+// integration.test.ts sends `process.env.IOT_API_KEY || "dev-iot-key"` while
+// src/config defaults to "change-me". On a machine with backend/.env both sides
+// read the same real value and the request is authorised; on CI, which has no
+// .env, the two fallbacks disagree and ingest returns 401. The test was passing
+// only because a file that is not in the repository happened to exist.
+process.env.IOT_API_KEY = process.env.IOT_API_KEY ?? "dev-iot-key";
+
 // Effectively unlimited code-bearing requests during a test run, for the same
 // reason REGISTER_RATE_LIMIT_MAX is raised above: one process, one in-memory
 // limiter store and one source address mean the production ceiling of 10 per

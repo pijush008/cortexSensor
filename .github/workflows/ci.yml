@@ -7,7 +7,12 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:15
+        # timescaledb, not plain postgres. measurements.test.ts asserts that
+        # measurements IS a hypertable, and the 20260916 migration branches on
+        # whether the extension exists — so a plain image silently exercises a
+        # different storage path from the one every developer runs, and fails a
+        # test that has nothing wrong with it.
+        image: timescale/timescaledb:latest-pg15
         env:
           POSTGRES_USER: shm
           POSTGRES_PASSWORD: shm_pass
@@ -16,6 +21,15 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+      redis:
+        # rate-limit-store.test.ts asserts that Redis is reachable rather than
+        # skipping when it is not — the same deliberate choice the analysis
+        # suites make about the engine. So CI must actually run one.
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
       - uses: actions/checkout@v7
       - name: Use Node.js
@@ -62,6 +76,7 @@ jobs:
           # that talk to Supabase. Against a plain Postgres there is no pooler in
           # between, so the two are the same connection.
           DIRECT_URL: postgresql://shm:shm_pass@localhost:5432/shm_ci?schema=public
+          REDIS_URL: redis://localhost:6379
           # The gRPC client loads the contract at runtime and defaults to the
           # container's /proto mount, which does not exist on a CI runner.
           SHM_ENGINE_PROTO_PATH: ${{ github.workspace }}/proto/shm/engine/v1/engine.proto
@@ -71,6 +86,14 @@ jobs:
           npm ci
           # wait for Postgres service
           until pg_isready -h localhost -p 5432 -U shm; do echo "waiting for postgres"; sleep 1; done
+          # Enable TimescaleDB explicitly rather than trusting the image to have
+          # done it. The extension is PER-DATABASE, and the dev stack enables it
+          # through docker-init/init_timescale.sql — a bind mount that CI does
+          # not have. measurements.test.ts asserts the hypertable exists and the
+          # 20260916 migration branches on this, so leaving it to chance means CI
+          # silently exercises the unpartitioned path.
+          PGPASSWORD=shm_pass psql -h localhost -U shm -d shm_ci \
+            -c "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"
           npx prisma migrate deploy
           npm run prisma:seed || true
           npm run test:run

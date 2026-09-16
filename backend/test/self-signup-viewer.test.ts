@@ -32,6 +32,7 @@ const LAPSED_EMAIL = "selfsignup-lapsed@example.com";
 let viewerId = 0;
 let lapsedId = 0;
 let lapsedTenantId = 0;
+let directoryProjectId = 0;
 
 async function makeUser(email: string, userType: "viewer" | "contractor") {
   const u = await prisma.user.create({
@@ -85,9 +86,34 @@ beforeAll(async () => {
       status: MembershipStatus.active,
     },
   });
+
+  // One project, so the directory is not empty.
+  //
+  // The listing endpoint answers 404 "Projects not found" when nothing
+  // matches, so a test asserting 200 was really asserting "this database
+  // happens to contain a project". It passed on a developer's machine and
+  // failed on CI, whose database is created fresh for every run — the same
+  // ambient-state dependency the pinned environment variables at the top of
+  // test/setup.ts exist to prevent. The fixture makes the assertion about the
+  // viewer's access, which is what it is for.
+  const directoryProject = await prisma.project.create({
+    data: {
+      projectName: `Directory-Visible-${Date.now()}`,
+      projectLocation: "Test Location",
+      startDate: new Date("2026-01-01"),
+      status: "start",
+      isDelete: false,
+      isRegistered: true,
+      createdBy: lapsedId,
+      tenantId: tenant.id,
+    },
+    select: { id: true },
+  });
+  directoryProjectId = directoryProject.id;
 });
 
 afterAll(async () => {
+  await prisma.project.deleteMany({ where: { id: directoryProjectId } });
   await prisma.membership.deleteMany({ where: { tenantId: lapsedTenantId } });
   await prisma.tenant.deleteMany({ where: { id: lapsedTenantId } });
   await prisma.user.deleteMany({
