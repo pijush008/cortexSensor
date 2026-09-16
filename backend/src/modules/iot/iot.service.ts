@@ -159,9 +159,23 @@ async function handleSensorData(
 
     if (!device) continue;
 
-    const channels = await prisma.deviceChannel.findMany({
-      where: { deviceId: String(device.id) },
-    });
+    // ORDERED BY CHANNEL NUMBER, because the payload's Channels array is
+    // positional: the firmware's first reading is channel 1, the second is
+    // channel 2, and so on.
+    //
+    // This query had no ordering at all, so the mapping depended on whatever
+    // order Postgres happened to return rows in — which for this device was
+    // 4, 1, 2, 3. Every reading was therefore attributed to the WRONG sensor,
+    // silently and plausibly: the values looked reasonable, they were simply
+    // recorded against the wrong instrument.
+    //
+    // Sorted numerically rather than by the VarChar column, or channel 10 would
+    // sort before channel 2 once a device has more than nine.
+    const channels = (
+      await prisma.deviceChannel.findMany({
+        where: { deviceId: String(device.id) },
+      })
+    ).sort((a, b) => Number(a.channelNumber) - Number(b.channelNumber));
 
     const pendingMeasurements: RawReading[] = [];
 
@@ -176,6 +190,17 @@ async function handleSensorData(
       const channelReading = telemetry.Sensor.Channels[i];
       const channel = channels[i];
       if (!channel || !channel.assignSensor) continue;
+
+      // A channel the administrator has not selected is not in use.
+      //
+      // Nothing enforced this before: `activeStatus` was displayed in the
+      // console and settable nowhere, so a channel shown as Inactive went on
+      // storing readings and raising alerts exactly like an active one. Skipped
+      // HERE, before storage and before the threshold comparison below, so
+      // "not selected" means no history and no alerts rather than only one of
+      // the two — a channel nobody is recording must not be emailing people
+      // about a sensor that may not even be wired up.
+      if (channel.activeStatus !== "one") continue;
 
       const sensor = await prisma.sensor.findUnique({
         where: { id: Number(channel.assignSensor) },

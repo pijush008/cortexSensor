@@ -49,10 +49,35 @@ router.get(
   (req: AuthRequest, res: Response) => {
     const ctx = req.auth!;
 
-    // A platform operator has no tenant, so there is no single stream to
-    // subscribe them to. Refusing explicitly is clearer than silently
-    // delivering nothing forever.
-    if (ctx.tenantId === null) {
+    /**
+     * Which organization's feed this connection carries.
+     *
+     * A member is pinned to their own, and nothing they send can change that —
+     * the query parameter is read ONLY for a platform operator, so a member
+     * cannot subscribe to a neighbour's stream by appending an id.
+     *
+     * A platform operator belongs to no organization, so there is no stream to
+     * infer. They used to be refused outright; instead they now NAME the one
+     * they want, one at a time. That keeps the isolation rule intact — a stream
+     * still carries exactly one tenant — while letting an operator watch a
+     * customer's live data, which is most of what the console is for.
+     */
+    let tenantId = ctx.tenantId;
+
+    if (ctx.isPlatformAdmin) {
+      const requested = Number(req.query.tenantId);
+      if (!Number.isInteger(requested) || requested <= 0) {
+        res.status(400).json({
+          status_code: 400,
+          message:
+            "Choose an organization to watch: pass ?tenantId= with the organization's id.",
+        });
+        return;
+      }
+      tenantId = requested;
+    }
+
+    if (tenantId === null) {
       res.status(400).json({
         status_code: 400,
         message:
@@ -75,7 +100,7 @@ router.get(
 
     res.write(
       `event: ready\ndata: ${JSON.stringify({
-        tenantId: ctx.tenantId,
+        tenantId,
         // Told to the client so it can render "waiting for data" honestly
         // rather than implying a stalled connection.
         keepaliveSeconds: KEEPALIVE_MS / 1000,
@@ -85,12 +110,12 @@ router.get(
     let pending = 0;
     let closed = false;
 
-    const unsubscribe = subscribeTenant(ctx.tenantId, (event) => {
+    const unsubscribe = subscribeTenant(tenantId, (event) => {
       if (closed) return;
       pending += 1;
       if (pending > MAX_PENDING_EVENTS) {
         logger.warn(
-          `SSE client for tenant ${ctx.tenantId} fell too far behind; closing`,
+          `SSE client for tenant ${tenantId} fell too far behind; closing`,
         );
         cleanup();
         res.end();

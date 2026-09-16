@@ -9,7 +9,6 @@ import {
   Eraser,
   FileSpreadsheet,
 } from "lucide-react";
-import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -157,11 +156,16 @@ export default function DataDownloadPage() {
     setNotice(null);
   };
 
-  const exportExcel = () => {
+  const exportExcel = async () => {
     if (orderAsc.length === 0) return;
     setBusy(true);
     setNotice(null);
     try {
+      // Loaded on click, not at import. xlsx is by far the heaviest dependency
+      // on this page, and it is only needed by whoever actually presses Export
+      // — a static import made every visitor download and parse it just to look
+      // at the table.
+      const XLSX = await import("xlsx");
       const dynKeys = new Set<string>();
       const prepared = orderAsc.map((m) => {
         const parsed = parsePayload(m.payload);

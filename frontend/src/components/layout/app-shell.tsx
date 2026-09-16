@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Menu, ChevronRight } from "lucide-react";
+import { Menu, ChevronRight, Clock } from "lucide-react";
 import { ImpersonationBanner } from "./impersonation-banner";
 import { NotificationsBell } from "./notifications-bell";
 import { Avatar } from "@/components/ui/avatar";
@@ -30,7 +30,6 @@ const PLATFORM_NAME = "Cloudglance Sensinglab Pvt Ltd";
 
 const ROUTE_LABELS: Record<string, string> = {
   dashboard: "Operations",
-  analytics: "Analysis",
   gateways: "Fleet",
   alerts: "Alerts",
   devices: "Devices",
@@ -46,13 +45,44 @@ const ROUTE_LABELS: Record<string, string> = {
   profile: "Settings",
 };
 
-function useUtcClock() {
+/**
+ * The header clock, isolated so its tick does not re-render the console.
+ *
+ * The state lived in AppShell, which meant every second React re-rendered the
+ * shell and everything it builds inline — the sidebar with its route list, the
+ * breadcrumb, the identity tile — to change eight characters of text. Owning
+ * the interval here confines the update to this element: the shell renders when
+ * the shell actually changes, and the seconds still tick.
+ */
+/**
+ * The wall-clock time, in the viewer's own timezone.
+ *
+ * Shown as local 12-hour time with AM/PM rather than the UTC instant it used
+ * to display. A reader five and a half hours from UTC had to convert in their
+ * head to answer "is this clock still running", which is the only question a
+ * header clock is there to answer.
+ *
+ * Note this is NOT the clock measurements are timestamped against — those are
+ * UTC, and each screen labels its own timestamps. This is the wall clock, and
+ * its only job is to show that the console is live.
+ */
+function LocalClock() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
-  return now.toISOString().slice(11, 19) + "Z";
+
+  // Rendered from the browser's own locale data rather than assembled by hand,
+  // so 12-hour formatting and the AM/PM marker follow the viewer's conventions.
+  const time = now.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+
+  return <span className="tabular-nums tracking-wide">{time}</span>;
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -68,7 +98,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const userType = me.data?.user.userType ?? storedUserType;
   const userId = me.data?.user.id ?? storedUserId;
   const pathname = usePathname();
-  const utc = useUtcClock();
 
   const segment = pathname.split("/").filter(Boolean)[0] || "dashboard";
   const moduleLabel = ROUTE_LABELS[segment] ?? "Console";
@@ -129,8 +158,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex shrink-0 items-center gap-2.5">
             {/* live clock */}
             <div className="hidden items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-mono text-[0.6875rem] text-slate-500 md:flex">
-              <PulseDot tone="green" />
-              <span className="tabular-nums tracking-wide">{utc}</span>
+              <Clock className="h-3.5 w-3.5 text-slate-400" strokeWidth={1.75} />
+              <LocalClock />
             </div>
 
             <NotificationsBell />

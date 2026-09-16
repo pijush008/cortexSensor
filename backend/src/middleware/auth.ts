@@ -147,6 +147,21 @@ export const authenticate = async (
 
     next();
   } catch (err) {
+    /**
+     * A bad or expired token is UNAUTHORISED, not a server fault.
+     *
+     * jsonwebtoken throws TokenExpiredError / JsonWebTokenError, neither of
+     * which is an AppError, so they fell through to the generic handler and
+     * came back as 500. That is not merely the wrong number: the client
+     * refreshes its session on 401 and only on 401, so an access token
+     * reaching its expiry — which every session does, on a short timer —
+     * produced "Internal Server Error" on every call instead of the silent
+     * renewal the refresh token exists to provide.
+     */
+    const name = (err as Error)?.name;
+    if (name === "TokenExpiredError" || name === "JsonWebTokenError" || name === "NotBeforeError") {
+      return next(new UnauthorizedError("Session expired"));
+    }
     next(err as Error);
   }
 };

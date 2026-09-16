@@ -79,28 +79,6 @@
   color: var(--legacy-steel);
 }
 
-.deviceBadge {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 46px;
-  height: 38px;
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  border-radius: 6px;
-  color: var(--legacy-navy-blue);
-  background: #fff;
-}
-
-.deviceDot {
-  position: absolute;
-  top: 4px;
-  right: 5px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
 .runBtn,
 .stopBtn,
 .endBtn {

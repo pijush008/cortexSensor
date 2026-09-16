@@ -24,6 +24,17 @@ let client: ReturnType<typeof mqtt.connect> | null = null;
 let started = false;
 let stopped = false;
 let reconnectDelayMs = 5000;
+/**
+ * Guards against more than one reconnect being in flight.
+ *
+ * Without it a single broker refusal fans out instead of retrying. mqtt.js
+ * reconnects on its own AND every `close` scheduled another `connect()`, so
+ * each attempt left an orphaned client that kept emitting `close` and spawning
+ * successors. Observed against a broker that rejected our credentials: ~84
+ * reconnects per second and 1.5 GB resident within six minutes, until the event
+ * loop starved and the API stopped answering HTTP — sign-in included.
+ */
+let reconnectTimer: NodeJS.Timeout | null = null;
 
 async function handleMessage(topic: string, buffer: Buffer): Promise<void> {
   try {
@@ -66,8 +77,33 @@ export function startMqttIngest(): void {
 
   const topics = config.mqtt.ingestTopics;
 
+  /** Schedules the single next attempt, replacing any already pending. */
+  const scheduleReconnect = (): void => {
+    if (stopped || reconnectTimer) return;
+    logger.warn(
+      `MQTT ingest disconnected; reconnecting in ${reconnectDelayMs / 1000}s`,
+    );
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      connect();
+    }, reconnectDelayMs);
+    reconnectDelayMs = Math.min(reconnectDelayMs * 2, 60000);
+  };
+
   const connect = (): void => {
     if (stopped) return;
+
+    // Retire the previous client before replacing it. Its listeners would
+    // otherwise outlive it and keep firing against a client nothing references.
+    if (client) {
+      client.removeAllListeners();
+      try {
+        client.end(true);
+      } catch {
+        // ignore teardown errors
+      }
+      client = null;
+    }
 
     try {
       client = mqtt.connect(brokerUrl, {
@@ -77,10 +113,13 @@ export function startMqttIngest(): void {
         protocolVersion: 5,
         keepalive: 30,
         clean: true,
+        // 0 disables mqtt.js's own retry so the backoff below is the ONLY
+        // thing that reconnects. With both active the two loops compounded.
+        reconnectPeriod: 0,
       });
     } catch (err) {
       logger.error(`MQTT ingest connect failed: ${(err as Error).message}`);
-      setTimeout(connect, reconnectDelayMs);
+      scheduleReconnect();
       return;
     }
 
@@ -107,12 +146,7 @@ export function startMqttIngest(): void {
     });
 
     client.on("close", () => {
-      if (stopped) return;
-      logger.warn(
-        `MQTT ingest disconnected; reconnecting in ${reconnectDelayMs / 1000}s`,
-      );
-      setTimeout(connect, reconnectDelayMs);
-      reconnectDelayMs = Math.min(reconnectDelayMs * 2, 60000);
+      scheduleReconnect();
     });
   };
 
@@ -121,6 +155,10 @@ export function startMqttIngest(): void {
 
 export function stopMqttIngest(): void {
   stopped = true;
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
   if (client) {
     try {
       client.end();

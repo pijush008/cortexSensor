@@ -10,7 +10,7 @@ import { Select } from "@/components/ui/select";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 import { api, type ApiResponse } from "@/lib/api";
 import { describeError, type DescribedError } from "@/lib/errors";
-import { useAuthStore } from "@/stores/auth-store";
+import { useRole } from "@/hooks/use-role";
 
 /**
  * Who is on a project, and who is being added to it.
@@ -104,9 +104,13 @@ export function StakeholdersPanel({
   contractor,
   authority,
 }: StakeholdersPanelProps) {
-  const { userType } = useAuthStore();
+  const sessionRole = useRole();
   const queryClient = useQueryClient();
-  const canManage = userType === "superadmin" || userType === "admin";
+  // Resolved from the SERVER. Read from localStorage this was a gate that could
+  // fail open: a stale cached role let an unprivileged session through.
+  const canManage = sessionRole === "superadmin" || sessionRole === "admin";
+
+
 
   const [role, setRole] = useState<"contractor" | "authority">("contractor");
   const [emailId, setEmailId] = useState("");
@@ -302,6 +306,13 @@ export function StakeholdersPanel({
   };
 
   const invitations = query.data ?? [];
+
+  // A self-service viewer never sees this panel. Placed after the hooks,
+  // not before them, because a conditional early return above a hook changes
+  // the hook order between renders. Gated here as well as at the caller so no
+  // future caller can render it to them by accident; the API refuses every
+  // action it offers anyway.
+  if (sessionRole === "viewer") return null;
 
   return (
     <Card>

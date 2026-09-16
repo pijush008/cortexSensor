@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronLeft,
   ChevronRight,
   FolderKanban,
-  MonitorSmartphone,
   Pause,
   Play,
   Square,
@@ -24,6 +23,7 @@ import {
 } from "@/hooks/use-project-dashboard";
 import { useLiveStream } from "@/hooks/use-live-stream";
 import { useAuthStore } from "@/stores/auth-store";
+import { useIsViewer } from "@/hooks/use-role";
 import type { Project, Sensor, SensorType } from "@/types";
 
 import { ChannelCard } from "./channel-card";
@@ -57,8 +57,18 @@ function personName(
 
 export default function ProjectDashboardPage() {
   const params = useParams<{ projectId: string }>();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const { userId, userType } = useAuthStore();
+
+  // This screen is charts and live readings, which a self-service viewer does
+  // not get. The button into it is already hidden and the API refuses the data,
+  // but the URL is guessable, so the page turns such a session around itself
+  // rather than rendering an armature of empty panels.
+  const isViewer = useIsViewer();
+  useEffect(() => {
+    if (isViewer) router.replace(`/projects/${params?.projectId ?? ""}`);
+  }, [isViewer, router, params?.projectId]);
 
   const adminId = userType === "superadmin" || !userType ? 0 : (userId ?? 0);
   const projectsQuery = useProjects(adminId);
@@ -245,23 +255,11 @@ export default function ProjectDashboardPage() {
         <img src="/brand/company-logo.png" alt="Cloudglance Sensinglab Pvt Ltd" style={{ height: 38 }} />
 
         <div className={styles.headerIcons}>
-          <span
-            className={styles.deviceBadge}
-            title={
-              d.updateHeartBeat
-                ? `Last check-in ${new Date(d.updateHeartBeat).toLocaleString()}`
-                : "Never checked in"
-            }
-          >
-            <MonitorSmartphone size={20} strokeWidth={1.75} />
-            {/* Red when the device has never reported — the legacy screen's
-                dot means "attention", not "connected". */}
-            <span
-              className={styles.deviceDot}
-              style={{ background: d.updateHeartBeat ? "rgb(55,151,69)" : "rgb(175,0,0)" }}
-            />
-          </span>
-
+          {/* The device check-in badge that used to sit here has been removed at
+              the owner's request: beside the admin, contractor and authority
+              logos it read as a fourth stakeholder rather than as hardware
+              status. Gateway liveness is still shown on the operations
+              dashboard's "Gateway nodes" panel, which is where it belongs. */}
           {emblems.map((e) => {
             // "Contractor — Acme Infra", or just "Contractor" where the slot is
             // empty. The title is what a reader gets on hover for a logo they
@@ -429,65 +427,69 @@ export default function ProjectDashboardPage() {
               </p>
             )}
 
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Channel</th>
-                  <th>Sensor Name</th>
-                  <th>Sensor Type</th>
-                  <th>Threshold Value</th>
-                  <th>Triggered Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                {drafts.length === 0 ? (
+            <div className="-mx-1 overflow-x-auto px-1">
+              {/* A data table sets its own minimum width; without this
+                  the columns would widen the whole page on a phone. */}
+              <table className={styles.table}>
+                <thead>
                   <tr>
-                    <td colSpan={5}>No channels on this device.</td>
+                    <th>Channel</th>
+                    <th>Sensor Name</th>
+                    <th>Sensor Type</th>
+                    <th>Threshold Value</th>
+                    <th>Triggered Value</th>
                   </tr>
-                ) : (
-                  drafts.map((ch, i) => {
-                    const sensor = sensorFor(ch);
-                    return (
-                      <tr key={ch.id}>
-                        <td>CH {ch.channelNumber}</td>
-                        <td>{ch.channelName ?? sensor?.sensorName ?? "—"}</td>
-                        <td>{sensor?.sensorType ?? "—"}</td>
-                        <td>
-                          <input
-                            className={styles.cellInput}
-                            value={ch.thresholdValue ?? ""}
-                            disabled={!editing}
-                            aria-label={`Threshold for channel ${ch.channelNumber}`}
-                            onChange={(e) =>
-                              setDrafts((rows) =>
-                                rows.map((r, j) =>
-                                  j === i ? { ...r, thresholdValue: e.target.value } : r,
-                                ),
-                              )
-                            }
-                          />
-                        </td>
-                        <td>
-                          <input
-                            className={styles.cellInput}
-                            value={ch.triggerValue ?? ""}
-                            disabled={!editing}
-                            aria-label={`Triggered for channel ${ch.channelNumber}`}
-                            onChange={(e) =>
-                              setDrafts((rows) =>
-                                rows.map((r, j) =>
-                                  j === i ? { ...r, triggerValue: e.target.value } : r,
-                                ),
-                              )
-                            }
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {drafts.length === 0 ? (
+                    <tr>
+                      <td colSpan={5}>No channels on this device.</td>
+                    </tr>
+                  ) : (
+                    drafts.map((ch, i) => {
+                      const sensor = sensorFor(ch);
+                      return (
+                        <tr key={ch.id}>
+                          <td>CH {ch.channelNumber}</td>
+                          <td>{ch.channelName ?? sensor?.sensorName ?? "—"}</td>
+                          <td>{sensor?.sensorType ?? "—"}</td>
+                          <td>
+                            <input
+                              className={styles.cellInput}
+                              value={ch.thresholdValue ?? ""}
+                              disabled={!editing}
+                              aria-label={`Threshold for channel ${ch.channelNumber}`}
+                              onChange={(e) =>
+                                setDrafts((rows) =>
+                                  rows.map((r, j) =>
+                                    j === i ? { ...r, thresholdValue: e.target.value } : r,
+                                  ),
+                                )
+                              }
+                            />
+                          </td>
+                          <td>
+                            <input
+                              className={styles.cellInput}
+                              value={ch.triggerValue ?? ""}
+                              disabled={!editing}
+                              aria-label={`Triggered for channel ${ch.channelNumber}`}
+                              onChange={(e) =>
+                                setDrafts((rows) =>
+                                  rows.map((r, j) =>
+                                    j === i ? { ...r, triggerValue: e.target.value } : r,
+                                  ),
+                                )
+                              }
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <AlertRecipients uniqueId={d.uniqueId} canEdit={canUploadImage} />

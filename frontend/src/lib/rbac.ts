@@ -20,13 +20,14 @@ import type { UserRole } from "@/types";
 /** Permission required to see a route. Prefix matched, longest first. */
 export const ROUTE_PERMISSION: Record<string, string> = {
   "/dashboard": "PROJECT_VIEW",
-  "/analytics": "SHM_VIEW",
   "/alerts": "ALERT_VIEW",
   "/gateways": "GATEWAY_VIEW",
   "/devices": "DEVICE_VIEW",
   "/sensors": "SENSOR_VIEW",
   "/mqtt": "SHM_VIEW",
-  "/projects": "PROJECT_VIEW",
+  // The directory only. A viewer holds PROJECT_BROWSE and not PROJECT_VIEW, so
+  // this opens for them while /dashboard does not.
+  "/projects": "PROJECT_BROWSE",
   "/structures": "STRUCTURE_VIEW",
   "/reports": "REPORT_VIEW",
   "/inspections": "INSPECTION_VIEW",
@@ -71,6 +72,50 @@ export function canAccessRoute(
   if (!match) return true;
 
   return session.permissions.includes(ROUTE_PERMISSION[match]);
+}
+
+/**
+ * Where the guard sends someone who may not see the page they asked for.
+ *
+ * Ordered by preference, and RESOLVED against the session rather than fixed:
+ * different roles have different first reachable pages, and a constant
+ * "/dashboard" is wrong for anyone who cannot open it. Ends at /profile, which
+ * is always allowed, so the list cannot come up empty for a real session.
+ */
+const FALLBACK_ORDER = ["/dashboard", "/projects", "/profile"];
+
+export function fallbackRouteFor(
+  session: SessionEntitlements | null | undefined,
+): string | null {
+  return FALLBACK_ORDER.find((r) => canAccessRoute(session, r)) ?? null;
+}
+
+/**
+ * What the route guard should do about this navigation.
+ *
+ * Returns a decision rather than performing one so the rule is testable on its
+ * own, and so the component cannot re-derive it slightly differently.
+ *
+ * The "blocked" case is the one that caused a bug worth naming. The guard used
+ * to answer every denial by redirecting to GUARD_FALLBACK and rendering null —
+ * but the fallback is an ordinary mapped route (/dashboard needs PROJECT_VIEW),
+ * so a session holding NO permissions was denied there too. It redirected to
+ * the page it had just refused, on every render, and rendered nothing in the
+ * meantime: a permanently blank application with no error and no way out.
+ *
+ * A self-service Google sign-in produces exactly that session — a real user,
+ * authenticated, with no organization membership and therefore no permissions.
+ * Such a session must be told what is wrong, not bounced in a circle.
+ */
+export type GuardDecision = "allow" | "redirect" | "blocked";
+
+export function guardDecision(
+  session: SessionEntitlements | null | undefined,
+  pathname: string,
+): GuardDecision {
+  if (canAccessRoute(session, pathname)) return "allow";
+  // Only redirect somewhere the session can actually land.
+  return fallbackRouteFor(session) ? "redirect" : "blocked";
 }
 
 /** Retained for the sidebar until it is driven by permissions too. */

@@ -19,10 +19,11 @@ router.put(
   projectsController.updateProject,
 );
 
+// The directory listing, and the ONLY project route a `viewer` may reach.
 router.get(
   "/projects/:adminId",
   authenticate,
-  requirePermission("VIEW_PROJECTS"),
+  requirePermission("BROWSE_PROJECTS"),
   projectsController.getProjectListHandler,
 );
 

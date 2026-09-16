@@ -27,6 +27,10 @@ import type { Device, DeviceType } from "@/types";
 
 const EMPTY_FORM = {
   deviceName: "",
+  // The unit's serial, as printed on the hardware. Stored as `deviceId`, which
+  // is what the schema has always called it; the FORM says "Serial Number"
+  // because that is what the person holding the cabinet is reading off it.
+  deviceId: "",
   channelCount: "1",
   deviceType: "",
   gatewayDeviceId: "",
@@ -78,6 +82,11 @@ export default function DevicesPage() {
       const payload = {
         ...form,
         deviceType: form.deviceType || "0",
+        // NULL, not "", when the serial is unknown. The column is unique, and
+        // Postgres treats an empty string as a value — so a second device saved
+        // with a blank serial would collide with the first, while many NULLs
+        // coexist happily under the same index.
+        deviceId: form.deviceId.trim() || null,
       };
       if (editing) {
         const { data } = await api.patch<ApiResponse>(
@@ -117,6 +126,7 @@ export default function DevicesPage() {
     setEditing(d);
     setForm({
       deviceName: d.deviceName,
+      deviceId: d.deviceId || "",
       channelCount: String(d.channelCount),
       deviceType: String(d.deviceType),
       gatewayDeviceId: d.gatewayDeviceId || "",
@@ -335,15 +345,19 @@ export default function DevicesPage() {
                           </td>
                         )}
                         <td className="py-3" onClick={(e) => e.stopPropagation()}>
+                          {/* A labelled button, not a bare icon: this opens the
+                              device's channel mapping, which is the main thing
+                              anyone comes to this table to do, and an
+                              unexplained chip glyph did not say so. */}
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
                             onClick={() =>
                               router.push(`/devices/${d.id}/channels`)
                             }
-                            aria-label="View channels"
+                            aria-label={`View channels for ${d.deviceName}`}
                           >
-                            <Cpu className="h-4 w-4 text-shm-navy-600" />
+                            View
                           </Button>
                         </td>
                       </tr>
@@ -368,26 +382,30 @@ export default function DevicesPage() {
         {deviceTypes.length === 0 ? (
           <p className="text-sm text-slate-500">No device types are configured.</p>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 text-left font-mono text-[0.75rem] font-medium text-slate-500">
-                <th className="pb-2">Type</th>
-                <th className="pb-2">ID</th>
-                <th className="pb-2 text-right">Devices</th>
-              </tr>
-            </thead>
-            <tbody>
-              {deviceTypes.map((t: DeviceType) => (
-                <tr key={t.deviceTypeId} className="border-b border-slate-100 last:border-0">
-                  <td className="py-2 font-medium text-slate-800">{t.deviceType}</td>
-                  <td className="py-2 font-mono text-xs text-slate-500">{t.deviceTypeId}</td>
-                  <td className="py-2 text-right tabular-nums text-slate-600">
-                    {devices.filter((d) => d.deviceType === t.deviceTypeId).length}
-                  </td>
+          <div className="-mx-1 overflow-x-auto px-1">
+            {/* A data table sets its own minimum width; without this
+                the columns would widen the whole page on a phone. */}
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left font-mono text-[0.75rem] font-medium text-slate-500">
+                  <th className="pb-2">Type</th>
+                  <th className="pb-2">ID</th>
+                  <th className="pb-2 text-right">Devices</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {deviceTypes.map((t: DeviceType) => (
+                  <tr key={t.deviceTypeId} className="border-b border-slate-100 last:border-0">
+                    <td className="py-2 font-medium text-slate-800">{t.deviceType}</td>
+                    <td className="py-2 font-mono text-xs text-slate-500">{t.deviceTypeId}</td>
+                    <td className="py-2 text-right tabular-nums text-slate-600">
+                      {devices.filter((d) => d.deviceType === t.deviceTypeId).length}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Modal>
 
@@ -414,6 +432,15 @@ export default function DevicesPage() {
             value={form.deviceName}
             onChange={(e) => setForm({ ...form, deviceName: e.target.value })}
             required
+          />
+          <Input
+            label="Serial Number"
+            value={form.deviceId}
+            onChange={(e) => setForm({ ...form, deviceId: e.target.value })}
+            placeholder="e.g. SN-00184-A"
+            // Unique in the database: two cabinets cannot carry the same
+            // serial, and the project's device chooser shows this string to
+            // tell otherwise similarly-named units apart.
           />
           <div className="grid grid-cols-2 gap-4">
             <Input

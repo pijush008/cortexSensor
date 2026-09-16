@@ -25,6 +25,21 @@ export const PERMISSIONS = {
 
   // Projects
   MANAGE_PROJECTS: [UserRole.superadmin, UserRole.admin],
+  /**
+   * The project DIRECTORY: names, ids, locations, stakeholders. No readings.
+   *
+   * Separate from VIEW_PROJECTS so that `viewer` — a self-service Google
+   * sign-up belonging to no organization — can browse the list without that
+   * also opening a project's dashboard, measurements or exports. The two must
+   * not be one permission, or the narrow grant becomes the wide one.
+   */
+  BROWSE_PROJECTS: [
+    UserRole.superadmin,
+    UserRole.admin,
+    UserRole.contractor,
+    UserRole.authority,
+    UserRole.viewer,
+  ],
   VIEW_PROJECTS: [
     UserRole.superadmin,
     UserRole.admin,

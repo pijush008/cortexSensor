@@ -16,6 +16,7 @@ import { api, type ApiResponse } from "@/lib/api";
 import { describeError, type DescribedError } from "@/lib/errors";
 import { formatDate } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
+import { useRole } from "@/hooks/use-role";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FolderKanban, Pause, Play, Plus, Square, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -94,6 +95,17 @@ export default function ProjectsPage() {
   const router = useRouter();
   const { userId, userType } = useAuthStore();
   const adminId = userType === "superadmin" || !userType ? 0 : (userId ?? 0);
+  // A self-service viewer may read the directory and open nothing in it. The
+  // API refuses the per-project routes regardless; this stops the UI offering
+  // a click that can only end in an error.
+  const role = useRole();
+  const isViewer = role === "viewer";
+  // Creating a project, and starting/pausing/ending one, require
+  // MANAGE_PROJECTS — which the API grants to superadmin and admin only. A
+  // contractor or authority was still shown the buttons, so the only thing
+  // pressing them achieved was a 403. Offer an action only to whoever the API
+  // will actually let perform it.
+  const canManageProjects = role === "superadmin" || role === "admin";
   const queryClient = useQueryClient();
   const { data: projects = [], isLoading } = useProjects(adminId);
 
@@ -212,16 +224,18 @@ export default function ProjectsPage() {
         title="Projects"
         subtitle="Overview of all structural health monitoring projects."
         actions={
-          <Button
-            onClick={() => {
-              setForm(EMPTY_FORM);
-              setInviteResults([]);
-              setError(null);
-              setShowModal(true);
-            }}
-          >
-            <Plus className="h-4 w-4" /> Add Project
-          </Button>
+          !canManageProjects ? null : (
+            <Button
+              onClick={() => {
+                setForm(EMPTY_FORM);
+                setInviteResults([]);
+                setError(null);
+                setShowModal(true);
+              }}
+            >
+              <Plus className="h-4 w-4" /> Add Project
+            </Button>
+          )
         }
       />
 
@@ -315,8 +329,19 @@ export default function ProjectsPage() {
                       <th className="pb-3 pr-4 font-medium">Start</th>
                       <th className="pb-3 pr-4 font-medium">End</th>
                       <th className="pb-3 pr-4 font-medium">Admin</th>
+                      {/* A viewer cannot open a project, so the stakeholders
+                          have to be visible in the directory itself — it is the
+                          only place they will ever see them. */}
+                      {isViewer && (
+                        <>
+                          <th className="pb-3 pr-4 font-medium">Contractor</th>
+                          <th className="pb-3 pr-4 font-medium">Authority</th>
+                        </>
+                      )}
                       <th className="pb-3 pr-4 font-medium">Status</th>
-                      <th className="pb-3 font-medium">Actions</th>
+                      {canManageProjects && (
+                        <th className="pb-3 font-medium">Actions</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -365,9 +390,24 @@ export default function ProjectsPage() {
                               ? `${p.adminFirstName} ${p.adminLastName ?? ""}`
                               : "—"}
                           </td>
+                          {isViewer && (
+                            <>
+                              <td className="py-3 pr-4 text-slate-600">
+                                {p.contractorFirstName
+                                  ? `${p.contractorFirstName} ${p.contractorLastName ?? ""}`
+                                  : "—"}
+                              </td>
+                              <td className="py-3 pr-4 text-slate-600">
+                                {p.authorityFirstName
+                                  ? `${p.authorityFirstName} ${p.authorityLastName ?? ""}`
+                                  : "—"}
+                              </td>
+                            </>
+                          )}
                           <td className="py-3 pr-4">
                             <StatusBadge label={meta.label} tone={meta.tone} />
                           </td>
+                          {canManageProjects && (
                           <td className="py-3" onClick={(e) => e.stopPropagation()}>
                             <div className="flex gap-1">
                               {p.status === "not_start" && (
@@ -442,6 +482,7 @@ export default function ProjectsPage() {
                               </Button>
                             </div>
                           </td>
+                          )}
                         </tr>
                       );
                     })}

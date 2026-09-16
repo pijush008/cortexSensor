@@ -16,7 +16,6 @@ import {
   Activity,
   Server,
   Bell,
-  LineChart,
   ShieldCheck,
   CreditCard,
   DownloadCloud,
@@ -44,7 +43,6 @@ const MENU_SECTION: Record<UserRole, { label: string; items: MenuItem[] }[]> = {
       label: "Operations",
       items: [
         { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { href: "/analytics", label: "Analysis", icon: LineChart },
         { href: "/alerts", label: "Alerts", icon: Bell },
       ],
     },
@@ -84,7 +82,6 @@ const MENU_SECTION: Record<UserRole, { label: string; items: MenuItem[] }[]> = {
       label: "Operations",
       items: [
         { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { href: "/analytics", label: "Analysis", icon: LineChart },
         { href: "/alerts", label: "Alerts", icon: Bell },
       ],
     },
@@ -101,7 +98,6 @@ const MENU_SECTION: Record<UserRole, { label: string; items: MenuItem[] }[]> = {
       label: "Workspace",
       items: [
         { href: "/projects", label: "Projects", icon: Projector },
-        { href: "/structures", label: "Structures", icon: Building2 },
         { href: "/reports", label: "Reports", icon: BarChart3 },
         { href: "/data-download", label: "Data Download", icon: DownloadCloud },
       ],
@@ -117,21 +113,12 @@ const MENU_SECTION: Record<UserRole, { label: string; items: MenuItem[] }[]> = {
       ],
     },
   ],
+  // A contractor delivers the work on a project. The operations dashboard, the
+  // alert queue and the hardware fleet belong to the organization running the
+  // platform, not to them — so the console is narrowed to the workspace they
+  // actually act in. The middleware refuses the rest server-side; this only
+  // stops offering a door that is locked.
   contractor: [
-    {
-      label: "Operations",
-      items: [
-        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { href: "/alerts", label: "Alerts", icon: Bell },
-      ],
-    },
-    {
-      label: "Fleet",
-      items: [
-        { href: "/gateways", label: "Gateways", icon: Server },
-        { href: "/mqtt", label: "MQTT Feed", icon: Activity },
-      ],
-    },
     {
       label: "Workspace",
       items: [
@@ -141,17 +128,24 @@ const MENU_SECTION: Record<UserRole, { label: string; items: MenuItem[] }[]> = {
       ],
     },
   ],
-  authority: [
-    {
-      label: "Operations",
-      items: [
-        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { href: "/alerts", label: "Alerts", icon: Bell },
-      ],
-    },
+  // A self-service viewer gets the project directory and nothing else: no
+  // dashboard, no alerts, no exports. The API refuses those routes too.
+  viewer: [
     {
       label: "Workspace",
       items: [
+        { href: "/projects", label: "Projects", icon: Projector },
+      ],
+    },
+  ],
+  // An authority signs off on a project. Same reasoning as contractor, minus
+  // structures: their interest is the project and its reports, not the survey
+  // geometry underneath it.
+  authority: [
+    {
+      label: "Workspace",
+      items: [
+        { href: "/projects", label: "Projects", icon: Projector },
         { href: "/reports", label: "Reports", icon: BarChart3 },
       ],
     },

@@ -75,12 +75,41 @@ export async function resolveAuthContext(userId: number): Promise<AuthContext> {
   });
 
   if (!membership) {
+    // No ACTIVE membership. Two very different situations share this branch and
+    // must not share an answer.
+    //
+    // A lapsed customer — their membership exists but the tenant is suspended
+    // or closed — keeps no permissions, exactly as before. Granting them the
+    // directory would turn "your subscription ended" into "you may now browse
+    // every other customer on the platform", which is the opposite of intended.
+    const belongsToSomeOrganization = await prisma.membership.findFirst({
+      where: { userId },
+      select: { id: true },
+    });
+    if (belongsToSomeOrganization) {
+      return {
+        userId,
+        isPlatformAdmin: false,
+        tenantId: null,
+        role: null,
+        permissions: new Set(),
+      };
+    }
+
+    // Genuinely in no organization at all — a self-service Google sign-up, or
+    // an account whose membership has not been created yet. Such a session gets
+    // exactly one thing: the project directory. A deliberate narrow grant
+    // rather than an empty set, because an empty set leaves a real
+    // authenticated user with no page they may open.
+    //
+    // PROJECT_BROWSE alone. It does NOT imply PROJECT_VIEW, so the directory
+    // opens and a project's measurements do not.
     return {
       userId,
       isPlatformAdmin: false,
       tenantId: null,
       role: null,
-      permissions: new Set(),
+      permissions: new Set<PermissionKey>(["PROJECT_BROWSE"]),
     };
   }
 

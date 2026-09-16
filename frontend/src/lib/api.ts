@@ -1,6 +1,13 @@
 import axios, { AxiosError, AxiosRequestConfig, InternalAxiosRequestConfig } from "axios";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api";
+/**
+ * Where the API lives, as the browser sees it.
+ *
+ * Exported because uploaded assets (sensor icons, logos) are stored as paths
+ * relative to it; a second copy of this rule elsewhere would drift the moment
+ * the API moves.
+ */
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 export const api = axios.create({
   baseURL: API_BASE,
@@ -13,6 +20,22 @@ const REFRESH_NATIVE_PATH = "/refresh";
 const AUTH_NATIVE_PATHS = [REFRESH_NATIVE_PATH, "/commonLogin", "/logout"];
 
 let refreshPromise: Promise<boolean> | null = null;
+
+/**
+ * Request options this client understands beyond axios's own.
+ *
+ * `skipAuthRedirect` suppresses the "bounce to /login" that follows a 401 which
+ * a refresh could not rescue. It exists for ONE case: the session probe made at
+ * startup to discover whether the browser holds a session at all. There a 401 is
+ * the answer, not a failure — the visitor is simply signed out.
+ *
+ * Without it that probe is a reload loop. The probe runs on /login, gets 401,
+ * the interceptor sends the browser to /login, the page reloads, and the probe
+ * runs again — roughly once a second, for as long as anyone watches.
+ */
+export interface AuthAwareRequestConfig extends AxiosRequestConfig {
+  skipAuthRedirect?: boolean;
+}
 
 function isNativePath(url: string | undefined): boolean {
   if (!url) return false;
@@ -47,7 +70,10 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const original = error.config as AxiosRequestConfig & { _retry?: boolean };
+    const original = error.config as AxiosRequestConfig & {
+      _retry?: boolean;
+      skipAuthRedirect?: boolean;
+    };
     const status = error.response?.status;
 
     if (
@@ -64,7 +90,10 @@ api.interceptors.response.use(
       if (typeof window !== "undefined") {
         localStorage.removeItem("userId");
         localStorage.removeItem("userType");
-        window.location.href = "/login";
+        // The caller asked to be told rather than redirected.
+        if (!original.skipAuthRedirect) {
+          window.location.href = "/login";
+        }
       }
     }
 

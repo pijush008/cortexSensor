@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { api, type ApiResponse } from "@/lib/api";
+import { api, type ApiResponse, type AuthAwareRequestConfig } from "@/lib/api";
 import type { UserRole } from "@/types";
 
 interface AuthState {
@@ -10,7 +10,7 @@ interface AuthState {
   login: (username: string, password: string) => Promise<LoginOutcome>;
   verifyLoginOtp: (userId: number, otp: string) => Promise<void>;
   logout: () => Promise<void>;
-  initialize: () => void;
+  initialize: () => Promise<void>;
 }
 
 interface LoginPayload {
@@ -20,6 +20,11 @@ interface LoginPayload {
   type?: UserRole;
   /** Platform operators finish signing in with an emailed code. */
   otpRequired?: boolean;
+}
+
+/** The subset of GET /me this store needs to identify the session. */
+interface SessionUser {
+  user: { id: number; userType: UserRole };
 }
 
 export interface LoginOutcome {
@@ -90,18 +95,63 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ userId: null, userType: null, isAuthenticated: false });
   },
 
-  initialize: () => {
+  /**
+   * Restore the session on entering the app.
+   *
+   * The SESSION COOKIE is the source of truth, not localStorage. localStorage
+   * is only a cache that lets a returning user render without waiting for a
+   * round trip; when it is missing the server is asked who this is.
+   *
+   * Treating localStorage as the truth produced a hang with no error. The
+   * middleware decides by cookie and sends anyone holding one from /login to
+   * /dashboard; this gate decided by localStorage and sent anyone without it
+   * from /dashboard to /login. A browser holding a valid cookie but no
+   * localStorage therefore bounced between the two forever, rendering nothing.
+   *
+   * That is exactly the state Google sign-in leaves: the callback is a SERVER
+   * redirect that sets cookies, so no client code ever ran to populate
+   * localStorage. Clearing site data while staying signed in did it too.
+   */
+  initialize: async () => {
     if (typeof window === "undefined") return;
-    const userId = localStorage.getItem("userId");
-    const userType = localStorage.getItem("userType") as UserRole | null;
-    if (userId && userType) {
+
+    const cachedId = localStorage.getItem("userId");
+    const cachedType = localStorage.getItem("userType") as UserRole | null;
+    if (cachedId && cachedType) {
       set({
-        userId: Number(userId),
-        userType,
+        userId: Number(cachedId),
+        userType: cachedType,
         isAuthenticated: true,
         isLoading: false,
       });
-    } else {
+      return;
+    }
+
+    // No cache. Ask the server rather than assuming signed out: the cookie is
+    // httpOnly, so this is the only way the client can see it.
+    try {
+      // skipAuthRedirect: a 401 here means "signed out", which is a valid
+      // answer to the question being asked. Letting the interceptor treat it as
+      // a lost session sends the browser to /login — and this probe runs ON
+      // /login, so the page reloads and asks again, forever.
+      const { data } = await api.get<ApiResponse<SessionUser>>("/me", {
+        skipAuthRedirect: true,
+      } as AuthAwareRequestConfig);
+      const user = data?.data?.user;
+      if (!user?.id || !user?.userType) {
+        set({ isLoading: false });
+        return;
+      }
+      localStorage.setItem("userId", String(user.id));
+      localStorage.setItem("userType", user.userType);
+      set({
+        userId: user.id,
+        userType: user.userType,
+        isAuthenticated: true,
+        isLoading: false,
+      });
+    } catch {
+      // 401, or the API is unreachable. Either way there is no usable session.
       set({ isLoading: false });
     }
   },

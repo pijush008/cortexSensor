@@ -132,7 +132,10 @@ function ResetForm() {
       </Button>
 
       <p className="text-center text-[0.78125rem] text-slate-500">
-        <Link href="/login" className="hover:underline">
+        <Link
+          href="/login"
+          className="inline-flex min-h-6 items-center hover:underline"
+        >
           Back to sign in
         </Link>
       </p>

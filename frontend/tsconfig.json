@@ -34,7 +34,9 @@
     "**/*.tsx",
     ".next/dev/types/**/*.ts",
     ".next/types/**/*.ts",
-    "next-env.d.ts"
+    "/tmp/claude-1000/-home-pijush-Downloads-SHM/60f4139b-38f4-4c4a-9a69-020a5ff56d1c/scratchpad/prodbuild/types/**/*.ts",
+    "next-env.d.ts",
+    ".next-cdn-probe/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

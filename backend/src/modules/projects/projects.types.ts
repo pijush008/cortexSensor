@@ -127,6 +127,14 @@ export const channelUpdateSchema = z.object({
       sensorName: z.string().optional(),
       triggeredValue: z.string().optional().nullable(),
       thresholdValue: z.string().optional().nullable(),
+      /**
+       * Whether the administrator has this channel selected.
+       *
+       * Load-bearing, not cosmetic: an unselected channel stores no readings
+       * and raises no alerts. Optional so a caller that only edits thresholds
+       * leaves the selection alone rather than silently switching it off.
+       */
+      isActive: z.boolean().optional(),
     }),
   ),
 });

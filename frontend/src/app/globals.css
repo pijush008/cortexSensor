@@ -27,6 +27,25 @@
 }
 
 @theme {
+  /* ── Type scale ───────────────────────────────────────────────────────────
+     Four steps for running text, because the homepage had FOURTEEN — 8.5, 9,
+     9.5, 10, 11, 11.5, 12, 12.5, 13, 13.5, 14.5, 15, 16 and 17px. Half-pixel
+     neighbours like that are not a scale; they are a size invented per element,
+     and the result reads as slightly-off rather than deliberate.
+
+     The floor is 12px. Six of the old sizes sat below it, the smallest at
+     8.5px in the footer — small enough to be genuinely hard to read, and the
+     audit was right to call it out.
+
+     Steps are far enough apart to signal hierarchy on their own, so a label and
+     a caption are never a half-pixel apart and left to the reader to tell. */
+  --text-label: 0.75rem;     /* 12px — uppercase, tracked micro labels */
+  --text-caption: 0.8125rem; /* 13px — captions, meta, secondary rows */
+  --text-body: 0.9375rem;    /* 15px — running copy */
+  --text-lead: 1.0625rem;    /* 17px — intros and standfirsts */
+}
+
+@theme {
   /* ── Homepage role tokens ─────────────────────────────────────────────────
      These are ROLES (ink, paper, ground, rule, line, accent), pointed at the
      Equals palette defined further down so the public pages, the login screen
@@ -613,6 +632,19 @@
   opacity: 1;
   transform: none;
   filter: none;
+}
+
+/* The wipe's finished state, scoped to the variant that actually wipes.
+ *
+ * This lived on .mo-in and so applied to EVERY revealed element. A clip-path on
+ * a settled element is not inert: it crops anything deliberately drawn outside
+ * the box. The "Most deployed" badge on the pricing card overhangs the card's
+ * top edge by 12px and was sliced in half along it — visible on the marketing
+ * page, and waiting to do the same to any future badge, tooltip or outline.
+ *
+ * `inset(0)` rather than `none` because the transition animates from
+ * `inset(0 100% 0 0)`, and a clip-path cannot transition to `none`. */
+.mo-unroll.mo-in {
   clip-path: inset(0 0 0 0);
 }
 

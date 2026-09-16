@@ -38,6 +38,7 @@ import {
   authenticate,
   enforceImpersonationReadOnly,
 } from "./middleware/auth";
+import { restrictDirectoryOnlySessions } from "./middleware/directory-only";
 import { requireApiKey } from "./middleware/apiKey";
 import prisma from "./config/prisma";
 import { formatImageUrl } from "./utils/helper";
@@ -112,6 +113,12 @@ app.use(cookieParser());
 // router, because a view-as session must not be able to write through ANY
 // route — including one that declares no auth middleware of its own.
 app.use(enforceImpersonationReadOnly);
+
+// Directly after it, and for the identical reason: a self-service sign-up
+// belongs to no organization, and dozens of routes treat "authenticated" as
+// sufficient. Confining that session in one place means a route written
+// tomorrow is covered without remembering anything.
+app.use(restrictDirectoryOnlySessions);
 
 app.use("/api/uploads", express.static(path.resolve("uploads")));
 

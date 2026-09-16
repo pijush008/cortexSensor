@@ -11,6 +11,7 @@ import { QueryState } from "@/components/ui/query-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useProjects } from "@/hooks/use-data";
 import { useAuthStore } from "@/stores/auth-store";
+import { useIsViewer } from "@/hooks/use-role";
 import { formatDate, formatDateTime } from "@/lib/format-detail";
 import type { Project } from "@/types";
 import { DevicePanel } from "./device-panel";
@@ -47,6 +48,13 @@ export default function ProjectDetailPage() {
   // with adminId 0, everyone else is scoped to their own id.
   const adminId = userType === "superadmin" || !userType ? 0 : (userId ?? 0);
   const query = useProjects(adminId);
+  // A self-service viewer reads the directory. This page is reachable because
+  // it is built from the SAME list response, but everything that administers
+  // the project — its hardware, its stakeholders, its invitations — and the
+  // route into live readings belong to the organization that owns it.
+  // Resolved from the SERVER, not from localStorage: a cached role that is out
+  // of date would turn this gate off and render the panels to a viewer.
+  const isViewer = useIsViewer();
 
   const id = Number(params?.projectId);
 
@@ -97,7 +105,7 @@ export default function ProjectDetailPage() {
               {/* The dashboard is the operational view of this project — the
                   images, sensor channels and live readings field teams work
                   from. It only resolves for a project that has a uniqueId. */}
-              {(p.uniqueId ?? p.projectUniqueID) && (
+              {!isViewer && (p.uniqueId ?? p.projectUniqueID) && (
                 <div className="mt-4">
                   <Button
                     size="sm"
@@ -148,12 +156,15 @@ export default function ProjectDetailPage() {
                 ]}
               />
             </Card>
+            {!isViewer && (
             <DevicePanel
               projectId={p.projectId ?? p.id}
               currentDeviceId={p.deviceId ?? null}
               currentDeviceName={p.deviceName ?? null}
               status={p.status}
             />
+            )}
+            {!isViewer && (
             <StakeholdersPanel
               projectId={p.projectId ?? p.id}
               contractor={{
@@ -167,6 +178,7 @@ export default function ProjectDetailPage() {
                 lastName: p.authorityLastName,
               }}
             />
+            )}
             </div>
           );
         }}

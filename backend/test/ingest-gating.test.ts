@@ -177,8 +177,10 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await prisma.measurement.deleteMany({ where: { projectId } }).catch(() => {});
+  await prisma.notification.deleteMany({
+    where: { sensorData: { projectId } },
+  }).catch(() => {});
   await prisma.sensorData.deleteMany({ where: { projectId } }).catch(() => {});
-  await prisma.notification.deleteMany({ where: { projectId } }).catch(() => {});
   await prisma.deviceChannel.deleteMany({ where: { deviceId: String(deviceRowId) } }).catch(() => {});
   await prisma.project.deleteMany({ where: { id: projectId } }).catch(() => {});
   await prisma.device.deleteMany({ where: { id: deviceRowId } }).catch(() => {});
@@ -192,6 +194,12 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await prisma.measurement.deleteMany({ where: { projectId } }).catch(() => {});
+  // Notifications reference sensor_data with ON DELETE RESTRICT, so they are
+  // cleared FIRST. Left to last, the reading they point at cannot be deleted
+  // and every later test inherits the previous one's rows.
+  await prisma.notification.deleteMany({
+    where: { sensorData: { projectId } },
+  }).catch(() => {});
   await prisma.sensorData.deleteMany({ where: { projectId } });
 });
 
@@ -245,6 +253,137 @@ describe("collection follows the project's status", () => {
     await setStatus("start");
     await createNetworkDataFromDevice(payload(2) as never);
     expect(await rowCount()).toBe(1);
+  });
+});
+
+describe("a reading lands on the channel the firmware meant", () => {
+  /**
+   * The payload's Channels array is positional: reading 0 is channel 1.
+   *
+   * The lookup that maps them had no ORDER BY, so the pairing depended on the
+   * order Postgres happened to return rows in — observed as 4, 1, 2, 3 on a
+   * real device. Every reading was attributed to the wrong sensor: values that
+   * looked entirely reasonable, recorded against the wrong instrument, with
+   * nothing in the logs to suggest it.
+   */
+  test("reading 0 goes to channel 1, not to whichever row came back first", async () => {
+    await setStatus("start");
+
+    // A second channel, created AFTER the first so its row id is higher, but
+    // numbered LOWER. Sorted by id it comes second; sorted by channel number it
+    // comes first. Only the correct ordering puts the reading on it.
+    const extra = await prisma.deviceChannel.create({
+      data: {
+        deviceId: String(deviceRowId),
+        channelNumber: "0",
+        channelName: "CH0",
+        assignSensor: String(sensorId),
+        activeStatus: "one" as never,
+      } as never,
+    });
+
+    try {
+      await createNetworkDataFromDevice(payload(42.5) as never);
+
+      const rows = await prisma.sensorData.findMany({ where: { projectId } });
+      // One reading in, one row out — and it belongs to the sensor on the
+      // lowest-numbered channel.
+      expect(rows).toHaveLength(1);
+      expect(rows[0].sensorData).toBeCloseTo(42.5, 2);
+    } finally {
+      await prisma.deviceChannel.delete({ where: { id: extra.id } });
+    }
+  });
+});
+
+describe("collection follows the channel's selection", () => {
+  /**
+   * An administrator selects which channels are in use. An unselected one is a
+   * socket nobody is recording — often nothing is even wired to it.
+   *
+   * Nothing enforced this before: `activeStatus` was shown in the console and
+   * settable nowhere, so a channel displayed as Inactive went on storing
+   * readings and raising alerts exactly like an active one. These assert the
+   * rule at BOTH ends, because a half-applied version — no history but alerts
+   * still firing — would be worse than either.
+   */
+  const setChannel = (active: boolean) =>
+    prisma.deviceChannel.updateMany({
+      where: { deviceId: String(deviceRowId) },
+      data: { activeStatus: (active ? "one" : "zero") as never },
+    });
+
+  test("a selected channel stores its reading", async () => {
+    await setStatus("start");
+    await setChannel(true);
+
+    const res = await createNetworkDataFromDevice(payload(77.7) as never);
+    expect(res.status_code).toBe(200);
+    expect(await rowCount()).toBe(1);
+  });
+
+  test("an unselected channel stores nothing", async () => {
+    await setStatus("start");
+    await setChannel(false);
+
+    const res = await createNetworkDataFromDevice(payload(77.7) as never);
+    // Acknowledged, not errored: a refused payload makes the gateway retry the
+    // same reading forever.
+    expect(res.status_code).toBe(200);
+    expect(await rowCount()).toBe(0);
+  });
+
+  /**
+   * The alert half of the rule, with a POSITIVE CONTROL.
+   *
+   * The fixture channel carries no threshold, so an "unselected raises no
+   * alert" assertion on its own passes whether or not the rule works — it was
+   * written that way first and proved nothing. Setting a threshold, showing an
+   * alert DOES fire when the channel is selected, and only then showing it does
+   * not when unselected, is what makes the second assertion mean something.
+   */
+  const withThreshold = () =>
+    prisma.deviceChannel.updateMany({
+      where: { deviceId: String(deviceRowId) },
+      data: { triggerValue: "10", thresholdValue: "20" },
+    });
+
+  test("a selected channel over its threshold DOES raise an alert", async () => {
+    await setStatus("start");
+    await withThreshold();
+    await setChannel(true);
+
+    const before = await prisma.notification.count();
+    await createNetworkDataFromDevice(payload(999) as never);
+    expect(await prisma.notification.count()).toBeGreaterThan(before);
+  });
+
+  test("an unselected channel over its threshold raises none", async () => {
+    await setStatus("start");
+    await withThreshold();
+    await setChannel(false);
+
+    const before = await prisma.notification.count();
+    await createNetworkDataFromDevice(payload(999) as never);
+    expect(await prisma.notification.count()).toBe(before);
+  });
+
+  test("selection is independent of the project's status", async () => {
+    // A selected channel on a paused project still stores nothing: the two
+    // gates are separate, and either one closing is enough.
+    await setStatus("pause");
+    await setChannel(true);
+    await createNetworkDataFromDevice(payload(5) as never);
+    expect(await rowCount()).toBe(0);
+  });
+
+  afterAll(async () => {
+    // Leave the fixture as the other suites expect to find it.
+    await setChannel(true);
+    await prisma.deviceChannel.updateMany({
+      where: { deviceId: String(deviceRowId) },
+      data: { triggerValue: null, thresholdValue: null },
+    });
   });
 });
 

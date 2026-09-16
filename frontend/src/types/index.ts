@@ -1,4 +1,14 @@
-export type UserRole = "superadmin" | "admin" | "contractor" | "authority";
+/**
+ * `viewer` is a self-service (Google) sign-up: no organization, and the project
+ * directory is the only thing they may open. Distinct from `authority`, which
+ * is a project stakeholder.
+ */
+export type UserRole =
+  | "superadmin"
+  | "admin"
+  | "contractor"
+  | "authority"
+  | "viewer";
 
 export interface LoginResponse {
   status_code: number;
@@ -34,6 +44,8 @@ export interface Device {
   deviceStartDate: string;
   assignedAdmin: number | null;
   createdAt: string;
+  /** Null until someone edits the device; the API returns it either way. */
+  updatedAt: string | null;
   deviceTypeName?: string;
 }
 

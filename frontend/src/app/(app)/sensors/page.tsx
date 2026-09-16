@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useParamFilter } from "@/hooks/use-param-filter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, Gauge, SearchX } from "lucide-react";
+import { Plus, Pencil, Trash2, Gauge, SearchX, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -13,14 +13,15 @@ import { StatCard } from "@/components/ui/stat-card";
 import { Reveal } from "@/components/ui/reveal";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
+import { Avatar } from "@/components/ui/avatar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { QueryState } from "@/components/ui/query-state";
 import { SkeletonTable } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/layout/page-header";
-import { useSensors, useSensorTypes } from "@/hooks/use-data";
-import { api, type ApiResponse } from "@/lib/api";
+import { useDevices, useSensors, useSensorTypes } from "@/hooks/use-data";
+import { API_BASE, api, type ApiResponse } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
-import type { Sensor, SensorType } from "@/types";
+import type { Device, Sensor, SensorType } from "@/types";
 
 const EMPTY_FORM = {
   sensorName: "",
@@ -34,6 +35,25 @@ const SENSOR_FILTERS = ["all", "calibrated", "uncalibrated"] as const;
 
 type SensorFilter = (typeof SENSOR_FILTERS)[number];
 
+/**
+ * The sensor-type icons available to choose from.
+ *
+ * A fixed list of what is actually on disk under uploads/sensors. Listing them
+ * is deliberate: the alternative was a free-text path, and a typo there is
+ * invisible until someone opens a table and finds an empty cell.
+ */
+const SENSOR_ICON_CHOICES = [
+  "uploads/sensors/1.png",
+  "uploads/sensors/2.png",
+  "uploads/sensors/3.png",
+  "uploads/sensors/4.png",
+  "uploads/sensors/5.png",
+  "uploads/sensors/6.png",
+  "uploads/sensors/7.png",
+  "uploads/sensors/8.png",
+  "uploads/sensors/9.png",
+];
+
 export default function SensorsPage() {
   const router = useRouter();
   const { userType } = useAuthStore();
@@ -42,6 +62,8 @@ export default function SensorsPage() {
   // Whole query object so <QueryState /> can distinguish a failed fetch from
   // an empty sensor list rather than showing "no sensors" for both.
   const sensorsQuery = useSensors();
+  // Sensors carry a deviceId; the NAME lives on the device.
+  const { data: devices = [] } = useDevices();
   const sensors = sensorsQuery.data ?? [];
   const { data: sensorTypes = [] } = useSensorTypes();
 
@@ -74,6 +96,38 @@ export default function SensorsPage() {
 
   const unitFor = (sensorTypeID: number): string =>
     sensorTypes.find((t: SensorType) => t.id === sensorTypeID)?.unit ?? "—";
+
+  /**
+   * The calibration figure and its unit as one quantity: "0.055 mm".
+   *
+   * They were two columns, which left the reader to pair them up. A calibration
+   * without its unit is not a number anyone can act on.
+   */
+  const calibrationWithUnit = (s: Sensor): string => {
+    if (!s.calibrationValue) return "—";
+    const unit = unitFor(s.sensorTypeID);
+    return unit === "—" ? s.calibrationValue : `${s.calibrationValue} ${unit}`;
+  };
+
+  /**
+   * Sensor-type icons are stored as a RELATIVE path ("uploads/sensors/2.png"),
+   * matching every other uploaded asset, so the origin serving them can change
+   * without rewriting rows. Absolute URLs are passed through untouched.
+   */
+  const iconUrl = (icon: string | null): string | null => {
+    if (!icon) return null;
+    if (/^https?:\/\//.test(icon)) return icon;
+    return `${API_BASE}/${icon.replace(/^\/+/, "")}`;
+  };
+
+  /** The device a sensor is wired to, by name rather than id. */
+  const deviceNameFor = (deviceId: string | null): string => {
+    if (!deviceId) return "———";
+    const device = devices.find(
+      (d: Device) => String(d.deviceId ?? d.id) === String(deviceId),
+    );
+    return device?.deviceName ?? `Device ${deviceId}`;
+  };
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -118,6 +172,35 @@ export default function SensorsPage() {
     onError: (err) =>
       setError((err as Error).message || "Failed to save sensor type"),
   });
+
+  /**
+   * The table as displayed, as a CSV.
+   *
+   * Built from the same values the cells render, not from the raw API rows, so
+   * the file cannot drift from the screen it claims to be a copy of.
+   */
+  const downloadCsv = () => {
+    const header = ["Name", "Type", "Calibration Value", "Admin", "Device"];
+    const rows = filtered.map((s) => [
+      s.sensorName,
+      s.sensorType,
+      calibrationWithUnit(s),
+      s.firstName ? `${s.firstName} (${s.adminId})` : "",
+      deviceNameFor(s.deviceId) === "———" ? "" : deviceNameFor(s.deviceId),
+    ]);
+    // Quotes doubled and every field wrapped: a sensor named  Pier 3, North
+    // would otherwise split into two columns.
+    const csv = [header, ...rows]
+      .map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `sensors_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const filtered = sensors.filter((s) => {
     const matchesSearch =
@@ -229,7 +312,7 @@ export default function SensorsPage() {
           <CardHeader>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <CardTitle>Sensor List</CardTitle>
+                <CardTitle>Sensor Table</CardTitle>
               </div>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Input
@@ -249,6 +332,19 @@ export default function SensorsPage() {
                     { value: "uncalibrated", label: "Not calibrated" },
                   ]}
                 />
+                {/* Exports what is ON SCREEN — the filtered, searched rows —
+                    rather than the whole table, so the file matches what the
+                    reader was looking at when they pressed it. */}
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={downloadCsv}
+                  disabled={filtered.length === 0}
+                  aria-label="Download sensor table as CSV"
+                  title="Download CSV"
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
               </div>
             </div>
           </CardHeader>
@@ -288,12 +384,15 @@ export default function SensorsPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-200 text-left text-[0.75rem] font-medium text-slate-500">
-                      <th className="pb-3 pr-4 font-medium">Sensor Name</th>
+                      <th className="pb-3 pr-4 font-medium">Name</th>
+                      <th className="pb-3 pr-4 font-medium">Icon</th>
                       <th className="pb-3 pr-4 font-medium">Type</th>
-                      <th className="pb-3 pr-4 font-medium">Calibration</th>
-                      <th className="pb-3 pr-4 font-medium">Unit</th>
-                      <th className="pb-3 pr-4 font-medium">Assigned Admin</th>
-                      {isSuperAdmin && <th className="pb-3 font-medium">Actions</th>}
+                      {/* Value and unit in ONE cell — "0.055 mm" reads as a
+                          quantity, where two columns made the reader join them. */}
+                      <th className="pb-3 pr-4 font-medium">Calibration Value</th>
+                      <th className="pb-3 pr-4 font-medium">Admin</th>
+                      <th className="pb-3 pr-4 font-medium">Device</th>
+                      <th className="pb-3 font-medium">Action</th>
                     </tr>
                   </thead>
                 <tbody>
@@ -312,19 +411,39 @@ export default function SensorsPage() {
                           {s.sensorName}
                         </Link>
                       </td>
+                      <td className="py-3 pr-4">
+                        {/* The icon belongs to the TYPE, not the sensor: every
+                            LVDT shows the same mark, which is what makes the
+                            column scannable. Avatar already falls back to
+                            initials when a type has no icon uploaded. */}
+                        <Avatar
+                          src={iconUrl(s.sensorIcon)}
+                          name={s.sensorType}
+                          fallback={s.sensorType}
+                          size="sm"
+                        />
+                      </td>
                       <td className="py-3 pr-4 text-slate-600">{s.sensorType}</td>
                       <td className="py-3 pr-4 font-mono text-slate-600">
-                        {s.calibrationValue ?? "—"}
-                      </td>
-                      <td className="py-3 pr-4 text-slate-600">
-                        {unitFor(s.sensorTypeID)}
+                        {calibrationWithUnit(s)}
                       </td>
                       <td className="py-3 pr-4 text-slate-600">
                         {s.firstName ? `${s.firstName} (${s.adminId})` : "—"}
                       </td>
-                      {isSuperAdmin && (
-                        <td className="py-3" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex gap-1">
+                      <td className="py-3 pr-4 text-slate-600">
+                        {deviceNameFor(s.deviceId)}
+                      </td>
+                      <td className="py-3" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.push(`/sensors/${s.sensorId}`)}
+                          >
+                            View
+                          </Button>
+                          {isSuperAdmin && (
+                          <>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -341,13 +460,26 @@ export default function SensorsPage() {
                             >
                               <Trash2 className="h-4 w-4 text-shm-red" />
                             </Button>
-                          </div>
-                        </td>
-                      )}
+                          </>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              {/* Page count comes from the FILTERED rows, so it always describes
+                  the table as displayed rather than the unfiltered total. */}
+              <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4 text-xs text-slate-500">
+                <span>
+                  {filtered.length === 0
+                    ? "No sensors"
+                    : `Showing ${filtered.length} of ${sensors.length} sensor${sensors.length === 1 ? "" : "s"}`}
+                </span>
+                <span className="flex h-7 min-w-7 items-center justify-center rounded-md bg-shm-navy-800 px-2 font-medium text-white">
+                  1
+                </span>
+              </div>
             </div>
                 )
               }
@@ -365,30 +497,34 @@ export default function SensorsPage() {
         {sensorTypes.length === 0 ? (
           <p className="text-sm text-slate-500">No sensor types are configured.</p>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 text-left font-mono text-[0.75rem] font-medium text-slate-500">
-                <th className="pb-2">Type</th>
-                <th className="pb-2">Unit</th>
-                <th className="pb-2">Calibration</th>
-                <th className="pb-2 text-right">Sensors</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sensorTypes.map((t: SensorType) => (
-                <tr key={t.id} className="border-b border-slate-100 last:border-0">
-                  <td className="py-2 font-medium text-slate-800">{t.sensorType}</td>
-                  <td className="py-2 text-slate-600">{t.unit ?? "—"}</td>
-                  <td className="py-2 font-mono text-xs text-slate-500">
-                    {t.calibrationValue || "—"}
-                  </td>
-                  <td className="py-2 text-right tabular-nums text-slate-600">
-                    {sensors.filter((x) => x.sensorTypeID === t.id).length}
-                  </td>
+          <div className="-mx-1 overflow-x-auto px-1">
+            {/* A data table sets its own minimum width; without this
+                the columns would widen the whole page on a phone. */}
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left font-mono text-[0.75rem] font-medium text-slate-500">
+                  <th className="pb-2">Type</th>
+                  <th className="pb-2">Unit</th>
+                  <th className="pb-2">Calibration</th>
+                  <th className="pb-2 text-right">Sensors</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {sensorTypes.map((t: SensorType) => (
+                  <tr key={t.id} className="border-b border-slate-100 last:border-0">
+                    <td className="py-2 font-medium text-slate-800">{t.sensorType}</td>
+                    <td className="py-2 text-slate-600">{t.unit ?? "—"}</td>
+                    <td className="py-2 font-mono text-xs text-slate-500">
+                      {t.calibrationValue || "—"}
+                    </td>
+                    <td className="py-2 text-right tabular-nums text-slate-600">
+                      {sensors.filter((x) => x.sensorTypeID === t.id).length}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Modal>
 
@@ -403,32 +539,36 @@ export default function SensorsPage() {
             No sensors are assigned to an admin yet.
           </p>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 text-left font-mono text-[0.75rem] font-medium text-slate-500">
-                <th className="pb-2">Admin</th>
-                <th className="pb-2 text-right">Sensors</th>
-              </tr>
-            </thead>
-            <tbody>
-              {adminLoad.map((a) => (
-                <tr key={a.id} className="border-b border-slate-100 last:border-0">
-                  <td className="py-2">
-                    <Link
-                      href={`/users/${a.id}`}
-                      className="font-medium text-shm-navy-700 underline-offset-2 hover:underline"
-                      onClick={() => setShowAdmins(false)}
-                    >
-                      {a.name}
-                    </Link>
-                  </td>
-                  <td className="py-2 text-right tabular-nums text-slate-600">
-                    {a.count}
-                  </td>
+          <div className="-mx-1 overflow-x-auto px-1">
+            {/* A data table sets its own minimum width; without this
+                the columns would widen the whole page on a phone. */}
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left font-mono text-[0.75rem] font-medium text-slate-500">
+                  <th className="pb-2">Admin</th>
+                  <th className="pb-2 text-right">Sensors</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {adminLoad.map((a) => (
+                  <tr key={a.id} className="border-b border-slate-100 last:border-0">
+                    <td className="py-2">
+                      <Link
+                        href={`/users/${a.id}`}
+                        className="font-medium text-shm-navy-700 underline-offset-2 hover:underline"
+                        onClick={() => setShowAdmins(false)}
+                      >
+                        {a.name}
+                      </Link>
+                    </td>
+                    <td className="py-2 text-right tabular-nums text-slate-600">
+                      {a.count}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Modal>
 
@@ -526,15 +666,41 @@ export default function SensorsPage() {
             }
             required
           />
-          <Input
-            label="Sensor Icon"
-            value={typeForm.sensorIcon}
-            onChange={(e) =>
-              setTypeForm({ ...typeForm, sensorIcon: e.target.value })
-            }
-            placeholder="Icon name or URL"
-            required
-          />
+          {/* A picker over the icons that EXIST, not a free-text path.
+              Typed by hand, this field produced sensor types pointing at
+              nothing — which is how Tiltmeter and Thermocouple ended up with a
+              blank icon column that looked like a rendering fault. */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+              Sensor Icon
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {SENSOR_ICON_CHOICES.map((choice) => {
+                const selected = typeForm.sensorIcon === choice;
+                return (
+                  <button
+                    key={choice}
+                    type="button"
+                    onClick={() => setTypeForm({ ...typeForm, sensorIcon: choice })}
+                    aria-pressed={selected}
+                    aria-label={`Use icon ${choice}`}
+                    className={`flex h-11 w-11 items-center justify-center rounded-lg border transition-colors ${
+                      selected
+                        ? "border-shm-navy-700 bg-shm-navy-50"
+                        : "border-slate-200 hover:border-slate-300"
+                    }`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`${API_BASE}/${choice}`}
+                      alt=""
+                      className="h-6 w-6 object-contain"
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <Input
             label="Unit"
             value={typeForm.unit}

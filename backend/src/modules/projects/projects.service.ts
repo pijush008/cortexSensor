@@ -655,6 +655,11 @@ export async function getProjectList(adminId: string, query: ProjectListQuery) {
       case "authority":
         where.authorityId = Number(adminId);
         break;
+      case "viewer":
+        // A self-service viewer browses the whole directory, so no ownership
+        // filter is applied. Only the directory: the per-project endpoints that
+        // return measurements refuse this session separately.
+        break;
       default:
         where.createdBy = Number(adminId);
         break;
@@ -695,6 +700,9 @@ export async function getProjectList(adminId: string, query: ProjectListQuery) {
       (p) =>
         (p.projectUniqueID && p.projectUniqueID.toLowerCase().includes(term)) ||
         p.projectName.toLowerCase().includes(term) ||
+        // Location was missing here, so searching for a town or site name found
+        // nothing even though every project carries one.
+        (p.projectLocation && p.projectLocation.toLowerCase().includes(term)) ||
         (p.contractor &&
           `${p.contractor.firstName} ${p.contractor.lastName}`.toLowerCase().includes(term)) ||
         (p.authority &&
@@ -1147,7 +1155,8 @@ export async function channelListByDeviceId(deviceId: string, page: number, limi
 
 export async function channelListUpdate(input: ChannelUpdateInput) {
   for (const update of input.channelUpdate) {
-    const { channelId, sensorId, sensorName, triggeredValue, thresholdValue } = update;
+    const { channelId, sensorId, sensorName, triggeredValue, thresholdValue, isActive } =
+      update;
 
     if (sensorName) {
       await prisma.sensor.update({
@@ -1161,6 +1170,11 @@ export async function channelListUpdate(input: ChannelUpdateInput) {
       data: {
         triggerValue: triggeredValue ?? null,
         thresholdValue: thresholdValue ?? null,
+        // Left untouched when the caller does not send it, so editing a
+        // threshold cannot switch a channel off as a side effect.
+        ...(isActive === undefined
+          ? {}
+          : { activeStatus: (isActive ? "one" : "zero") as never }),
       },
     });
   }

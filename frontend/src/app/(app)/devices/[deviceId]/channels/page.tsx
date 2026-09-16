@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Avatar } from "@/components/ui/avatar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Reveal } from "@/components/ui/reveal";
 import { Select } from "@/components/ui/select";
@@ -161,7 +162,20 @@ export default function ChannelViewPage({
     <div className="space-y-6">
       <PageHeader
         title="Channel View"
-        subtitle={device ? `${device.deviceName} — sensor-to-channel mapping` : "Device channel configuration"}
+        subtitle={
+          device
+            ? // The legacy screen carried a "Last update ... by ..." line, which
+              // is what tells a reader whether the mapping they are looking at
+              // is current. Shown only when the device actually records one —
+              // inventing "never" for a device that has simply not been edited
+              // would be noise rather than information.
+              `${device.deviceName} — sensor-to-channel mapping${
+                device.updatedAt
+                  ? ` · Last update ${new Date(device.updatedAt).toLocaleString()}`
+                  : ""
+              }`
+            : "Device channel configuration"
+        }
         actions={
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => router.back()}>
@@ -243,6 +257,7 @@ export default function ChannelViewPage({
                     <tr className="border-b border-slate-200 text-left text-[0.75rem] font-medium text-slate-500">
                       <th className="pb-3 pr-4 font-medium">Channel</th>
                       <th className="pb-3 pr-4 font-medium">Assigned Sensor</th>
+                      <th className="pb-3 pr-4 font-medium">Icon</th>
                       <th className="pb-3 pr-4 font-medium">Type</th>
                       <th className="pb-3 pr-4 font-medium">Calibration / Unit</th>
                       <th className="pb-3 pr-4 font-medium">Trigger</th>
@@ -261,8 +276,42 @@ export default function ChannelViewPage({
                           className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
                         >
                           <td className="py-3 pr-4 font-medium text-slate-800">
-                            {channelItem.channelName || channelItem.channelNumber}
+                            <label className="flex items-center gap-2.5">
+                              {/* The selection itself, next to what it selects.
+                                  It used to be a wrench button at the far right
+                                  of the row, visible only while editing, which
+                                  gave no hint that it decided whether the
+                                  channel records anything at all. */}
+                              <input
+                                type="checkbox"
+                                checked={
+                                  editing && draft
+                                    ? draft.isEnable
+                                    : channelItem.activeStatus === "one"
+                                }
+                                disabled={!editing || !draft}
+                                onChange={() =>
+                                  draft &&
+                                  upsertChannel({ ...draft, isEnable: !draft.isEnable })
+                                }
+                                className="h-4 w-4 rounded border-slate-300 accent-shm-navy-700 disabled:opacity-60"
+                                aria-label={`Channel ${channelItem.channelNumber} selected`}
+                              />
+                              {/* "Channel 3", not the sensor's name. The column
+                                  identifies the SOCKET on the device, which is
+                                  what stays constant when a sensor is swapped. */}
+                              {`Channel ${channelItem.channelNumber}`}
+                            </label>
                           </td>
+                          {!editing && !channelItem.assignSensor ? (
+                            // An unassigned socket says what to DO about it,
+                            // rather than showing six columns of em-dashes.
+                            <td className="py-3 pr-4 text-slate-400" colSpan={7}>
+                              Not in use — choose Edit Channels to assign a
+                              sensor to this channel.
+                            </td>
+                          ) : (
+                          <>
                           <td className="py-3 pr-4">
                             {editing && draft ? (
                               <Select
@@ -283,6 +332,17 @@ export default function ChannelViewPage({
                                 {channelItem.sensorName || "—"}
                               </span>
                             )}
+                          </td>
+                          <td className="py-3 pr-4">
+                            {/* Avatar falls back to an initial badge, so a type
+                                whose icon has not been uploaded still reads as
+                                an icon slot rather than as a broken cell. */}
+                            <Avatar
+                              src={channelItem.sensorIcon}
+                              name={channelItem.sensorTypeName}
+                              fallback={channelItem.sensorTypeName}
+                              size="sm"
+                            />
                           </td>
                           <td className="py-3 pr-4 text-slate-600">
                             {channelItem.sensorTypeName || "—"}
@@ -346,25 +406,6 @@ export default function ChannelViewPage({
                           </td>
                           <td className="py-3">
                             <div className="flex gap-1">
-                              {editing && draft && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() =>
-                                    upsertChannel({
-                                      ...draft,
-                                      isEnable: !draft.isEnable,
-                                    })
-                                  }
-                                  aria-label="Toggle channel enable"
-                                >
-                                  {draft.isEnable ? (
-                                    <Wrench className="h-4 w-4 text-amber-600" />
-                                  ) : (
-                                    <Wrench className="h-4 w-4 text-slate-400" />
-                                  )}
-                                </Button>
-                              )}
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -375,6 +416,8 @@ export default function ChannelViewPage({
                               </Button>
                             </div>
                           </td>
+                          </>
+                          )}
                         </tr>
                       );
                     })}

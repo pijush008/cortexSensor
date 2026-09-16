@@ -168,6 +168,7 @@ export async function resolveUser(identity: GoogleIdentity): Promise<number> {
       isPlatformAdmin: true,
       isDelete: true,
       status: true,
+      mfaEnabledAt: true,
     },
   });
 
@@ -176,10 +177,26 @@ export async function resolveUser(identity: GoogleIdentity): Promise<number> {
       throw new ForbiddenError("This account is no longer active");
     }
 
-    // See note 1. An elevated account keeps its own front door.
-    if (existing.isPlatformAdmin || existing.userType === "admin") {
+    // An ORGANIZATION ADMIN keeps its own front door entirely. That account is
+    // also behind the payment gate, and letting Google past it would let a
+    // Google address stand in for a paid, verified registration.
+    if (!existing.isPlatformAdmin && existing.userType === "admin") {
       throw new ForbiddenError(
         "This address belongs to an administrator account. Sign in with your email and password.",
+      );
+    }
+
+    // A PLATFORM OPERATOR may use Google, but never Google alone: that account
+    // reaches every tenant on the deployment, so one compromised mailbox would
+    // be the whole platform. It is allowed only behind an authenticator, which
+    // is a factor an attacker holding the mailbox does not also hold.
+    //
+    // The caller is told to enrol rather than simply refused — the account can
+    // still sign in with its password today, and enrolment is the one action
+    // that makes this route available.
+    if (existing.isPlatformAdmin && !existing.mfaEnabledAt) {
+      throw new ForbiddenError(
+        "This operator account needs an authenticator app before it can use Google. Sign in with your password and enrol in multi-factor authentication first.",
       );
     }
 
@@ -199,7 +216,10 @@ export async function resolveUser(identity: GoogleIdentity): Promise<number> {
       // unknown value means nothing can be guessed into it, and the password
       // reset flow remains available if they later want local credentials.
       password: randomBytes(32).toString("hex"),
-      userType: "authority",
+      // `viewer`, not `authority`: an Authority is a project stakeholder who
+      // signs off on work, and a stranger who signed up with Google is not one.
+      // A viewer belongs to no organization and browses the project directory.
+      userType: "viewer",
       isPlatformAdmin: false,
       // Google has already proven control of the mailbox, which is exactly what
       // our own verification email establishes.

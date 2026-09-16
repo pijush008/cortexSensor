@@ -53,6 +53,10 @@ export default function LoginPage() {
   // been mailed. Until the code is accepted there is no session.
   const [otpUserId, setOtpUserId] = useState<number | null>(null);
   const [otp, setOtp] = useState("");
+  // Set when Google sends an OPERATOR back here. Google has proved the mailbox;
+  // the authenticator code is the factor an attacker holding that mailbox does
+  // not also hold, and no session exists until it is accepted.
+  const [googleMfa, setGoogleMfa] = useState(false);
   const [mode, setMode] = useState<Mode>("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -84,10 +88,18 @@ export default function LoginPage() {
   // codes are mapped to text on THIS side; the server never sends prose through
   // the URL, so a crafted link cannot put arbitrary words on the page.
   useEffect(() => {
-    const reason = new URLSearchParams(window.location.search).get("error");
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("mfa") === "google") setGoogleMfa(true);
+
+    const reason = params.get("error");
     if (!reason) return;
 
     const messages: Record<string, { title: string; description: string }> = {
+      google_mfa_required: {
+        title: "Set up an authenticator first",
+        description:
+          "Operator accounts can use Google only with an authenticator app. Sign in with your password, enrol in multi-factor authentication from your profile, then try Google again.",
+      },
       google_admin: {
         title: "Use your email and password",
         description:
@@ -128,6 +140,28 @@ export default function LoginPage() {
     const id = setInterval(() => setCursor((c) => !c), 900);
     return () => clearInterval(id);
   }, []);
+
+  /** Finishes an operator's Google sign-in with the authenticator code. */
+  const handleGoogleMfa = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      // The account is identified by the httpOnly pending cookie the callback
+      // set, never by anything sent from here.
+      const { data } = await api.post<{ status_code: number; type?: string }>(
+        "/auth/google/mfa",
+        { mfaToken: otp },
+      );
+      if (data.status_code !== 200) throw new Error("Sign-in failed");
+      // A full navigation, not a router push: the session cookies were just
+      // issued and the app must boot with them.
+      window.location.href = "/dashboard";
+    } catch (err) {
+      setError(describeError(err, { secondFactorAttempt: true }));
+      setLoading(false);
+    }
+  };
 
   const handleOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -344,7 +378,43 @@ export default function LoginPage() {
               {/* Second factor. Replaces the credential form entirely rather
                   than appearing beside it: the password step is finished, and
                   leaving those fields on screen invites re-submitting them. */}
-              {otpUserId !== null ? (
+              {googleMfa ? (
+                <form onSubmit={handleGoogleMfa} className="mt-6 space-y-4">
+                  <p className="text-[0.8125rem] leading-relaxed text-slate-600">
+                    Google has confirmed your account. Enter the six-digit code
+                    from your authenticator app to finish signing in.
+                  </p>
+                  <Input
+                    label="Authenticator code"
+                    placeholder="000000"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                    required
+                  />
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={loading || otp.length < 6}
+                  >
+                    {loading ? "Verifying…" : "Verify and sign in"}
+                  </Button>
+                  <button
+                    type="button"
+                    className="w-full text-center text-xs text-slate-500 hover:text-slate-700"
+                    onClick={() => {
+                      setGoogleMfa(false);
+                      setOtp("");
+                      setError(null);
+                      window.history.replaceState(null, "", "/login");
+                    }}
+                  >
+                    Use email and password instead
+                  </button>
+                </form>
+              ) : otpUserId !== null ? (
                 <form onSubmit={handleOtp} className="mt-6 space-y-4">
                   <p className="text-[0.8125rem] leading-relaxed text-slate-600">
                     A six-digit sign-in code has been emailed to{" "}
@@ -466,7 +536,7 @@ export default function LoginPage() {
                       setMode("forgot");
                       setError(null);
                     }}
-                    className="text-shm-navy-600 hover:underline cursor-pointer"
+                    className="inline-flex min-h-6 items-center text-shm-navy-600 hover:underline cursor-pointer"
                   >
                     Forgot password?
                   </button>
@@ -488,7 +558,7 @@ export default function LoginPage() {
                       setMode("login");
                       setError(null);
                     }}
-                    className="text-slate-500 hover:underline cursor-pointer"
+                    className="inline-flex min-h-6 items-center text-slate-500 hover:underline cursor-pointer"
                   >
                     ← Back to login
                   </button>

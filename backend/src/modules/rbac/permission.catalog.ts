@@ -17,6 +17,14 @@ import { RoleKey } from "@prisma/client";
  */
 
 export const PERMISSIONS = {
+  /**
+   * See the project directory: names, IDs, locations and stakeholders.
+   *
+   * Deliberately separate from PROJECT_VIEW, which opens a project and its
+   * measurements. A self-service viewer browses the directory and nothing else,
+   * so one permission cannot be allowed to imply the other.
+   */
+  PROJECT_BROWSE: "Browse the project directory",
   PROJECT_VIEW: "View projects",
   PROJECT_CREATE: "Create projects",
   PROJECT_EDIT: "Edit projects",
@@ -70,6 +78,8 @@ export type PermissionKey = keyof typeof PERMISSIONS;
 export const ALL_PERMISSIONS = Object.keys(PERMISSIONS) as PermissionKey[];
 
 const VIEW_ONLY: PermissionKey[] = [
+  // Anyone who may view a project may of course also see it listed.
+  "PROJECT_BROWSE",
   "PROJECT_VIEW",
   "STRUCTURE_VIEW",
   "SENSOR_VIEW",

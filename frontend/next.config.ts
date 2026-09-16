@@ -2,6 +2,37 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /**
+   * Hide the Next.js dev-tools badge.
+   *
+   * The small rounded square with a status dot that the dev server injects at
+   * the corner of every page. It is not part of this app and never appears in a
+   * production build, but it sits on top of the console's own chrome and reads
+   * as one of its controls.
+   */
+  devIndicators: false,
+
+  /**
+   * Hosts allowed to load /_next/* from the DEV server.
+   *
+   * Next's dev server treats a request whose Host is not the one it is serving
+   * on as cross-origin and refuses the dev assets. Reached through a tunnel
+   * (cloudflared, ngrok) the HMR client then cannot hold its connection and the
+   * dev runtime reloads the page over and over — which looks like the app
+   * refreshing in a loop rather than like a configuration problem.
+   *
+   * Read from the environment rather than hardcoded: a quick tunnel gets a new
+   * hostname every run, and a throwaway host does not belong in the repo.
+   * Comma-separated, e.g.
+   *   DEV_ALLOWED_ORIGINS=abc-def.trycloudflare.com npm run dev
+   *
+   * Dev only — `next build` ignores it.
+   */
+  allowedDevOrigins: (process.env.DEV_ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((h) => h.trim())
+    .filter(Boolean),
+
+  /**
    * Proxy the API through the Next server.
    *
    * The browser calls the API at the relative path `/api`, so it goes to

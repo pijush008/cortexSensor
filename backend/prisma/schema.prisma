@@ -18,6 +18,10 @@ enum UserRole {
   admin
   contractor
   authority
+  /// Self-service sign-up (Google). Belongs to no organization and browses the
+  /// project directory only — deliberately distinct from `authority`, which is
+  /// a project stakeholder who signs off on work.
+  viewer
 }
 
 enum UserStatus {

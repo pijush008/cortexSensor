@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { api, type ApiResponse } from "@/lib/api";
 import { describeError, type DescribedError } from "@/lib/errors";
-import { useAuthStore } from "@/stores/auth-store";
+import { useRole } from "@/hooks/use-role";
 
 /**
  * The hardware a project monitors with.
@@ -42,9 +42,13 @@ export function DevicePanel({
   currentDeviceName,
   status,
 }: DevicePanelProps) {
-  const { userType } = useAuthStore();
+  const role = useRole();
   const queryClient = useQueryClient();
-  const canManage = userType === "superadmin" || userType === "admin";
+  // Resolved from the SERVER. Read from localStorage this was a gate that could
+  // fail open: a stale cached role let an unprivileged session through.
+  const canManage = role === "superadmin" || role === "admin";
+
+
   const notStarted = status === "not_start";
   const editable = canManage && notStarted;
 
@@ -110,6 +114,13 @@ export function DevicePanel({
       : []),
     ...options.map((d) => ({ value: String(d.id), label: optionLabel(d) })),
   ];
+
+  // A self-service viewer never sees this panel. Placed after the hooks,
+  // not before them, because a conditional early return above a hook changes
+  // the hook order between renders. Gated here as well as at the caller so no
+  // future caller can render it to them by accident; the API refuses every
+  // action it offers anyway.
+  if (role === "viewer") return null;
 
   return (
     <Card>

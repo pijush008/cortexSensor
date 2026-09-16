@@ -1,29 +1,23 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Motion, MotionOnLoad } from "@/components/ui/motion";
+import { MobileNav } from "@/components/home/mobile-nav";
+import { NAV_ITEMS } from "@/components/home/nav-items";
 import { SectionLabel } from "@/components/ui/section-label";
 import {
-  AlertTriangle,
-  BarChart3,
   Bell,
   Brain,
   ChevronRight,
   Cloud,
-  Cog,
   Cpu,
   Database,
-  Eye,
-  FileText,
   Gauge,
   Globe,
   Layers,
   Lock,
   MonitorDot,
-  Radar,
   Radio,
   Server,
-  Shield,
-  TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -77,11 +71,7 @@ export default function HomePage() {
             />
           </Link>
           <div className="hidden items-center gap-1 md:flex">
-            {[
-              { label: "Platform", href: "#platform" },
-              { label: "Architecture", href: "#architecture" },
-              { label: "Modules", href: "#modules" },
-            ].map((item) => (
+            {NAV_ITEMS.map((item) => (
               <a
                 key={item.label}
                 href={item.href}
@@ -92,8 +82,9 @@ export default function HomePage() {
               </a>
             ))}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 sm:gap-3">
             <ConsoleLink size="sm">Sign in</ConsoleLink>
+            <MobileNav />
           </div>
         </div>
       </nav>
@@ -116,7 +107,7 @@ export default function HomePage() {
             <div>
               {/* Set as a running head on a drawing, not a pill badge. */}
               <MotionOnLoad index={0}>
-                <p className="mb-8 flex items-center gap-3 font-mono text-[0.71875rem] text-sheet-ink/50">
+                <p className="mb-8 flex items-center gap-3 font-mono text-label text-sheet-ink/55">
                   <span className="h-px w-10 bg-sheet-rust" />
                   Structural monitoring as a service
                 </p>
@@ -124,12 +115,13 @@ export default function HomePage() {
 
               <MotionOnLoad index={1}>
                 <h1 className="max-w-[15ch] text-[2.75rem] font-bold leading-[1.02] tracking-[-0.035em] text-sheet-ink sm:text-[3.625rem] lg:text-[4.125rem]">
-                  Every structure is already telling you something.
+                  Structural health monitoring for bridges, dams and
+                  buildings.
                 </h1>
               </MotionOnLoad>
 
               <MotionOnLoad index={2}>
-                <p className="mt-7 max-w-[54ch] text-[1.0625rem] leading-[1.62] text-sheet-ink/75">
+                <p className="mt-7 max-w-[54ch] text-lead leading-[1.62] text-sheet-ink/70">
                   Strain, vibration and deflection, measured continuously at the
                   structure and carried to engineers who can act on them. The
                   platform records what was measured, when, and by which
@@ -147,7 +139,7 @@ export default function HomePage() {
                   <Button
                     size="lg"
                     variant="ghost"
-                    className="w-full border border-sheet-ink/25 text-sheet-ink hover:border-sheet-ink/45 hover:bg-sheet-paper sm:w-auto"
+                    className="w-full border-2 border-sheet-ink/35 bg-sheet-paper/60 text-sheet-ink hover:border-sheet-ink/60 hover:bg-sheet-paper sm:w-auto"
                   >
                     <Layers className="h-4 w-4" />
                     See what it monitors
@@ -161,7 +153,7 @@ export default function HomePage() {
                   kind of statement a buyer verifies. */}
               {/* Also above the fold, so the cascade is CSS-only. The index
                   continues the hero's sequence rather than restarting it. */}
-              <ul className="mt-10 flex flex-col gap-x-8 gap-y-3 border-t border-sheet-ink/15 pt-6 text-[0.84375rem] text-sheet-ink/70 sm:flex-row">
+              <ul className="mt-14 flex flex-col gap-x-8 gap-y-3 border-t border-sheet-ink/15 pt-7 text-caption text-sheet-ink/70 sm:flex-row">
                 {[
                   { icon: Lock, text: "Tenant isolation enforced in the database" },
                   { icon: Globe, text: "Per-device credentials, not a shared key" },
@@ -201,11 +193,12 @@ export default function HomePage() {
             <div className="mb-12 max-w-2xl">
               <SectionLabel label="Three-plane architecture" />
               <h2 className="mt-5 text-3xl font-semibold tracking-tight text-sheet-ink sm:text-4xl">
-                One platform. Three planes. End-to-end.
+                The platform runs in three planes.
               </h2>
-              <p className="mt-4 text-[0.9375rem] leading-relaxed text-sheet-ink/55">
-                Control, application, and edge planes operate independently yet
-                integrate for continuous structural monitoring.
+              <p className="mt-4 text-body leading-relaxed text-sheet-ink/55">
+                Each plane is deployed, scaled and secured on its own. That
+                separation is what lets the edge keep recording when the link to
+                the cloud is down.
               </p>
             </div>
           </Motion>
@@ -216,9 +209,6 @@ export default function HomePage() {
                 index: "01",
                 title: "Control Plane",
                 sub: "Platform management",
-                icon: Cog,
-                tone: "from-sheet-navy to-sheet-ink",
-                accent: "text-sheet-rule",
                 items: [
                   "Tenant & RBAC administration",
                   "Subscriptions, billing & payments",
@@ -230,9 +220,6 @@ export default function HomePage() {
                 index: "02",
                 title: "Application Plane",
                 sub: "Analytics & intelligence",
-                icon: MonitorDot,
-                tone: "from-sheet-rule to-sheet-navy",
-                accent: "text-shm-cyan",
                 items: [
                   "Signal processing, FFT & modal analysis",
                   "AI/ML anomaly detection",
@@ -244,9 +231,6 @@ export default function HomePage() {
                 index: "03",
                 title: "Edge / IoT Plane",
                 sub: "Sensors & gateways",
-                icon: Radio,
-                tone: "from-sheet-navy to-sheet-ink",
-                accent: "text-sheet-rule",
                 items: [
                   "ESP32 / MCU sensor nodes",
                   "Marine & industrial gateways",
@@ -256,30 +240,30 @@ export default function HomePage() {
               },
             ].map((plane, i) => (
               <Motion key={plane.title} variant="ink" index={i}>
-                <Card className="group h-full overflow-hidden border-sheet-ink/15">
-                  <div
-                    className={`flex items-center justify-between bg-gradient-to-r ${plane.tone} px-5 py-3`}
-                  >
-                    <span className="font-mono text-[0.625rem] tracking-[0.22em] text-white/70">
-                      PLANE {plane.index}
-                    </span>
-                    <plane.icon
-                      className={`h-4 w-4 ${plane.accent}`}
-                      strokeWidth={1.75}
-                    />
-                  </div>
+                {/* No gradient plate, and no "PLANE 01" set in tracked mono on
+                    top of it. The ordinal is worth keeping — the planes are
+                    genuinely ordered — but as a quiet marker beside the name,
+                    the same shape the pricing cards use for their tier. A
+                    coloured gradient header carries no information the title
+                    does not already carry. */}
+                <Card className="h-full border-sheet-ink/15">
                   <CardContent className="p-5">
-                    <h3 className="text-[0.9375rem] font-semibold tracking-tight text-sheet-ink">
-                      {plane.title}
-                    </h3>
-                    <p className="mt-0.5 font-mono text-[0.75rem] font-medium text-sheet-ink/60">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <h3 className="text-body font-semibold tracking-tight text-sheet-ink">
+                        {plane.title}
+                      </h3>
+                      <span className="font-mono text-label text-sheet-ink/45">
+                        {plane.index}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-caption text-sheet-ink/55">
                       {plane.sub}
                     </p>
-                    <ul className="mt-4 space-y-2.5">
+                    <ul className="mt-4 space-y-2.5 border-t border-sheet-ink/15 pt-4">
                       {plane.items.map((item) => (
                         <li
                           key={item}
-                          className="flex items-start gap-2.5 text-[0.8125rem] leading-snug text-sheet-ink/70"
+                          className="flex items-start gap-2.5 text-caption leading-snug text-sheet-ink/70"
                         >
                           <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-shm-navy-400" />
                           {item}
@@ -296,14 +280,14 @@ export default function HomePage() {
           <Motion variant="rise" index={2}>
             <div className="mt-10 rounded-xl border border-sheet-ink/15 bg-white p-5">
               <div className="mb-4 flex items-center justify-between">
-                <span className="font-mono text-[0.625rem] font-semibold uppercase tracking-[0.22em] text-sheet-ink/55">
+                <span className="font-mono text-label font-semibold uppercase tracking-[0.22em] text-sheet-ink/55">
                   Data flow
                 </span>
-                <span className="font-mono text-[0.625rem] text-sheet-ink/45">
+                <span className="font-mono text-label text-sheet-ink/45">
                   SENSOR → INGEST → ANALYZE
                 </span>
               </div>
-              <div className="flex flex-wrap items-center gap-2 text-xs">
+              <div className="flex flex-wrap items-center gap-2 text-label">
                 {[
                   {
                     label: "Sensors",
@@ -314,12 +298,12 @@ export default function HomePage() {
                   {
                     label: "ESP32",
                     icon: Cpu,
-                    color: "bg-slate-100 text-sheet-ink/75 border-sheet-ink/15",
+                    color: "bg-slate-100 text-sheet-ink/70 border-sheet-ink/15",
                   },
                   {
                     label: "Gateway",
                     icon: Server,
-                    color: "bg-slate-100 text-sheet-ink/75 border-sheet-ink/15",
+                    color: "bg-slate-100 text-sheet-ink/70 border-sheet-ink/15",
                   },
                   {
                     label: "MQTT",
@@ -387,119 +371,124 @@ export default function HomePage() {
             <div className="mb-12 max-w-2xl">
               <SectionLabel label="Platform modules" />
               <h2 className="mt-5 text-3xl font-semibold tracking-tight text-sheet-ink sm:text-4xl">
-                Twelve capabilities, one instrumented truth.
+                Modules, grouped by where they run.
               </h2>
-              <p className="mt-4 text-[0.9375rem] leading-relaxed text-sheet-ink/55">
-                From IoT ingestion to damage localization, every module is built
-                for production-grade structural monitoring.
+              <p className="mt-4 text-body leading-relaxed text-sheet-ink/55">
+                From ingestion at the sensor through to alerting, reporting
+                and damage assessment.
               </p>
             </div>
           </Motion>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {/* Grouped by where each module runs, not laid out as twelve
+              identical boxes.
+
+              A uniform icon grid is the default shape of a marketing page, and
+              it flattens everything onto one level: an ingestion pipeline and a
+              report generator get the same weight, the same icon treatment and
+              the same tracked-uppercase tag. Grouping says something the grid
+              could not — that these are four stages of one pipeline — and a
+              hairline-divided list is how the reference-structures plate on
+              this page already presents specifications. */}
+          <div className="grid gap-x-10 gap-y-10 md:grid-cols-2 lg:grid-cols-4">
             {[
               {
-                icon: Radio,
-                title: "IoT Data Pipeline",
-                description:
-                  "MQTT ingestion with validation, deduplication, and store-and-forward buffering.",
-                tag: "Edge",
+                group: "Edge and ingest",
+                modules: [
+                  {
+                    title: "IoT data pipeline",
+                    description:
+                      "MQTT ingestion with validation, deduplication, and store-and-forward buffering.",
+                  },
+                  {
+                    title: "Edge gateway",
+                    description:
+                      "Industrial gateway with local processing and secure sync.",
+                  },
+                  {
+                    title: "Time-series store",
+                    description:
+                      "PostgreSQL + TimescaleDB for high-frequency sensor data.",
+                  },
+                ],
               },
               {
-                icon: Database,
-                title: "Time-Series Store",
-                description:
-                  "PostgreSQL + TimescaleDB for high-frequency sensor data.",
-                tag: "Data",
+                group: "Analysis",
+                modules: [
+                  {
+                    title: "FFT & modal analysis",
+                    description:
+                      "Welch PSD, STFT, wavelet analysis, frequency tracking, mode shapes.",
+                  },
+                  {
+                    title: "Physics-informed FEM",
+                    description:
+                      "Finite-element comparison against live sensor telemetry.",
+                  },
+                  {
+                    title: "AI anomaly detection",
+                    description:
+                      "Isolation Forest, autoencoders, LSTM and transformers — explainable.",
+                  },
+                ],
               },
               {
-                icon: BarChart3,
-                title: "FFT & Modal Analysis",
-                description:
-                  "Welch PSD, STFT, wavelet analysis, frequency tracking, mode shapes.",
-                tag: "Analytics",
+                group: "Assessment",
+                modules: [
+                  {
+                    title: "Damage localization",
+                    description:
+                      "Component-level severity with evidence-based recommendations.",
+                  },
+                  {
+                    title: "Computer vision",
+                    description:
+                      "Crack, spalling and corrosion analysis from inspection imagery.",
+                  },
+                  {
+                    title: "Sensor health",
+                    description:
+                      "Detect drift, saturation, battery and calibration issues early.",
+                  },
+                ],
               },
               {
-                icon: Brain,
-                title: "AI Anomaly Detection",
-                description:
-                  "Isolation Forest, autoencoders, LSTM and transformers — explainable.",
-                tag: "AI",
+                group: "Operations",
+                modules: [
+                  {
+                    title: "Smart alert engine",
+                    description:
+                      "Thresholds, severity, multi-channel email / SMS / push dispatch.",
+                  },
+                  {
+                    title: "Automated reports",
+                    description:
+                      "FFT summaries, anomaly history, inspection recommendations.",
+                  },
+                  {
+                    title: "Multi-tenant SaaS",
+                    description:
+                      "Tenant isolation, RBAC, subscriptions, and payments.",
+                  },
+                ],
               },
-              {
-                icon: TrendingUp,
-                title: "Physics-Informed FEM",
-                description:
-                  "Finite-element comparison against live sensor telemetry.",
-                tag: "Physics",
-              },
-              {
-                icon: AlertTriangle,
-                title: "Smart Alert Engine",
-                description:
-                  "Thresholds, severity, multi-channel email / SMS / push dispatch.",
-                tag: "Alerts",
-              },
-              {
-                icon: Lock,
-                title: "Multi-Tenant SaaS",
-                description:
-                  "Tenant isolation, RBAC, subscriptions, and payments.",
-                tag: "SaaS",
-              },
-              {
-                icon: FileText,
-                title: "Automated Reports",
-                description:
-                  "FFT summaries, anomaly history, inspection recommendations.",
-                tag: "Reports",
-              },
-              {
-                icon: Shield,
-                title: "Sensor Health",
-                description:
-                  "Detect drift, saturation, battery and calibration issues early.",
-                tag: "Health",
-              },
-              {
-                icon: Radar,
-                title: "Damage Localization",
-                description:
-                  "Component-level severity with evidence-based recommendations.",
-                tag: "Damage",
-              },
-              {
-                icon: Cloud,
-                title: "Edge Gateway",
-                description:
-                  "Industrial gateway with local processing and secure sync.",
-                tag: "Edge",
-              },
-              {
-                icon: Eye,
-                title: "Computer Vision",
-                description:
-                  "Crack, spalling and corrosion analysis from inspection imagery.",
-                tag: "Vision",
-              },
-            ].map((m, i) => (
-              <Motion key={m.title} variant="ink" index={i % 3}>
-                <div className="group h-full rounded-xl border border-sheet-ink/15 bg-sheet-paper p-5 shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-sheet-rule hover:shadow-[0_10px_30px_-12px_rgba(17,17,17,0.2)]">
-                  <div className="mb-4 flex items-center justify-between">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sheet-paper text-sheet-ink transition-colors duration-300 group-hover:bg-sheet-ink group-hover:text-white">
-                      <m.icon className="h-4.5 w-4.5" strokeWidth={1.75} />
+            ].map((column, i) => (
+              <Motion key={column.group} variant="rise" index={i}>
+                <h3 className="text-caption font-semibold tracking-tight text-sheet-ink">
+                  {column.group}
+                </h3>
+                <dl className="mt-3 divide-y divide-sheet-ink/10 border-t border-sheet-ink/15">
+                  {column.modules.map((m) => (
+                    <div key={m.title} className="py-3">
+                      <dt className="text-caption font-medium text-sheet-ink">
+                        {m.title}
+                      </dt>
+                      <dd className="mt-1 text-caption leading-relaxed text-sheet-ink/55">
+                        {m.description}
+                      </dd>
                     </div>
-                    <span className="font-mono text-[0.5625rem] font-semibold uppercase tracking-[0.2em] text-sheet-ink/45">
-                      {m.tag}
-                    </span>
-                  </div>
-                  <h3 className="text-[0.90625rem] font-semibold tracking-tight text-sheet-ink">
-                    {m.title}
-                  </h3>
-                  <p className="mt-1.5 text-[0.78125rem] leading-relaxed text-sheet-ink/55">
-                    {m.description}
-                  </p>
-                </div>
+                  ))}
+                </dl>
               </Motion>
             ))}
           </div>
@@ -513,11 +502,10 @@ export default function HomePage() {
             <div className="mb-12 max-w-2xl">
               <SectionLabel label="Access control" />
               <h2 className="mt-5 text-3xl font-semibold tracking-tight text-sheet-ink sm:text-4xl">
-                Role-based access, fully audited.
+                Access is role-based, and every action is recorded.
               </h2>
-              <p className="mt-4 text-[0.9375rem] leading-relaxed text-sheet-ink/55">
-                Five distinct roles with permission-based access. Every action
-                is recorded.
+              <p className="mt-4 text-body leading-relaxed text-sheet-ink/55">
+                Five roles, each scoped to what that job actually needs.
               </p>
             </div>
           </Motion>
@@ -527,60 +515,46 @@ export default function HomePage() {
               {
                 role: "Super Admin",
                 desc: "Platform owner — tenants, billing, system health.",
-                icon: Shield,
-                tag: "ADMIN",
                 items: ["Tenants", "Billing", "Audit"],
               },
               {
                 role: "Org Admin",
                 desc: "Customer admin — users, structures, devices.",
-                icon: Cog,
-                tag: "ADMIN",
                 items: ["Users", "Structures"],
               },
               {
                 role: "SHM Engineer",
                 desc: "FFT, AI models, damage localization.",
-                icon: Brain,
-                tag: "ENG",
                 items: ["Analytics", "FFT", "Reports"],
               },
               {
                 role: "Technician",
                 desc: "Field ops — health, calibration, firmware.",
-                icon: Wrench,
-                tag: "FIELD",
                 items: ["Gateways", "Sensors"],
               },
               {
                 role: "Viewer",
                 desc: "Read-only dashboards, alerts, reports.",
-                icon: Eye,
-                tag: "RO",
                 items: ["Dashboard", "Alerts"],
               },
             ].map((r, i) => (
               <Motion key={r.role} variant="ink" index={i}>
-                <div className="group h-full rounded-xl border border-sheet-ink/15 bg-sheet-paper p-5 text-left shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-sheet-rule hover:shadow-[0_10px_30px_-12px_rgba(17,17,17,0.2)]">
-                  <div className="mb-3 flex items-center justify-between">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sheet-ink text-white transition-transform duration-300 group-hover:scale-105">
-                      <r.icon className="h-4.5 w-4.5" strokeWidth={1.75} />
-                    </div>
-                    <span className="font-mono text-[0.5625rem] font-semibold uppercase tracking-[0.18em] text-sheet-ink/45">
-                      {r.tag}
-                    </span>
-                  </div>
-                  <h3 className="text-[0.90625rem] font-semibold tracking-tight text-sheet-ink">
+                {/* Same treatment as the module list: no icon tile, and no
+                    invented ADMIN / ENG / FIELD / RO abbreviation set in tracked
+                    mono. The role's name is the label; a second, shorter label
+                    beside it was decoration standing in for information. */}
+                <div className="flex h-full flex-col border-t border-sheet-ink/15 pt-4 text-left">
+                  <h3 className="text-body font-semibold tracking-tight text-sheet-ink">
                     {r.role}
                   </h3>
-                  <p className="mt-1.5 text-[0.75rem] leading-relaxed text-sheet-ink/55">
+                  <p className="mt-1.5 text-caption leading-relaxed text-sheet-ink/55">
                     {r.desc}
                   </p>
-                  <div className="mt-3 flex flex-wrap gap-1">
+                  <div className="mt-auto flex flex-wrap gap-1 pt-3">
                     {r.items.map((item) => (
                       <span
                         key={item}
-                        className="rounded bg-slate-100 px-2 py-0.5 font-mono text-[0.59375rem] text-sheet-ink/55"
+                        className="rounded bg-slate-100 px-2 py-0.5 font-mono text-label text-sheet-ink/55"
                       >
                         {item}
                       </span>
@@ -600,16 +574,20 @@ export default function HomePage() {
             <div className="mb-12 max-w-2xl">
               <SectionLabel label="Subscription plans" />
               <h2 className="mt-5 text-3xl font-semibold tracking-tight text-sheet-ink sm:text-4xl">
-                Pricing by scale, not by structure.
+                Plans are priced by how much you monitor.
               </h2>
-              <p className="mt-4 text-[0.9375rem] leading-relaxed text-sheet-ink/55">
-                Entitlement-based plans that grow with your infrastructure
-                footprint.
+              <p className="mt-4 text-body leading-relaxed text-sheet-ink/55">
+                Structures, sensors and users are the limits that change
+                between plans.
               </p>
             </div>
           </Motion>
 
-          <div className="grid gap-5 lg:grid-cols-3">
+          {/* Two plans, so two columns — and capped in width, because two cards
+              stretched across a three-column grid read as a row with something
+              missing from it. The Enterprise tier remains sellable in billing;
+              it is simply not advertised here. */}
+          <div className="mx-auto grid max-w-3xl gap-5 sm:grid-cols-2">
             {[
               {
                 name: "Starter",
@@ -643,21 +621,6 @@ export default function HomePage() {
                 ],
                 featured: true,
               },
-              {
-                name: "Enterprise",
-                price: "Custom",
-                period: "",
-                desc: "Large-scale infrastructure",
-                features: [
-                  "Unlimited structures & sensors",
-                  "Advanced AI + FEM",
-                  "Digital twin + vision",
-                  "Custom integrations",
-                  "SSO & dedicated deployment",
-                  "SLA & support",
-                ],
-                featured: false,
-              },
             ].map((plan, i) => (
               <Motion key={plan.name} variant="ink" index={i}>
                 <div
@@ -668,26 +631,26 @@ export default function HomePage() {
                   }`}
                 >
                   {plan.featured && (
-                    <span className="absolute -top-3 left-6 rounded-full bg-sheet-ink px-3 py-1 font-mono text-[0.5625rem] font-semibold uppercase tracking-[0.18em] text-white">
+                    <span className="absolute -top-3 left-6 rounded-full bg-sheet-ink px-3 py-1 font-mono text-label font-semibold uppercase tracking-[0.18em] text-white">
                       Most deployed
                     </span>
                   )}
                   <div className="flex items-baseline justify-between">
-                    <h3 className="text-[1rem] font-semibold tracking-tight text-sheet-ink">
+                    <h3 className="text-lead font-semibold tracking-tight text-sheet-ink">
                       {plan.name}
                     </h3>
-                    <span className="font-mono text-[0.5625rem] uppercase tracking-[0.18em] text-sheet-ink/45">
+                    <span className="font-mono text-label uppercase tracking-[0.18em] text-sheet-ink/45">
                       TIER 0{i + 1}
                     </span>
                   </div>
-                  <p className="mt-1 text-[0.78125rem] text-sheet-ink/55">
+                  <p className="mt-1 text-caption text-sheet-ink/55">
                     {plan.desc}
                   </p>
                   <div className="mt-5 flex items-baseline gap-1">
                     <span className="text-3xl font-semibold tracking-tight text-sheet-ink">
                       {plan.price}
                     </span>
-                    <span className="text-[0.75rem] text-sheet-ink/45">
+                    <span className="text-label text-sheet-ink/45">
                       {plan.period}
                     </span>
                   </div>
@@ -695,7 +658,7 @@ export default function HomePage() {
                     {plan.features.map((f) => (
                       <li
                         key={f}
-                        className="flex items-start gap-2 text-[0.8125rem] text-sheet-ink/70"
+                        className="flex items-start gap-2 text-caption text-sheet-ink/70"
                       >
                         <CheckMark />
                         {f}
@@ -703,10 +666,26 @@ export default function HomePage() {
                     ))}
                   </ul>
                   <Link href="/login" className="mt-6">
+                    {/* The same forward chevron the hero and closing CTAs carry.
+                        Every primary action on the page now signals "this moves
+                        you onward" the same way; without it these read as a
+                        different KIND of control from the one in the hero. */}
                     <Button
-                      className={`w-full ${plan.featured ? "" : "bg-slate-100 text-slate-800 hover:bg-sheet-ink/15"}`}
+                      className={`w-full ${
+                        plan.featured
+                          ? // Dark plate inverts to light. On a white card a
+                            // white button would vanish, so it gains a 2px
+                            // outline — drawn INSET, because a real border
+                            // would resize the button under the cursor.
+                            "hover:bg-sheet-paper hover:text-shm-navy-800 hover:shadow-[inset_0_0_0_2px_var(--color-shm-navy-800)]"
+                          : // Light plate inverts to dark. The resting hover
+                            // was sheet-ink at 15% — a grey barely separable
+                            // from the resting grey, with the label unchanged.
+                            "bg-slate-100 text-slate-800 hover:bg-shm-navy-800 hover:text-white"
+                      }`}
                     >
                       Get started
+                      <ChevronRight className="h-4 w-4" />
                     </Button>
                   </Link>
                 </div>
@@ -721,31 +700,28 @@ export default function HomePage() {
         <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-transparent blur-3xl" />
         <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
           <Motion variant="rise">
-            <p className="mb-4 font-mono text-[0.6875rem] uppercase tracking-[0.24em] text-sheet-rule">
-              Ready when you are
+            {/* The page's own eyebrow component rather than a second, uppercase
+                implementation of the same idea. Sentence case reads faster than
+                a tracked all-caps run, and this is now the ONE way a section is
+                labelled instead of two. */}
+            <p className="mb-4 text-caption font-medium text-sheet-paper/70">
+              Getting started
             </p>
             <h2 className="mb-5 text-3xl font-semibold tracking-tight text-white sm:text-5xl">
-              Protect your infrastructure before it signals.
+              Start with a single structure.
             </h2>
-            <p className="mx-auto mb-8 max-w-xl text-[0.9375rem] leading-relaxed text-sheet-paper/70">
-              Start monitoring in minutes. Live telemetry, engineering analysis,
-              and alerts that reach the right person at the right time.
+            <p className="mx-auto mb-8 max-w-xl text-body leading-relaxed text-sheet-paper/70">
+              Instrument one span or one pier, confirm the data reads the way
+              you expect it to, and expand from there.
             </p>
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
               <ConsoleLink
                 size="lg"
                 className="w-full bg-white text-sheet-ink hover:bg-sheet-print sm:w-auto"
               >
-                Start free trial
+                Go to Dashboard
               </ConsoleLink>
-              <Button
-                size="lg"
-                variant="ghost"
-                className="w-full border border-white/25 text-white hover:border-white/40 hover:bg-white/5 sm:w-auto"
-              >
-                <FileText className="h-4 w-4" />
-                Request a demo
-              </Button>
+            
             </div>
           </Motion>
         </div>
@@ -763,10 +739,10 @@ export default function HomePage() {
                 height={LOGO.height}
                 className="h-9 w-auto"
               />
-              <p className="mt-3 font-mono text-[0.53125rem] uppercase tracking-[0.22em] text-sheet-ink/45">
+              <p className="mt-3 font-mono text-label uppercase tracking-[0.22em] text-sheet-ink/45">
                 {TAGLINE}
               </p>
-              <p className="mt-4 text-[0.8125rem] leading-relaxed text-sheet-ink/55">
+              <p className="mt-4 text-caption leading-relaxed text-sheet-ink/55">
                 Continuous structural health monitoring — IoT edge nodes, cloud
                 analytics, physics-informed AI, and a full multi-tenant SaaS
                 platform.
@@ -792,10 +768,10 @@ export default function HomePage() {
               },
             ].map((col) => (
               <div key={col.title}>
-                <h4 className="mb-3 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.2em] text-sheet-ink">
+                <h3 className="mb-3 font-mono text-label font-semibold uppercase tracking-[0.2em] text-sheet-ink">
                   {col.title}
-                </h4>
-                <ul className="space-y-2 text-[0.8125rem] text-sheet-ink/55">
+                </h3>
+                <ul className="space-y-2 text-caption text-sheet-ink/55">
                   {col.links.map((l) => (
                     <li key={l}>
                       <span className="mo-link cursor-pointer transition-colors hover:text-sheet-ink">
@@ -808,12 +784,12 @@ export default function HomePage() {
             ))}
           </div>
           <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-sheet-ink/15 pt-6 sm:flex-row">
-            <p className="font-mono text-[0.6875rem] text-sheet-ink/45">
+            <p className="font-mono text-label text-sheet-ink/45">
               {/* Derived from the clock, so the notice does not silently go
                   stale on 1 January. */}
               © {new Date().getFullYear()} {COMPANY}
             </p>
-            <div className="flex gap-5 font-mono text-[0.6875rem] text-sheet-ink/45">
+            <div className="flex gap-5 font-mono text-label text-sheet-ink/45">
               <span className="cursor-pointer transition-colors hover:text-sheet-ink/70">
                 PRIVACY
               </span>
@@ -849,24 +825,5 @@ function CheckMark() {
         <path d="M20 6 9 17l-5-5" />
       </svg>
     </span>
-  );
-}
-
-function Wrench(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.75"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      {...props}
-    >
-      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-    </svg>
   );
 }

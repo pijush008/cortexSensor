@@ -124,3 +124,48 @@ export function verifyCheckoutToken(token: string): JwtPayload & {
   }
   return decoded as JwtPayload & { purpose: string };
 }
+
+/**
+ * Authorises ONE thing: finishing a Google sign-in that still owes a
+ * multi-factor code.
+ *
+ * A platform operator may sign in with Google, but Google alone must not be
+ * enough — it would make one mailbox the single key to every tenant on the
+ * platform. The callback therefore issues NO session; it issues this, and the
+ * session is created only once the authenticator code is verified.
+ *
+ * Two minutes: this is the gap between picking an account and typing six
+ * digits, not a session. Signed with the refresh secret and stamped with a
+ * purpose, like the reset and checkout tokens, so an access token cannot be
+ * presented in its place — and so this cannot be presented as one.
+ */
+export function signPendingMfaToken(userId: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const payload: JwtPayload & { purpose: string } = {
+      userId,
+      purpose: "pending_mfa",
+    };
+    const options: jwt.SignOptions = { expiresIn: "2m", issuer: "shm-api" };
+    jwt.sign(payload, config.jwtRefreshSecret, options, (err, token) => {
+      if (err || !token) {
+        reject(err || new Error("Pending MFA token generation failed"));
+      } else {
+        resolve(token);
+      }
+    });
+  });
+}
+
+export function verifyPendingMfaToken(token: string): JwtPayload & {
+  purpose: string;
+} {
+  const payload = jwt.verify(token, config.jwtRefreshSecret, {
+    issuer: "shm-api",
+  }) as JwtPayload & { purpose: string };
+  // Checked here rather than at the call site: a token minted for a password
+  // reset must not finish a sign-in.
+  if (payload.purpose !== "pending_mfa") {
+    throw new Error("Token is not a pending multi-factor token");
+  }
+  return payload;
+}

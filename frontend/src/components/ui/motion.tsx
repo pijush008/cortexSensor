@@ -39,12 +39,43 @@ export type MotionVariant = "rise" | "ink" | "unroll";
  * this page: a fast scroll to the bottom left 16 elements invisible, including
  * the whole structures plate.
  *
- * A position check has no such hole: "has this element's top passed the bottom
- * of the viewport" is true from then on, however the reader got there. One
+ * A position check has no such hole: "is enough of this element on screen" is
+ * true from then on, however the reader got there. One
  * rAF-throttled listener serves every pending element and detaches itself once
  * the last one has been revealed, so a fully-revealed page costs nothing.
  */
 type Pending = { el: HTMLElement; reveal: () => void };
+
+/**
+ * Has enough of this element arrived for its entrance to be worth playing?
+ *
+ * Measured in HOW MUCH OF THE ELEMENT is on screen, not in where its top edge
+ * falls. The previous rule was `rect.top < vh * 0.82`: a fixed line with 18% of
+ * the viewport below it — 146px on a 813px screen. That is the whole of a short
+ * card and the top sliver of a tall one, so the rule was really calibrated for a
+ * single element height and quietly wrong for every other.
+ *
+ * On this page it broke the pricing cards. At 491px they are the tallest
+ * animated elements here, and they began their entrance with 30% of themselves
+ * showing: the price, the feature list and the button all finished animating
+ * below the fold, and the reader scrolled down to meet a card that had already
+ * settled. The animation ran perfectly and nobody ever saw it — which, as the
+ * motion CSS says of movement too small to notice, is the same as no animation
+ * at all, only slower.
+ *
+ * Two bounds keep this honest:
+ *
+ * - A floor of 18% of the viewport, exactly the old rule. Elements that already
+ *   read well — the twelve module cards, the plane cards — must not start
+ *   arriving LATER because tall ones needed to start later.
+ * - A ceiling of 62% of the viewport, so an element taller than the screen can
+ *   still satisfy the test. Without it a full-height panel could never be 55%
+ *   visible and would sit at opacity 0 forever.
+ */
+export function shouldReveal(rect: { top: number; height: number }, vh: number) {
+  const needed = Math.max(vh * 0.18, Math.min(rect.height * 0.55, vh * 0.62));
+  return rect.top < vh - needed;
+}
 
 const pending = new Set<Pending>();
 let ticking = false;
@@ -52,15 +83,13 @@ let listening = false;
 
 function flush() {
   ticking = false;
-  // Fire when the element is properly INSIDE the viewport, not the instant its
-  // top edge clears the bottom. At the old threshold (60px from the bottom) a
-  // section finished animating while it was still off-screen, so the reader
-  // only ever met the final state.
-  const limit = window.innerHeight * 0.82;
+  const vh = window.innerHeight;
   for (const entry of [...pending]) {
     const rect = entry.el.getBoundingClientRect();
-    // Top has entered the viewport, or the element is already above it.
-    if (rect.top < limit) {
+    // Height-aware, so a tall element waits until the reader can actually watch
+    // it arrive. An element already scrolled past has a negative top and so
+    // passes unconditionally — nothing is ever stranded at opacity 0.
+    if (shouldReveal(rect, vh)) {
       entry.reveal();
       pending.delete(entry);
     }

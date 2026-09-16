@@ -214,6 +214,38 @@ services:
       - redis
       - backend
 
+  firebase-bridge:
+    # Follows a Firestore collection an ESP32 writes to and forwards each new
+    # reading into the same ingest endpoint the broker path uses.
+    #
+    # PROFILE-GATED: it needs a Firebase service-account key, which this repo
+    # does not and must not contain, so it stays out of `docker compose up`
+    # until you ask for it:
+    #
+    #   docker compose --profile firebase up -d firebase-bridge
+    profiles: ["firebase"]
+    build:
+      context: ./firebase-bridge
+      dockerfile: Dockerfile.dev
+    working_dir: /app
+    restart: unless-stopped
+    volumes:
+      - ./firebase-bridge:/app
+      - /app/node_modules
+      # The service-account JSON, mounted read-only from wherever you keep it.
+      # Set FIREBASE_CREDENTIALS on the host to its path.
+      - ${FIREBASE_CREDENTIALS:-./firebase-bridge/service-account.json}:/run/secrets/firebase.json:ro
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: "/run/secrets/firebase.json"
+      FIREBASE_COLLECTION: "${FIREBASE_COLLECTION:-telemetry}"
+      BACKEND_URL: "http://backend:3001/api/beamDeviceData"
+      # Must match IOT_API_KEY in backend/.env, or every reading is refused.
+      IOT_API_KEY: "${IOT_API_KEY:-change-me-to-random-value}"
+      FIREBASE_BACKFILL_MINUTES: "${FIREBASE_BACKFILL_MINUTES:-10}"
+    command: sh -c "npm ci --silent || npm install --silent && node index.js"
+    depends_on:
+      - backend
+
   nginx:
     image: nginx:alpine
     restart: unless-stopped

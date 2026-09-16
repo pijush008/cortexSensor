@@ -27,7 +27,7 @@ export function SectionLabel({ label, className, light }: SectionLabelProps) {
     <div className={cn("flex items-center gap-3", className)}>
       <span
         className={cn(
-          "text-[0.78125rem] font-medium",
+          "text-caption font-medium",
           light ? "text-sheet-paper/70" : "text-slate-500"
         )}
       >
