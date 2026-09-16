@@ -17,14 +17,49 @@ jobs:
         options: >-
           --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Use Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 18
+          # 22, matching every Dockerfile in the repo. Not cosmetic: docker-compose
+          # records that @tailwindcss/oxide's native binding declares
+          # `engines: { node: ">= 20" }`, and npm SILENTLY SKIPS an optional dep
+          # whose engines do not match — so on 18 the frontend installs without
+          # error and then fails every render.
+          node-version: 22
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      # The analysis suites assert that the engine is REACHABLE rather than
+      # skipping when it is not — a deliberate choice, since a silently skipped
+      # spectral test is worse than a red one. So CI has to actually run the
+      # engine; without this step `analysis.test.ts` and `engine-transport.test.ts`
+      # fail every build with "SHM engine unreachable".
+      - name: Start the SHM analysis engine
+        run: |
+          cd python_shm_service
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          # Same generation the container entrypoint runs, pointed at the
+          # checkout instead of the /proto and /app mounts compose provides.
+          PROTO_DIR="$GITHUB_WORKSPACE/proto" APP_DIR="$PWD" ./generate_proto.sh
+          python -m serve_all &
+          # serve_all starts gRPC first and then hands the main thread to
+          # uvicorn, so an answer on the HTTP face means both are listening.
+          for _ in $(seq 1 60); do
+            curl -sf http://localhost:8000/health >/dev/null && break
+            sleep 2
+          done
+          # Fail the step here rather than letting every analysis test report
+          # the same unreachable-engine assertion.
+          curl -sf http://localhost:8000/health
       - name: Install deps, prepare DB and run tests
         env:
           DATABASE_URL: postgresql://shm:shm_pass@localhost:5432/shm_ci?schema=public
+          # The gRPC client loads the contract at runtime and defaults to the
+          # container's /proto mount, which does not exist on a CI runner.
+          SHM_ENGINE_PROTO_PATH: ${{ github.workspace }}/proto/shm/engine/v1/engine.proto
         run: |
           sudo apt-get update && sudo apt-get install -y postgresql-client
           cd backend
@@ -37,11 +72,16 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Use Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 18
+          # 22, matching every Dockerfile in the repo. Not cosmetic: docker-compose
+          # records that @tailwindcss/oxide's native binding declares
+          # `engines: { node: ">= 20" }`, and npm SILENTLY SKIPS an optional dep
+          # whose engines do not match — so on 18 the frontend installs without
+          # error and then fails every render.
+          node-version: 22
       - name: Install deps and check
         run: |
           cd frontend
@@ -50,9 +90,9 @@ jobs:
   python-service:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Install deps
