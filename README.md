@@ -4,9 +4,9 @@ A multi-tenant platform for monitoring civil structures — bridges, flyovers, p
 — from instrumented field hardware through to an office dashboard. Built and
 operated by **Cloudglance Sensinglab Pvt Ltd**.
 
-Sensor nodes on the structure publish over MQTT to a gateway in the field; the
-gateway forwards to the cloud, where the backend ingests, stores and analyses
-readings; engineers and stakeholders read them from the web console.
+Sensor nodes on the structure POST their readings to the cloud over HTTPS,
+where the backend validates, stores and analyses them; engineers and
+stakeholders read them from the web console.
 
 ---
 
@@ -45,7 +45,6 @@ docker compose up -d          # or: up --build, the first time
 | nginx | `80` | serves frontend and `/api` on one origin |
 | PostgreSQL + TimescaleDB | `5432` | user `shm`, password `shm_pass`, db `shm_dev` |
 | Redis | `6379` | rate-limit counters |
-| Mosquitto MQTT | `1883`, `9001` | broker, websocket |
 | Python analysis service | `8000` | FFT and signal processing |
 
 The backend container runs `prisma migrate` and the seed on startup, and
@@ -69,18 +68,26 @@ To run without Docker, copy `backend/.env.example` to `backend/.env`, point
 ## How the system fits together
 
 ```
- FIELD                                CLOUD                         OFFICE
- ESP32 nodes ──MQTT──► Pi gateway ──MQTT/REST──► backend ──► Postgres ──► web console
-  strain, load,        local mosquitto           Express      Timescale     Next.js
-  DHT22, battery       store-and-forward         + Prisma     hypertables
+ FIELD                              CLOUD                          OFFICE
+ ESP32 nodes ──HTTPS──► backend ──► Postgres ──► SSE ──► web console
+  strain, load,         Express      Timescale          Next.js
+  DHT22, battery        + Prisma     hypertables
 ```
 
-Two ingestion paths share one JSON contract, so the console is agnostic to
-which was used:
+Devices ingest over HTTPS:
 
-- **MQTT** — gateway publishes to `shm/device/#`, the backend subscribes.
-- **REST** — `POST /api/beamDeviceData` with an `x-api-key` header, used as a
-  fallback when the broker is unreachable.
+- `POST /api/beamDeviceData` with an `x-api-key` header — the documented
+  contract, taking a batch of telemetry per request.
+- `POST /api/sensorDataFromDevice` — the older single-reading form, kept for
+  devices already deployed against it.
+
+Both go through the same validation, tenant scoping, calibration, channel
+gating and `eventId` de-duplication, which is why devices ingest through the
+API rather than writing to the database directly.
+
+An MQTT path existed previously, with a Mosquitto broker and gateway
+subscribers. It was removed; `gateway/`, `gateway-pi/` and `firmware/` still
+contain those implementations and need porting to the endpoints above.
 
 Readings land in `sensor_data` and `node_data`, both TimescaleDB hypertables.
 
@@ -104,7 +111,6 @@ SHM/
 ├── gateway-pi/         Raspberry Pi field gateway (Python)
 ├── firmware/           ESP32 sensor node firmware
 ├── python_shm_service/ FFT / analysis service
-├── mosquitto/          broker config, ACL, credentials (owned by uid 1883)
 ├── nginx/              reverse proxy config
 └── docker-init/        TimescaleDB extension and hypertable bootstrap
 ```
@@ -239,9 +245,6 @@ JWT_ACCESS_EXPIRY=24h              JWT_REFRESH_EXPIRY=7d
 APP_URL=http://localhost:3000
 BASE_URL=http://localhost:3000
 
-MQTT_BROKER_URL=mqtt://mosquitto:1883
-MQTT_INGEST_ENABLED=false
-
 GMAIL_ACCOUNT=…                    GMAIL_PASSWORD=<app password>
 BILLING_ENABLED=true               BILLING_WEBHOOK_SECRET=…
 RAZORPAY_KEY_ID=…                  RAZORPAY_WEBHOOK_SECRET=…
@@ -297,23 +300,21 @@ See `firmware/esp32_sensor_node/` and `gateway-pi/` for the code, and the
 wiring and flashing notes kept with each.
 
 **Equipment.** ESP32 sensor nodes (strain gauges, load cells, DHT22,
-battery monitoring) → Raspberry Pi gateway running mosquitto locally →
-cloud broker.
+battery monitoring), optionally aggregated by a Raspberry Pi gateway.
+
+> **These implementations are dormant.** Both publish over MQTT, which the
+> platform no longer runs. They need porting to `POST /api/beamDeviceData`
+> before they will deliver readings again.
 
 **Bring-up.**
 
-1. Cloud: broker reachable, `MQTT_INGEST_ENABLED=true`, credentials in
-   `mosquitto/passwd` and topic rules in `mosquitto/acl` (owned by uid 1883, so
-   editing needs `sudo`).
-2. Register the device in the console (Devices → add, with its serial), assign
+1. Register the device in the console (Devices → add, with its serial), assign
    sensors, then attach it to a project.
-3. Field: flash the ESP32 nodes with the gateway id; configure
-   `gateway-pi/pi_gateway.py` with the cloud broker and API key.
-4. Verify: watch `shm/device/#` on the cloud broker, then confirm rows arriving
-   in `sensor_data`, then the project dashboard.
+2. Issue the device an API key and point it at `POST /api/beamDeviceData`.
+3. Verify: confirm rows arriving in `sensor_data`, then the project dashboard.
 
-The Pi gateway stores and forwards, so a dropped link backfills when it
-returns.
+Whatever sends the readings should buffer them locally, so that a dropped link
+backfills when it returns rather than losing the window.
 
 ---
 
@@ -326,7 +327,7 @@ returns.
 3. Supply real secrets for JWT, Razorpay, SMTP and Google; generate fresh JWT
    secrets rather than reusing development values.
 4. `npx prisma migrate deploy`, then seed roles and plans.
-5. Put the MQTT broker behind TLS and real credentials.
+5. Issue each device its own API key rather than sharing one fleet-wide.
 
 ---
 

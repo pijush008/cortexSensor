@@ -39,12 +39,6 @@ backend/prisma/seed.d.ts.map
 # Playwright MCP debugging artifacts (console logs / page snapshots)
 .playwright-mcp/
 
-# Mosquitto runtime credentials. `passwd` holds hashed broker logins and must
-# never be committed; `acl` is generated alongside it and is owned by the
-# broker's uid (1883), so it is not readable by the developer account either.
-# Regenerate both from docs/mosquitto-acl.example.
-mosquitto/passwd
-mosquitto/acl
 
 # python (raspberry pi gateway)
 gateway-pi/.venv/
