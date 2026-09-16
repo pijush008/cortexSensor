@@ -103,22 +103,28 @@ export const saveBase64Image = async (
   const filename = `${sanitizeFilenamePrefix(prefix)}_${uuidv4()}.${safeExt}`;
   const relativePath = path.posix.join(dir, filename).replace(/\\/g, "/");
 
+  // Belt and braces: even with the prefix sanitised, `dir` is caller-supplied.
+  // This assertion is what still holds if someone later reintroduces an
+  // unsanitised path segment, so it is the check that actually guarantees
+  // containment rather than merely making traversal inconvenient.
+  //
+  // It runs BEFORE the object-storage branch below, and must stay there. The
+  // branch was originally added above this check, which skipped it for every
+  // upload once Supabase Storage was configured — i.e. in production. putObject
+  // strips a leading slash but does not resolve "..", so the one guarantee this
+  // function makes about where a file lands was silently not being made.
+  const uploadsRoot = path.resolve("uploads");
+  const absolute = path.resolve(relativePath);
+  if (absolute !== uploadsRoot && !absolute.startsWith(uploadsRoot + path.sep)) {
+    throw new BadRequestError("Invalid upload location");
+  }
+
   // Object storage when it is configured. The returned https URL travels back
   // through the same field the relative path used to, and both formatImageUrl
   // and toPublicImagePath already pass absolute URLs through unchanged — so no
   // caller and no response shape has to know which of the two is in use.
   if (objectStorageEnabled()) {
     return putObject(relativePath, imageBuffer);
-  }
-
-  // Belt and braces: even with the prefix sanitised, `dir` is caller-supplied.
-  // This assertion is what still holds if someone later reintroduces an
-  // unsanitised path segment, so it is the check that actually guarantees
-  // containment rather than merely making traversal inconvenient.
-  const uploadsRoot = path.resolve("uploads");
-  const absolute = path.resolve(relativePath);
-  if (absolute !== uploadsRoot && !absolute.startsWith(uploadsRoot + path.sep)) {
-    throw new BadRequestError("Invalid upload location");
   }
 
   await fs.mkdir(path.dirname(relativePath), { recursive: true });
