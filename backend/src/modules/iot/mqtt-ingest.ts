@@ -57,6 +57,28 @@ async function handleMessage(topic: string, buffer: Buffer): Promise<void> {
   }
 }
 
+/**
+ * Whether the ingest client currently holds a broker connection.
+ *
+ * Reported rather than inferred: a TCP probe of the broker only proves the host
+ * is reachable, which is a different claim from "this process is subscribed and
+ * receiving". The dev banner and /ready both want the second one.
+ */
+let connected = false;
+
+export function mqttIngestStatus(): {
+  enabled: boolean;
+  connected: boolean;
+  broker: string;
+} {
+  return {
+    enabled: config.mqtt.ingestEnabled,
+    connected,
+    // Credentials live in the URL's userinfo, so hand back host:port only.
+    broker: config.mqtt.brokerUrl.replace(/\/\/[^@/]*@/, "//"),
+  };
+}
+
 export function startMqttIngest(): void {
   if (started) return;
   started = true;
@@ -125,6 +147,7 @@ export function startMqttIngest(): void {
 
     client.on("connect", () => {
       reconnectDelayMs = 5000;
+      connected = true;
       logger.info(`MQTT ingest connected to ${brokerUrl}`);
       for (const topic of topics) {
         client!.subscribe(topic, (err: Error | null) => {
@@ -146,6 +169,7 @@ export function startMqttIngest(): void {
     });
 
     client.on("close", () => {
+      connected = false;
       scheduleReconnect();
     });
   };
@@ -155,6 +179,7 @@ export function startMqttIngest(): void {
 
 export function stopMqttIngest(): void {
   stopped = true;
+  connected = false;
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;

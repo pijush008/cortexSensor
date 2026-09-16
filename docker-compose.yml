@@ -47,7 +47,12 @@ services:
       NODE_ENV: development
       NODE_OPTIONS: "--max-old-space-size=4096"
       DATABASE_URL: "postgresql://shm:shm_pass@postgres:5432/shm_dev?schema=public"
-      REDIS_URL: "redis://redis:6379"
+      # Defaults to the local container so the dev stack costs nothing to
+      # run. Export REDIS_URL (e.g. the Upstash endpoint) to point the
+      # containers at a managed instance instead — worth doing
+      # deliberately, since the rate limiter touches Redis on every
+      # request and a metered plan bills per command.
+      REDIS_URL: "${REDIS_URL:-redis://redis:6379}"
       PORT: 3001
       MQTT_BROKER_URL: "mqtt://mosquitto:1883"
       MQTT_INGEST_ENABLED: "true"
@@ -203,7 +208,12 @@ services:
       - ./gateway:/app
       - /app/node_modules
     environment:
-      REDIS_URL: "redis://redis:6379"
+      # Defaults to the local container so the dev stack costs nothing to
+      # run. Export REDIS_URL (e.g. the Upstash endpoint) to point the
+      # containers at a managed instance instead — worth doing
+      # deliberately, since the rate limiter touches Redis on every
+      # request and a metered plan bills per command.
+      REDIS_URL: "${REDIS_URL:-redis://redis:6379}"
       MQTT_BROKER: "mqtt://mosquitto:1883"
       MQTT_USERNAME: "shm-gateway"
       MQTT_PASSWORD: "shm-gateway-pass"

@@ -2,6 +2,7 @@ import app from "./app";
 import { config } from "./config";
 import prisma from "./config/prisma";
 import { logger } from "./utils/logger";
+import { logStorageMode } from "./utils/object-storage";
 import { startMqttIngest } from "./modules/iot/mqtt-ingest";
 import { initEventBus } from "./modules/stream/event-bus";
 import { startAnalysisWorker } from "./modules/analysis/analysis.queue";
@@ -10,6 +11,7 @@ async function main() {
   try {
     await prisma.$connect();
     logger.info("Connected to PostgreSQL via Prisma");
+    logStorageMode();
 
     // Live device-to-cloud ingestion: subscribes to the MQTT topics that
     // ESP32 nodes / Raspberry Pi gateways publish telemetry to. Non-fatal:

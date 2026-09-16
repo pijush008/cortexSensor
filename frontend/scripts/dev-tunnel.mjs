@@ -16,6 +16,7 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { printStatus } from "./dev-status.mjs";
 
 const PORT = process.env.PORT || "3000";
 const CLOUDFLARED =
@@ -99,8 +100,7 @@ function onTunnelOutput(chunk) {
   url = match[0];
   const host = url.replace(/^https:\/\//, "");
 
-  console.log(`\n  Public URL:  ${url}\n`);
-  console.log("Starting Next…\n");
+  console.log("\nStarting Next…\n");
 
   const next = spawn(
     "npx",
@@ -119,6 +119,30 @@ function onTunnelOutput(chunk) {
       shutdown(code ?? 1);
     }
   });
+
+  // Next owns the terminal (stdio is inherited), so there is no output to watch
+  // for readiness. Poll the port instead, then print the service banner once —
+  // after compilation, so it lands at the bottom where it can be read rather
+  // than scrolling away above Next's own startup noise.
+  waitForNextThenReport();
+}
+
+async function waitForNextThenReport() {
+  for (let i = 0; i < 120 && !shuttingDown; i++) {
+    try {
+      await fetch(`http://127.0.0.1:${PORT}`, { signal: AbortSignal.timeout(2000) });
+      break;
+    } catch {
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
+  if (shuttingDown) return;
+  try {
+    await printStatus({ url, port: PORT });
+  } catch (err) {
+    // A banner is a convenience. It must never be the reason a dev server dies.
+    console.error(`(status banner failed: ${err.message})`);
+  }
 }
 
 // cloudflared prints its banner to stderr; the hostname can appear in either.

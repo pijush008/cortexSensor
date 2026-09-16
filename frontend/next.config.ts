@@ -2,6 +2,18 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /**
+   * Self-contained server output, for the container image.
+   *
+   * Without this a production image has to carry the whole node_modules tree —
+   * hundreds of megabytes of build-time dependencies that never run. Standalone
+   * emits .next/standalone with only the files the server actually reaches, so
+   * the runtime stage copies that and nothing else.
+   *
+   * Ignored by `next dev`; it only changes what `next build` writes.
+   */
+  output: "standalone",
+
+  /**
    * Hide the Next.js dev-tools badge.
    *
    * The small rounded square with a status dot that the dev server injects at

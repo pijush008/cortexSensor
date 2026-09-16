@@ -73,3 +73,51 @@ process.env.MQTT_INGEST_ENABLED = process.env.MQTT_INGEST_ENABLED ?? "false";
 // quarter-hour is reached partway through the invitation suite and every later
 // request 429s. The limiter's own behaviour is covered in isolation instead.
 process.env.OTP_RATE_LIMIT_MAX = "100000";
+
+// ── Refuse to run against a database that is not local ──────────────────────
+//
+// The suites are DESTRUCTIVE: they share one database and clean up with
+// deleteMany. That is fine against a throwaway local Postgres and catastrophic
+// against a hosted one — and the only thing standing between the two is which
+// DATABASE_URL happens to be in .env at the time.
+//
+// With the project's .env now pointing at Supabase so the app reads live data,
+// a developer running `npm test` out of habit would have deleted production
+// rows with no warning and no undo. So the suite checks where it is pointed and
+// refuses anything that is not loopback or the compose service name.
+//
+// Set ALLOW_REMOTE_TEST_DB=1 to override, which should only ever be done
+// against a database created for the purpose.
+{
+  const url = process.env.DATABASE_URL || "";
+  const LOCAL = new Set(["localhost", "127.0.0.1", "::1", "postgres", ""]);
+  let host = "";
+  try {
+    host = url ? new URL(url).hostname : "";
+  } catch {
+    host = "";
+  }
+  if (url && !LOCAL.has(host) && process.env.ALLOW_REMOTE_TEST_DB !== "1") {
+    throw new Error(
+      `Refusing to run the test suite against a non-local database (${host}).\n` +
+        "These tests delete rows. Point DATABASE_URL at a local Postgres, e.g.\n" +
+        '  DATABASE_URL="postgresql://shm:shm_pass@127.0.0.1:5432/shm_dev?schema=public" npm run test:run\n' +
+        "or set ALLOW_REMOTE_TEST_DB=1 if the target really is disposable.",
+    );
+  }
+}
+
+// Object storage OFF, pinned empty.
+//
+// Same reasoning as the mail credentials above, and it is not hypothetical: the
+// first run after Supabase Storage was wired up wrote 44 images into the
+// project's real bucket, because the suite inherited SUPABASE_* from .env and
+// every fixture that uploads an avatar or a company logo went straight to
+// production. A test suite must not be able to write to a live bucket any more
+// than it may email strangers.
+//
+// Pinning these also keeps the upload helpers on their documented local-disk
+// behaviour, which is what the assertions about `uploads/...` paths describe.
+process.env.SUPABASE_URL = "";
+process.env.SUPABASE_SERVICE_ROLE_KEY = "";
+process.env.SUPABASE_STORAGE_BUCKET = "";

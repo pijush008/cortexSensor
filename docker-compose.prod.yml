@@ -1,0 +1,81 @@
+# Production stack for a single VPS.
+#
+# What is NOT here is the point:
+#
+#   postgres  -> Supabase (ap-northeast-2), reached over the transaction pooler
+#   redis     -> Upstash
+#   mosquitto -> HiveMQ Cloud
+#   firebase-bridge, gateway, mysql -> not part of this deployment
+#
+# So the box runs four containers: the API, the web app, the analysis engine,
+# and nginx in front of them. Nothing here bind-mounts source code — every
+# service runs a built image, which is the difference between this file and
+# docker-compose.yml.
+#
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#
+# Migrations are NOT run automatically on boot. A container that migrates as it
+# starts will, on a rolling restart, run two migrations at once against the same
+# database. Run it deliberately:
+#
+#   docker compose -f docker-compose.prod.yml run --rm backend npx prisma migrate deploy
+
+services:
+  backend:
+    build:
+      # Repository root, so the image can COPY both backend/ and proto/.
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    env_file: [.env.prod]
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      # Inside the compose network, not localhost — which in this container is
+      # nothing at all.
+      SHM_ENGINE_URL: "http://python-shm:8000"
+      SHM_ENGINE_GRPC_URL: "python-shm:50051"
+    depends_on:
+      python-shm:
+        condition: service_started
+    expose: ["3001"]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Empty on purpose: the browser then calls the relative /api, which
+        # nginx routes to the backend on the same origin. Setting an absolute
+        # URL here bakes one hostname into the bundle and breaks every other.
+        NEXT_PUBLIC_API_URL: ""
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+    expose: ["3000"]
+
+  python-shm:
+    build:
+      context: ./python_shm_service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+      GRPC_PORT: "50051"
+    volumes:
+      # The contract, shared read-only with the backend image. One .proto, two
+      # consumers, no generated copy to drift.
+      - ./proto:/proto:ro
+    expose: ["8000", "50051"]
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
+      - python-shm

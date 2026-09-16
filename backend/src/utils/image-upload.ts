@@ -2,6 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import { BadRequestError } from "./AppError";
+import { objectStorageEnabled, putObject } from "./object-storage";
 
 /**
  * Validated image upload.
@@ -139,6 +140,12 @@ export async function saveImageUpload(
   // caller supplied reaches the path, so there is no traversal to sanitise.
   const filename = `${uuidv4()}.${signature.ext}`;
   const relativePath = path.posix.join(dir, filename);
+
+  // Same split as saveBase64Image: object storage when configured, local disk
+  // otherwise, and an absolute URL either way is transparent to callers.
+  if (objectStorageEnabled()) {
+    return putObject(relativePath, buffer);
+  }
 
   await fs.mkdir(path.dirname(relativePath), { recursive: true });
   await fs.writeFile(relativePath, buffer);

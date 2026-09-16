@@ -65,3 +65,6 @@ legacy-backup-*.tar.gz
 # with the .proto it came from, and regenerating costs under a second.
 python_shm_service/proto/engine_pb2.py
 python_shm_service/proto/engine_pb2_grpc.py
+
+# Production secrets: database password, Supabase service-role key, JWT secrets.
+.env.prod

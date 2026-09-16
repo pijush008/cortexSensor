@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { config } from "../config";
 import path from "path";
 import { BadRequestError } from "./AppError";
+import { objectStorageEnabled, putObject } from "./object-storage";
 
 export const generateRandomPassword = (length = 6): string => {
   const digits = "0123456789";
@@ -101,6 +102,14 @@ export const saveBase64Image = async (
   );
   const filename = `${sanitizeFilenamePrefix(prefix)}_${uuidv4()}.${safeExt}`;
   const relativePath = path.posix.join(dir, filename).replace(/\\/g, "/");
+
+  // Object storage when it is configured. The returned https URL travels back
+  // through the same field the relative path used to, and both formatImageUrl
+  // and toPublicImagePath already pass absolute URLs through unchanged — so no
+  // caller and no response shape has to know which of the two is in use.
+  if (objectStorageEnabled()) {
+    return putObject(relativePath, imageBuffer);
+  }
 
   // Belt and braces: even with the prefix sanitised, `dir` is caller-supplied.
   // This assertion is what still holds if someone later reintroduces an

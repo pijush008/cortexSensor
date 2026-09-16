@@ -1,15 +1,31 @@
 import Redis from "ioredis";
-import { config } from "./index";
 import { logger } from "../utils/logger";
 
 // REDIS_URL is provided by docker-compose (redis://redis:6379). When it is
 // absent — e.g. during unit tests that import `app` but never start the
 // server — we don't connect at all; callers must tolerate `null`.
-const redisUrl = process.env.REDIS_URL || "";
+//
+// READ LAZILY, not at module load. This file used to capture the value in a
+// top-level `const`, and it was always "". The only reason `dotenv.config()`
+// would have run first is the `import { config } from "./index"` that sat at
+// the top — but nothing in this module ever USED `config`, so TypeScript
+// elided the import as dead, and with it the one thing that loaded .env on
+// this path. The result was silent and total: getRedis() returned null
+// forever, rate limiting fell back to its in-memory store, and no error was
+// logged because nothing had failed — the URL was simply never seen.
+//
+// event-bus.ts and analysis.queue.ts read process.env inside their functions
+// and so were never affected, which is why the queue and the pub/sub bus
+// connected happily while this client did not.
+function redisUrl(): string {
+  return process.env.REDIS_URL || "";
+}
 
 // Tests deliberately disable Redis so rate-limit counters (and caches) stay
 // isolated per run instead of accumulating in a shared server.
-const redisEnabled = (process.env.REDIS_ENABLED || "true") !== "false";
+function redisEnabled(): boolean {
+  return (process.env.REDIS_ENABLED || "true") !== "false";
+}
 
 let redis: Redis | null = null;
 let connecting = false;
@@ -21,10 +37,11 @@ let connecting = false;
  */
 export function getRedis(): Redis | null {
   if (redis) return redis;
-  if (!redisEnabled || !redisUrl || connecting) return null;
+  const url = redisUrl();
+  if (!redisEnabled() || !url || connecting) return null;
 
   connecting = true;
-  const client = new Redis(redisUrl, {
+  const client = new Redis(url, {
     lazyConnect: true,
     enableOfflineQueue: false,
     maxRetriesPerRequest: 1,
@@ -55,6 +72,38 @@ export function getRedis(): Redis | null {
 /** True once a live Redis connection is established. */
 export function redisAvailable(): boolean {
   return redis !== null;
+}
+
+/**
+ * Actively verifies Redis, rather than reporting whether anything has happened
+ * to use it yet.
+ *
+ * `redisAvailable()` answers "has the shared client connected", and that client
+ * connects lazily on the first rate-limited request. A readiness probe run
+ * before any such request therefore reported Redis as unavailable while the
+ * analysis worker and the event bus — which hold their own connections — were
+ * demonstrably talking to it. The probe was describing its own laziness.
+ *
+ * So: ask for the client (which starts the connect if it has not begun), give
+ * it a moment to finish, then PING. Same shape as the database check, which has
+ * always issued a real SELECT 1 rather than trusting a flag.
+ */
+export async function redisHealthy(timeoutMs = 2000): Promise<boolean> {
+  if (!redisEnabled() || !redisUrl()) return false;
+
+  const deadline = Date.now() + timeoutMs;
+  let client = getRedis();
+  while (!client && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 50));
+    client = getRedis();
+  }
+  if (!client) return false;
+
+  try {
+    return (await client.ping()) === "PONG";
+  } catch {
+    return false;
+  }
 }
 
 /**
