@@ -24,18 +24,6 @@ export const config = {
   jwtAccessExpiry: process.env.JWT_ACCESS_EXPIRY || "15m",
   jwtRefreshExpiry: process.env.JWT_REFRESH_EXPIRY || "7d",
   expiresInMs,
-  mqtt: {
-    brokerUrl: process.env.MQTT_BROKER_URL || "",
-    username: process.env.MQTT_USERNAME || "",
-    password: process.env.MQTT_PASSWORD || "",
-    // Live device-to-cloud ingestion (ESP32 / Raspberry Pi gateways)
-    ingestEnabled: process.env.MQTT_INGEST_ENABLED !== "false",
-    ingestTopics: (process.env.MQTT_INGEST_TOPICS || "shm/ingest/#")
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean),
-    ingestClientId: process.env.MQTT_INGEST_CLIENT_ID || "shm-backend-ingest",
-  },
   email: {
     /**
      * SMTP credentials. GMAIL_* are the historical names and still work; the

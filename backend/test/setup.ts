@@ -63,9 +63,6 @@ process.env.SMTP_PASSWORD = "";
 // isolation instead.
 process.env.REGISTER_RATE_LIMIT_MAX = "100000";
 
-// Keep the ingest path on its documented default so the contract tests and the
-// legacy-key deprecation path behave predictably.
-process.env.MQTT_INGEST_ENABLED = process.env.MQTT_INGEST_ENABLED ?? "false";
 
 // PINNED, for the same reason as the webhook secrets above: the suite must not
 // depend on a developer's .env.

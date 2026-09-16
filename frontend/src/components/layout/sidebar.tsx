@@ -13,7 +13,6 @@ import {
   Users,
   LogOut,
   Settings,
-  Activity,
   Server,
   Bell,
   ShieldCheck,
@@ -52,7 +51,6 @@ const MENU_SECTION: Record<UserRole, { label: string; items: MenuItem[] }[]> = {
         { href: "/gateways", label: "Gateways", icon: Server },
         { href: "/devices", label: "Devices", icon: Cpu },
         { href: "/sensors", label: "Sensors", icon: Gauge },
-        { href: "/mqtt", label: "MQTT Feed", icon: Activity },
       ],
     },
     {
@@ -91,7 +89,6 @@ const MENU_SECTION: Record<UserRole, { label: string; items: MenuItem[] }[]> = {
         { href: "/gateways", label: "Gateways", icon: Server },
         { href: "/devices", label: "Devices", icon: Cpu },
         { href: "/sensors", label: "Sensors", icon: Gauge },
-        { href: "/mqtt", label: "MQTT Feed", icon: Activity },
       ],
     },
     {

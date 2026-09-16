@@ -1,7 +1,6 @@
 import { Router } from "express";
 import prisma from "../../config/prisma";
 import { redisHealthy } from "../../config/redis";
-import { mqttIngestStatus } from "../iot/mqtt-ingest";
 import { config } from "../../config";
 import { logger } from "../../utils/logger";
 
@@ -18,10 +17,9 @@ import { logger } from "../../utils/logger";
  *              restarted, because restarting an API whose database is down
  *              accomplishes nothing except losing warm state.
  *
- * Redis and MQTT are reported but are NOT part of the readiness verdict: the
- * API degrades gracefully without either (rate limiting falls back to an
- * in-memory store; ingest resumes when the broker returns), so an outage in
- * one must not take the whole API out of rotation.
+ * Redis is reported but is NOT part of the readiness verdict: the API degrades
+ * gracefully without it (rate limiting falls back to an in-memory store), so a
+ * Redis outage must not take the whole API out of rotation.
  *
  * Nginx was observed crash-looping during the architecture audit with no probe
  * available to explain which upstream was unhealthy. That is what these fix.
@@ -51,12 +49,10 @@ function endpointOf(url: string): string | undefined {
 }
 
 router.get("/ready", async (_req, res) => {
-  const mqtt = mqttIngestStatus();
 
   const checks: Record<string, "ok" | "unavailable" | "disabled"> = {
     database: "unavailable",
     redis: "unavailable",
-    mqtt: !mqtt.enabled ? "disabled" : mqtt.connected ? "ok" : "unavailable",
   };
 
   // Both verified, not inferred: a real SELECT 1 and a real PING, run together
@@ -74,7 +70,7 @@ router.get("/ready", async (_req, res) => {
   checks.database = dbOk ? "ok" : "unavailable";
   checks.redis = redisOk ? "ok" : "unavailable";
 
-  // Only the database gates readiness; see the note above on Redis and MQTT.
+  // Only the database gates readiness; see the note above on Redis.
   const ready = checks.database === "ok";
 
   // WHICH database and which broker, so a developer can see at a glance that
@@ -87,7 +83,6 @@ router.get("/ready", async (_req, res) => {
       : {
           database: endpointOf(process.env.DATABASE_URL || ""),
           redis: endpointOf(process.env.REDIS_URL || ""),
-          mqtt: endpointOf(mqtt.broker),
         };
 
   res.status(ready ? 200 : 503).json({

@@ -24,7 +24,6 @@ export const ROUTE_PERMISSION: Record<string, string> = {
   "/gateways": "GATEWAY_VIEW",
   "/devices": "DEVICE_VIEW",
   "/sensors": "SENSOR_VIEW",
-  "/mqtt": "SHM_VIEW",
   // The directory only. A viewer holds PROJECT_BROWSE and not PROJECT_VIEW, so
   // this opens for them while /dashboard does not.
   "/projects": "PROJECT_BROWSE",

@@ -234,7 +234,7 @@ export default function HomePage() {
                 items: [
                   "ESP32 / MCU sensor nodes",
                   "Marine & industrial gateways",
-                  "MQTT with store-and-forward buffer",
+                  "HTTPS ingest with per-device credentials",
                   "Health, calibration & OTA firmware",
                 ],
               },
@@ -306,7 +306,7 @@ export default function HomePage() {
                     color: "bg-slate-100 text-sheet-ink/70 border-sheet-ink/15",
                   },
                   {
-                    label: "MQTT",
+                    label: "HTTPS",
                     icon: Radio,
                     color:
                       "bg-sheet-paper0/10 text-sheet-navy border-sheet-navy/20",
@@ -398,7 +398,7 @@ export default function HomePage() {
                   {
                     title: "IoT data pipeline",
                     description:
-                      "MQTT ingestion with validation, deduplication, and store-and-forward buffering.",
+                      "HTTPS ingest with schema validation, deduplication by event id, and per-device credentials.",
                   },
                   {
                     title: "Edge gateway",

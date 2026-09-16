@@ -57,11 +57,6 @@ services:
       # request and a metered plan bills per command.
       REDIS_URL: "${REDIS_URL:-redis://redis:6379}"
       PORT: 3001
-      MQTT_BROKER_URL: "mqtt://mosquitto:1883"
-      MQTT_INGEST_ENABLED: "true"
-      MQTT_INGEST_TOPICS: "shm/ingest/#"
-      MQTT_USERNAME: "shm-backend"
-      MQTT_PASSWORD: "shm-backend-pass"
       # The analysis engine, addressed by its compose service name. Without
       # this the backend falls back to localhost:8000, which inside its own
       # container is nothing — every analysis run fails while the engine sits
@@ -108,7 +103,6 @@ services:
     depends_on:
       - postgres
       - redis
-      - mosquitto
       - python-shm
 
   frontend:
@@ -187,45 +181,7 @@ services:
     depends_on:
       - postgres
 
-  mosquitto:
-    image: eclipse-mosquitto:2.0
-    ports:
-      - "1883:1883"
-      - "9001:9001"
-    volumes:
-      - mosquitto_data:/mosquitto/data
-      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
-      - ./mosquitto/passwd:/mosquitto/config/passwd:ro
-      - ./mosquitto/acl:/mosquitto/config/acl:ro
 
-  node-gateway:
-    # Node 22, matching the backend and frontend. Node 18 went end of life in
-    # April 2025 and receives no security patches; this service simulates field
-    # hardware publishing to the broker, so there is nothing here that pins it
-    # to an older runtime.
-    build:
-      context: ./gateway
-      dockerfile: Dockerfile.dev
-    working_dir: /app
-    volumes:
-      - ./gateway:/app
-      - /app/node_modules
-    environment:
-      # Defaults to the local container so the dev stack costs nothing to
-      # run. Export REDIS_URL (e.g. the Upstash endpoint) to point the
-      # containers at a managed instance instead — worth doing
-      # deliberately, since the rate limiter touches Redis on every
-      # request and a metered plan bills per command.
-      REDIS_URL: "${REDIS_URL:-redis://redis:6379}"
-      MQTT_BROKER: "mqtt://mosquitto:1883"
-      MQTT_USERNAME: "shm-gateway"
-      MQTT_PASSWORD: "shm-gateway-pass"
-      TOPIC: "shm/ingest/shm-gateway/data"
-    command: sh -c "npm ci --silent || npm install --silent && node index.js"
-    depends_on:
-      - mosquitto
-      - redis
-      - backend
 
   firebase-bridge:
     # Follows a Firestore collection an ESP32 writes to and forwards each new
@@ -274,4 +230,3 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  mosquitto_data:

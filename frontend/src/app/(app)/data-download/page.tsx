@@ -270,7 +270,7 @@ export default function DataDownloadPage() {
     <div className="space-y-6">
       <PageHeader
         title="Data Download"
-        subtitle="Capture live MQTT telemetry, filter by date & time, and export to Excel."
+        subtitle="Capture live telemetry, filter by date & time, and export to Excel."
         actions={
           <Button onClick={clearCaptured} variant="outline">
             {connected ? (
@@ -295,7 +295,7 @@ export default function DataDownloadPage() {
               <div className="flex items-center gap-2">
                 <CardTitle className="flex items-center gap-2 font-mono text-sm font-medium text-white">
                   <Activity className="h-4 w-4 text-shm-teal" />
-                  Live MQTT Stream
+                  Live Stream
                 </CardTitle>
               </div>
               <div className="flex items-center gap-3">
@@ -517,7 +517,7 @@ export default function DataDownloadPage() {
             <p className="text-sm leading-relaxed text-slate-600">
               Pull the telemetry that ESP32 nodes / Raspberry Pi gateways already sent to
               the cloud out of <span className="font-medium text-slate-800">PostgreSQL</span>.
-              Readings were stored via live MQTT ingestion or{" "}
+              Readings were stored via{" "}
               <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[0.6875rem] text-slate-500">
                 POST /api/beamDeviceData
               </code>

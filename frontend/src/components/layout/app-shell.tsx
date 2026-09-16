@@ -39,7 +39,6 @@ const ROUTE_LABELS: Record<string, string> = {
   exports: "Exports",
   "data-download": "Data Download",
   users: "Administration",
-  mqtt: "MQTT Feed",
   audit: "Audit Log",
   subscription: "Billing",
   profile: "Settings",

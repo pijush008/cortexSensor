@@ -1,4 +1,3 @@
-import mqtt from "mqtt";
 import prisma from "../../config/prisma";
 import { config } from "../../config";
 import { sendEmail } from "../../utils/email";
@@ -31,71 +30,6 @@ function isTodayBetweenOrEqualTo(
   const end = new Date(endDate);
   end.setHours(0, 0, 0, 0);
   return today >= start && today <= end;
-}
-
-let mqttPublisher: ReturnType<typeof mqtt.connect> | null = null;
-let mqttPublisherStarted = false;
-
-/**
- * Reuse a single long-lived MQTT client for outbound publishing
- * (calibrated sensor readings → dashboard topics). Falls back to a
- * per-message client only if the singleton is not yet connected.
- */
-function getMqttPublisher(): ReturnType<typeof mqtt.connect> {
-  if (!mqttPublisherStarted) {
-    mqttPublisherStarted = true;
-    if (!config.mqtt.brokerUrl) {
-      logger.warn("MQTT publish skipped: MQTT_BROKER_URL is empty");
-      return null as never;
-    }
-    mqttPublisher = mqtt.connect(config.mqtt.brokerUrl, {
-      username: config.mqtt.username,
-      password: config.mqtt.password,
-      clientId: `${config.mqtt.ingestClientId}-pub`,
-      protocolVersion: 5,
-      keepalive: 30,
-      clean: true,
-    });
-    mqttPublisher.on("error", (err) => {
-      logger.error(`MQTT publisher error: ${err.message}`);
-    });
-    mqttPublisher.on("close", () => {
-      logger.warn("MQTT publisher disconnected");
-    });
-  }
-  return mqttPublisher as ReturnType<typeof mqtt.connect>;
-}
-
-function publishMqtt(topic: string, message: object): void {
-  const brokerUrl = config.mqtt.brokerUrl;
-  if (!brokerUrl) return;
-
-  const publisher = getMqttPublisher();
-  if (!publisher || publisher.connected) {
-    if (publisher?.connected) {
-      publisher.publish(topic, JSON.stringify(message), {}, (err) => {
-        if (err) logger.error(`MQTT publish failed: ${err.message}`);
-      });
-      return;
-    }
-  }
-
-  // Singleton not connected yet: fall back to a one-shot publish.
-  const client = mqtt.connect(brokerUrl, {
-    username: config.mqtt.username,
-    password: config.mqtt.password,
-  });
-
-  client.on("connect", () => {
-    client.publish(topic, JSON.stringify(message), {}, () => {
-      client.end();
-    });
-  });
-
-  client.on("error", (err) => {
-    logger.error(`MQTT publish error: ${err.message}`);
-    client.end();
-  });
 }
 
 async function handleNodeData(telemetries: TelemetryInput[]): Promise<void> {
@@ -258,15 +192,6 @@ async function handleSensorData(
           sensorData: actualReading,
           createdAt: measuredAt,
         },
-      });
-
-      publishMqtt(`shm/feed/${telemetry.DeviceId}/${sensor.id}`, {
-        sensorId: sensor.id,
-        sensorName: sensor.sensorName,
-        reading: actualReading,
-        rawReading,
-        calibrationValue,
-        timestamp: telemetry.Timestamp,
       });
 
       if (channel.triggerValue || channel.thresholdValue) {

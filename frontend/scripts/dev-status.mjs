@@ -56,9 +56,8 @@ function vendorOf(endpoint) {
   const h = endpoint.toLowerCase();
   if (h.includes("supabase.co") || h.includes("supabase.com")) return "Supabase";
   if (h.includes("upstash.io")) return "Upstash";
-  if (h.includes("hivemq")) return "HiveMQ Cloud";
   if (h.includes("neon.tech")) return "Neon";
-  if (/^(localhost|127\.0\.0\.1|postgres|redis|mosquitto)\b/.test(h)) return "local";
+  if (/^(localhost|127\.0\.0\.1|postgres|redis)\b/.test(h)) return "local";
   return null;
 }
 
@@ -100,9 +99,9 @@ export async function printStatus({ url, port }) {
   );
 
   // The backend is the only thing that can speak authoritatively about the
-  // database, Redis and the broker: it holds the credentials and the live
-  // connections. When it is down those lines report that, rather than falling
-  // back to a reachability check that would answer a different question.
+  // database and Redis: it holds the credentials and the live connections. When
+  // it is down those lines report that, rather than falling back to a
+  // reachability check that would answer a different question.
   let body = null;
   if (ready.res) {
     try {
@@ -114,7 +113,7 @@ export async function printStatus({ url, port }) {
 
   if (!body) {
     rows.push(line(BAD, "Backend", apiOrigin, ready.error || `HTTP ${ready.status}`));
-    for (const name of ["Supabase", "Redis", "MQTT"]) {
+    for (const name of ["Supabase", "Redis"]) {
       rows.push(line(MEH, name, `${DIM}unknown${RESET}`, "backend offline"));
     }
   } else {
@@ -151,14 +150,6 @@ export async function printStatus({ url, port }) {
       ),
     );
 
-    rows.push(
-      line(
-        mark(checks.mqtt),
-        "MQTT",
-        detail.mqtt || `${DIM}?${RESET}`,
-        checks.mqtt === "disabled" ? "ingest disabled" : vendorOf(detail.mqtt) || undefined,
-      ),
-    );
   }
 
   rows.push(

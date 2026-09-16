@@ -18,7 +18,7 @@ import {
 
 const ADMIN_ONLY = ["/users", "/audit"];
 const OPERATIONS = ["/dashboard", "/alerts"];
-const FLEET = ["/gateways", "/devices", "/sensors", "/mqtt"];
+const FLEET = ["/gateways", "/devices", "/sensors"];
 
 describe("the redirect invariant", () => {
   it("sends every restricted role somewhere it is allowed to be", () => {
@@ -90,7 +90,6 @@ describe("an organization admin", () => {
       "/gateways",
       "/devices",
       "/sensors",
-      "/mqtt",
       "/projects",
       "/reports",
       "/users",
