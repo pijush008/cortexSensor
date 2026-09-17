@@ -1,5 +1,6 @@
 import { PrismaClient, RoleKey } from "@prisma/client";
 import { randomBytes } from "crypto";
+import { BILLING_PLANS } from "./plans";
 import {
   ALL_PERMISSIONS,
   PERMISSIONS,
@@ -54,72 +55,7 @@ async function seedReferenceData() {
 }
 
 async function seedBillingPlans() {
-  const PLANS = [
-    {
-      code: "complimentary",
-      name: "Platform Owner Plan",
-      priceMonthly: 0,
-      currency: "INR",
-      maxStructures: null,
-      maxSensors: null,
-      maxUsers: null,
-      dataRetentionDays: null,
-      apiAccess: true,
-      smsAlerts: true,
-      aiFeatures: true,
-      advancedReports: true,
-      femIntegration: true,
-      sso: true,
-    },
-    {
-      code: "starter",
-      name: "Starter",
-      priceMonthly: 499900, // ₹4,999
-      currency: "INR",
-      maxStructures: 3,
-      maxSensors: 20,
-      maxUsers: 5,
-      dataRetentionDays: 30,
-      apiAccess: false,
-      smsAlerts: false,
-      aiFeatures: false,
-      advancedReports: false,
-      femIntegration: false,
-      sso: false,
-    },
-    {
-      code: "professional",
-      name: "Professional",
-      priceMonthly: 1499900, // ₹14,999
-      currency: "INR",
-      maxStructures: 20,
-      maxSensors: 200,
-      maxUsers: 25,
-      dataRetentionDays: 365,
-      apiAccess: true,
-      smsAlerts: true,
-      aiFeatures: true,
-      advancedReports: true,
-      femIntegration: false,
-      sso: false,
-    },
-    {
-      code: "enterprise",
-      name: "Enterprise",
-      priceMonthly: 0, // custom / quoted
-      currency: "INR",
-      maxStructures: null,
-      maxSensors: null,
-      maxUsers: null,
-      dataRetentionDays: null,
-      apiAccess: true,
-      smsAlerts: true,
-      aiFeatures: true,
-      advancedReports: true,
-      femIntegration: true,
-      sso: true,
-    },
-  ];
+  const PLANS = BILLING_PLANS;
 
   console.log("Seeding billing plans…");
   for (const plan of PLANS) {

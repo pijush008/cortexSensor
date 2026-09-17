@@ -22,6 +22,7 @@ import {
 import Link from "next/link";
 import Image from "next/image";
 import { ConsoleLink } from "@/components/home/console-link";
+import { PricingPlans } from "@/components/home/pricing-plans";
 import { InstrumentationSchematic } from "@/components/home/instrumentation-schematic";
 import { ReferenceStructures } from "@/components/home/reference-structures";
 
@@ -583,115 +584,9 @@ export default function HomePage() {
             </div>
           </Motion>
 
-          {/* Two plans, so two columns — and capped in width, because two cards
-              stretched across a three-column grid read as a row with something
-              missing from it. The Enterprise tier remains sellable in billing;
-              it is simply not advertised here. */}
-          <div className="mx-auto grid max-w-3xl gap-5 sm:grid-cols-2">
-            {[
-              {
-                name: "Starter",
-                price: "₹4,999",
-                period: "/month",
-                desc: "Small projects and proof of concept",
-                features: [
-                  "Up to 3 structures",
-                  "Up to 20 sensors",
-                  "5 users",
-                  "Basic analytics & reports",
-                  "Email alerts",
-                  "30-day retention",
-                ],
-                featured: false,
-              },
-              {
-                name: "Professional",
-                price: "₹14,999",
-                period: "/month",
-                desc: "Growing monitoring operations",
-                features: [
-                  "Up to 20 structures",
-                  "Up to 200 sensors",
-                  "25 users",
-                  "Advanced analytics + FFT",
-                  "AI anomaly detection",
-                  "API access",
-                  "Email + SMS alerts",
-                  "1-year retention",
-                ],
-                featured: true,
-              },
-            ].map((plan, i) => (
-              <Motion key={plan.name} variant="ink" index={i}>
-                <div
-                  className={`relative flex h-full flex-col rounded-xl border bg-white p-6 ${
-                    plan.featured
-                      ? "border-shm-navy-500 shadow-[0_0_0_1px_rgba(17,17,17,0.25),0_20px_60px_-20px_rgba(17,17,17,0.35)]"
-                      : "border-sheet-ink/15 shadow-[0_1px_2px_rgba(17,17,17,0.04)]"
-                  }`}
-                >
-                  {plan.featured && (
-                    <span className="absolute -top-3 left-6 rounded-full bg-sheet-ink px-3 py-1 font-mono text-label font-semibold uppercase tracking-[0.18em] text-white">
-                      Most deployed
-                    </span>
-                  )}
-                  <div className="flex items-baseline justify-between">
-                    <h3 className="text-lead font-semibold tracking-tight text-sheet-ink">
-                      {plan.name}
-                    </h3>
-                    <span className="font-mono text-label uppercase tracking-[0.18em] text-sheet-ink/45">
-                      TIER 0{i + 1}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-caption text-sheet-ink/55">
-                    {plan.desc}
-                  </p>
-                  <div className="mt-5 flex items-baseline gap-1">
-                    <span className="text-3xl font-semibold tracking-tight text-sheet-ink">
-                      {plan.price}
-                    </span>
-                    <span className="text-label text-sheet-ink/45">
-                      {plan.period}
-                    </span>
-                  </div>
-                  <ul className="mt-5 flex-1 space-y-2 border-t border-sheet-ink/10 pt-5">
-                    {plan.features.map((f) => (
-                      <li
-                        key={f}
-                        className="flex items-start gap-2 text-caption text-sheet-ink/70"
-                      >
-                        <CheckMark />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <Link href="/login" className="mt-6">
-                    {/* The same forward chevron the hero and closing CTAs carry.
-                        Every primary action on the page now signals "this moves
-                        you onward" the same way; without it these read as a
-                        different KIND of control from the one in the hero. */}
-                    <Button
-                      className={`w-full ${
-                        plan.featured
-                          ? // Dark plate inverts to light. On a white card a
-                            // white button would vanish, so it gains a 2px
-                            // outline — drawn INSET, because a real border
-                            // would resize the button under the cursor.
-                            "hover:bg-sheet-paper hover:text-shm-navy-800 hover:shadow-[inset_0_0_0_2px_var(--color-shm-navy-800)]"
-                          : // Light plate inverts to dark. The resting hover
-                            // was sheet-ink at 15% — a grey barely separable
-                            // from the resting grey, with the label unchanged.
-                            "bg-slate-100 text-slate-800 hover:bg-shm-navy-800 hover:text-white"
-                      }`}
-                    >
-                      Get started
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </Link>
-                </div>
-              </Motion>
-            ))}
-          </div>
+          {/* Read from the billing catalog, so these are the plans and prices
+              an admin then sees on the subscription page — see PricingPlans. */}
+          <PricingPlans />
         </div>
       </section>
 
@@ -804,26 +699,5 @@ export default function HomePage() {
         </div>
       </footer>
     </div>
-  );
-}
-
-
-
-function CheckMark() {
-  return (
-    <span className="mt-[3px] flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-sheet-paper0/10 text-sheet-navy">
-      <svg
-        width="10"
-        height="10"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M20 6 9 17l-5-5" />
-      </svg>
-    </span>
   );
 }

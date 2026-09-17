@@ -255,8 +255,13 @@ export default function SubscriptionPage() {
         </div>
       )}
 
-      {/* Plans */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      {/* Plans: the offered catalog, as the pricing page shows it, plus the
+          current plan when the operator set one that is not on offer. */}
+      <div
+        className={`grid gap-4 ${
+          catalog.length >= 3 ? "lg:grid-cols-3" : "mx-auto max-w-3xl sm:grid-cols-2"
+        }`}
+      >
         {catalog.map((item) => {
           const icon = PLAN_ICON[item.code] ?? { icon: Zap, className: "text-shm-navy-400" };
           const Icon = icon.icon;
@@ -290,15 +295,12 @@ export default function SubscriptionPage() {
                   )}
                 </div>
                 <ul className="mb-5 space-y-2">
-                  {Object.entries(item.limits)
-                    .filter(([key]) => ["structures", "sensors", "users"].includes(key))
-                    .map(([key, max]) => (
-                      <li key={key} className="flex items-start gap-2 text-sm text-slate-600">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-shm-navy-400" />
-                        {key.charAt(0).toUpperCase() + key.slice(1)}:{" "}
-                        {max === null ? "Unlimited" : max}
-                      </li>
-                    ))}
+                  {item.highlights.map((line) => (
+                    <li key={line} className="flex items-start gap-2 text-sm text-slate-600">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-shm-navy-400" />
+                      {line}
+                    </li>
+                  ))}
                 </ul>
                 <Button
                   className={`w-full ${

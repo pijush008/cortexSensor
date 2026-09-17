@@ -207,6 +207,8 @@ export interface BillingPlanSummary {
   currency: string;
   limits: PlanLimits;
   features: PlanFeatures;
+  /** The card's bullet list, worded by the server so every screen matches. */
+  highlights: string[];
 }
 
 export interface SubscriptionUsage {

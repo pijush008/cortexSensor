@@ -209,6 +209,24 @@ describe("billing (plan enrollment, enforcement, invoices)", () => {
     expect(data.usage).toEqual({ structures: 0, sensors: 0, users: 0 });
   });
 
+  test("an admin is offered exactly the plans the pricing page advertises", async () => {
+    const res = await request(app)
+      .get("/api/subscription/plan")
+      .set("Cookie", adminP.cookie);
+    expect(res.status).toBe(200);
+    const plans = res.body.data.plans as Array<{ code: string; highlights: string[] }>;
+    // Two, in the configured order. Not Enterprise (quoted, not self-service)
+    // and not the operator's complimentary plan.
+    expect(plans.map((p) => p.code)).toEqual(["starter", "professional"]);
+    for (const p of plans) expect(p.highlights.length).toBeGreaterThan(0);
+    // The public sign-up list is the same catalog.
+    const pub = await request(app).get("/api/billing/plans");
+    expect(pub.status).toBe(200);
+    expect(pub.body.plans.map((p: { code: string }) => p.code)).toEqual(["starter", "professional"]);
+    expect(pub.body.plans[0].priceLabel).toBe("₹4,999");
+    expect(pub.body.plans[1].priceLabel).toBe("₹14,999");
+  });
+
   test("contractor members cannot read the billing admin endpoint", async () => {
     // Added by adminQ, not adminP.
     //

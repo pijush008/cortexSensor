@@ -8,6 +8,18 @@
  * configures it: before the process loads its code.
  */
 
+import dotenv from "dotenv";
+import { join } from "node:path";
+
+// The engine contract. The gRPC client defaults to /proto, which is where the
+// backend IMAGE mounts it; on a developer's machine the file is in the repo.
+// Without this a local run fails nine engine tests with ENOENT while the
+// engine itself is up and answering — a wrong-looking failure for a missing
+// path. CI and `npm run dev` set the same variable explicitly.
+process.env.SHM_ENGINE_PROTO_PATH ??= join(
+  __dirname, "..", "..", "proto", "shm", "engine", "v1", "engine.proto",
+);
+
 // Redis is disabled so rate-limit counters stay per-run instead of leaking
 // between suites through a shared server.
 process.env.REDIS_ENABLED = process.env.REDIS_ENABLED ?? "false";
@@ -95,7 +107,27 @@ process.env.OTP_RATE_LIMIT_MAX = "100000";
 //
 // Set ALLOW_REMOTE_TEST_DB=1 to override, which should only ever be done
 // against a database created for the purpose.
+//
+// The check must see the SAME environment the app will. Nothing has loaded
+// .env at this point — src/config does that, on import, later — so reading
+// process.env here found an empty DATABASE_URL, waved the run through, and the
+// app then connected to whatever .env named. With .env on Supabase that is
+// exactly the scenario above, and it went unnoticed because the suite still
+// passed: two seconds per round trip to Seoul is slow, not wrong. Load .env
+// first, in the same way and from the same place, so the guard judges the
+// real target.
+//
+// TEST_DATABASE_URL, when set, is used instead: it lets .env stay on the live
+// database for `npm run dev` while `npm test` goes to the local Postgres,
+// without editing either file between the two. It is subject to the same
+// check — it selects the target, it does not vouch for it.
+dotenv.config();
 {
+  const preferred = process.env.TEST_DATABASE_URL;
+  if (preferred) {
+    process.env.DATABASE_URL = preferred;
+    process.env.DIRECT_URL = process.env.TEST_DIRECT_URL || preferred;
+  }
   const url = process.env.DATABASE_URL || "";
   const LOCAL = new Set(["localhost", "127.0.0.1", "::1", "postgres", ""]);
   let host = "";

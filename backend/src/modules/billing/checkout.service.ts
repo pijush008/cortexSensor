@@ -2,12 +2,9 @@ import prisma from "../../config/prisma";
 import { config } from "../../config";
 import { BadRequestError } from "../../utils/AppError";
 import { paymentProvider } from "./provider";
+import { listOfferedPlans, type PlanCard } from "./plan-catalog";
 
-export interface SignupPlan {
-  code: string;
-  name: string;
-  amountPaise: number;
-  currency: string;
+export interface SignupPlan extends PlanCard {
   maxStructures: number | null;
   maxSensors: number | null;
   maxUsers: number | null;
@@ -21,23 +18,13 @@ export interface SignupPlan {
  * to the public. Order follows the configured order, not the table's.
  */
 export async function listSignupPlans(): Promise<SignupPlan[]> {
-  const codes = config.billing.signupPlanCodes;
-  const rows = await prisma.billingPlan.findMany({
-    where: { code: { in: codes }, isActive: true },
-  });
-
-  return codes
-    .map((code) => rows.find((r) => r.code === code))
-    .filter((r): r is NonNullable<typeof r> => Boolean(r))
-    .map((r) => ({
-      code: r.code,
-      name: r.name,
-      amountPaise: r.priceMonthly,
-      currency: r.currency,
-      maxStructures: r.maxStructures,
-      maxSensors: r.maxSensors,
-      maxUsers: r.maxUsers,
-    }));
+  const offered = await listOfferedPlans();
+  return offered.map((p) => ({
+    ...p,
+    maxStructures: p.limits.structures,
+    maxSensors: p.limits.sensors,
+    maxUsers: p.limits.users,
+  }));
 }
 
 export interface StartedCheckout {

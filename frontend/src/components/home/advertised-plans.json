@@ -1,0 +1,32 @@
+[
+  {
+    "code": "starter",
+    "name": "Starter",
+    "priceLabel": "₹4,999",
+    "tagline": "Small projects and proof of concept",
+    "highlights": [
+      "Up to 3 structures",
+      "Up to 20 sensors",
+      "5 users",
+      "Basic analytics & reports",
+      "Email alerts",
+      "30-day retention"
+    ]
+  },
+  {
+    "code": "professional",
+    "name": "Professional",
+    "priceLabel": "₹14,999",
+    "tagline": "Growing monitoring operations",
+    "highlights": [
+      "Up to 20 structures",
+      "Up to 200 sensors",
+      "25 users",
+      "Advanced analytics + FFT",
+      "AI anomaly detection",
+      "API access",
+      "Email + SMS alerts",
+      "1-year retention"
+    ]
+  }
+]

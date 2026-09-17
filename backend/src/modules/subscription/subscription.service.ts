@@ -7,6 +7,15 @@ import {
   PaymentRequiredError,
 } from "../../utils/AppError";
 import type { SwitchPlanInput } from "./subscription.types";
+import {
+  describePlan,
+  formatPrice,
+  listOfferedPlans,
+  type PlanFeatures,
+} from "../billing/plan-catalog";
+
+export { formatPrice };
+export type { PlanFeatures };
 
 // Single source of truth: checkout charges for the same plan sign-up assigns.
 const FALLBACK_CODE = config.billing.signupPlanCode;
@@ -16,15 +25,6 @@ export interface UsageCounts {
   structures: number;
   sensors: number;
   users: number;
-}
-
-export interface PlanFeatures {
-  apiAccess: boolean;
-  smsAlerts: boolean;
-  aiFeatures: boolean;
-  advancedReports: boolean;
-  femIntegration: boolean;
-  sso: boolean;
 }
 
 interface PlanRecord {
@@ -53,12 +53,6 @@ export async function resolveSubscriptionAdminId(
   if (user.userType === "admin") return user.id;
   // contractor/authority bill through their parent admin's subscription
   return user.parentId || null;
-}
-
-export function formatPrice(plan: PlanRecord): string {
-  if (plan.priceMonthly === 0) return plan.code === "complimentary" ? "FREE" : "Custom";
-  const value = plan.priceMonthly / 100;
-  return `₹${value.toLocaleString("en-IN")}`;
 }
 
 export async function countUsage(adminId: number): Promise<UsageCounts> {
@@ -116,17 +110,6 @@ export async function getEffectivePlan(adminId: number) {
   return {
     subscription,
     plan: plan as unknown as PlanRecord,
-  };
-}
-
-function featureList(plan: PlanRecord): PlanFeatures {
-  return {
-    apiAccess: plan.apiAccess,
-    smsAlerts: plan.smsAlerts,
-    aiFeatures: plan.aiFeatures,
-    advancedReports: plan.advancedReports,
-    femIntegration: plan.femIntegration,
-    sso: plan.sso,
   };
 }
 
@@ -191,18 +174,9 @@ export async function getPlanView(user: AuthenticatedRequestUser) {
     return {
       scheme: "complimentary",
       plan: {
-        code: plan.code,
-        name: plan.name,
-        priceLabel: "FREE",
+        ...describePlan(plan),
+        description: "The platform operator's own organization",
         periodLabel: "lifetime · no charge",
-        currency: plan.currency,
-        limits: {
-          structures: plan.maxStructures,
-          sensors: plan.maxSensors,
-          users: plan.maxUsers,
-          dataRetentionDays: plan.dataRetentionDays,
-        },
-        features: featureList(plan),
       },
       status: "active" as const,
       autoRenew: false,
@@ -212,57 +186,30 @@ export async function getPlanView(user: AuthenticatedRequestUser) {
 
   const { subscription, plan } = await getEffectivePlan(adminId);
   const usage = await countUsage(adminId);
-  const catalog = await listActivePlans();
+  const current = describePlan(plan);
+  // The offered plans, exactly as the pricing page shows them. An admin whose
+  // plan was set by the operator — Enterprise, say — is not on that list, and
+  // must still see the plan they are on, so it goes first.
+  const offered = await listOfferedPlans();
+  const catalog = offered.some((p) => p.code === current.code)
+    ? offered
+    : [current, ...offered];
 
   return {
     scheme: "subscription" as const,
     plan: {
-      code: plan.code,
-      name: plan.name,
-      priceLabel: formatPrice(plan),
+      ...current,
+      description: current.tagline,
       periodLabel: plan.priceMonthly > 0 ? "per month · billed monthly" : "custom quote",
-      currency: plan.currency,
-      limits: {
-        structures: plan.maxStructures,
-        sensors: plan.maxSensors,
-        users: plan.maxUsers,
-        dataRetentionDays: plan.dataRetentionDays,
-      },
-      features: featureList(plan),
     },
     status: subscription.status,
     autoRenew: subscription.autoRenew,
     renewsOn: subscription.renewsOn,
     usage,
-    plans: catalog,
+    plans: catalog.map((c) => ({ ...c, description: c.tagline })),
   };
 }
 
-export async function listActivePlans() {
-  const rows = await prisma.billingPlan.findMany({
-    where: { isActive: true, code: { not: "complimentary" } },
-    orderBy: { priceMonthly: "asc" },
-  });
-  return rows.map((p) => {
-    const plan = p as unknown as PlanRecord;
-    return {
-      code: plan.code,
-      name: plan.name,
-      priceLabel: formatPrice(plan),
-      description:
-        plan.code === "enterprise"
-          ? "For large-scale infrastructure monitoring."
-          : undefined,
-      limits: {
-        structures: plan.maxStructures,
-        sensors: plan.maxSensors,
-        users: plan.maxUsers,
-        dataRetentionDays: plan.dataRetentionDays,
-      },
-      features: featureList(plan),
-    };
-  });
-}
 
 export async function switchPlan(adminId: number | null, input: SwitchPlanInput) {
   if (!adminId) {
