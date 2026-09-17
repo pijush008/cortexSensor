@@ -5,7 +5,6 @@
 #   postgres  -> Supabase (ap-northeast-2), reached over the transaction pooler
 #   redis     -> Upstash
 #   mosquitto -> gone; MQTT was removed, devices ingest over HTTPS
-#   gateway, gateway-pi, firmware -> dormant for the same reason
 #
 # So the box runs four containers: the API, the web app, the analysis engine,
 # and nginx in front of them. Nothing here bind-mounts source code — every

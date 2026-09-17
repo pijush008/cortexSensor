@@ -85,9 +85,9 @@ Both go through the same validation, tenant scoping, calibration, channel
 gating and `eventId` de-duplication, which is why devices ingest through the
 API rather than writing to the database directly.
 
-An MQTT path existed previously, with a Mosquitto broker and gateway
-subscribers. It was removed; `gateway/`, `gateway-pi/` and `firmware/` still
-contain those implementations and need porting to the endpoints above.
+An MQTT path existed previously, with a Mosquitto broker, gateway subscribers
+and ESP32 firmware that published to it. All of it was removed; new device
+code targets the two endpoints above directly.
 
 Readings land in `sensor_data` and `node_data`, both TimescaleDB hypertables.
 
@@ -107,9 +107,6 @@ SHM/
 │   ├── src/app/(app)/  authenticated screens
 │   ├── src/app/(auth)/ login, register, reset-password
 │   └── src/components/ UI primitives and layout
-├── gateway/            sample Node gateway that simulates field hardware
-├── gateway-pi/         Raspberry Pi field gateway (Python)
-├── firmware/           ESP32 sensor node firmware
 ├── python_shm_service/ FFT / analysis service
 ├── nginx/              reverse proxy config
 └── docker-init/        TimescaleDB extension and hypertable bootstrap
@@ -296,15 +293,11 @@ docker compose exec frontend npx next lint
 
 ## Field hardware
 
-See `firmware/esp32_sensor_node/` and `gateway-pi/` for the code, and the
-wiring and flashing notes kept with each.
-
-**Equipment.** ESP32 sensor nodes (strain gauges, load cells, DHT22,
-battery monitoring), optionally aggregated by a Raspberry Pi gateway.
-
-> **These implementations are dormant.** Both publish over MQTT, which the
-> platform no longer runs. They need porting to `POST /api/beamDeviceData`
-> before they will deliver readings again.
+ESP32 sensor nodes (strain gauges, load cells, DHT22, battery monitoring)
+send readings over HTTPS to `POST /api/beamDeviceData` with the device's
+`x-api-key`. No firmware lives in this repository: the earlier MQTT-based
+node and Raspberry Pi gateway were removed with the broker, and the device
+code that replaces them is kept with the hardware project.
 
 **Bring-up.**
 
