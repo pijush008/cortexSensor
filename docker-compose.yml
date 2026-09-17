@@ -9,12 +9,17 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./docker-init:/docker-entrypoint-initdb.d
     ports:
-      - "5432:5432"
+      # Loopback ONLY. "5432:5432" binds every interface, and Docker's iptables
+      # rules are evaluated ahead of ufw's — so a firewall reports the port
+      # closed while Postgres answers the internet. Still reachable from this
+      # machine and from other containers; just not from anywhere else.
+      - "127.0.0.1:5432:5432"
 
   redis:
     image: redis:7
     ports:
-      - "6379:6379"
+      # Loopback only, for the same reason as Postgres above.
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
 

@@ -20,6 +20,20 @@
 #
 #   docker compose -f docker-compose.prod.yml run --rm backend npx prisma migrate deploy
 
+# Its own compose project, deliberately.
+#
+# Both files otherwise derive their project name from the directory — "shm" —
+# so they share container names like shm-backend-1. Starting this file while a
+# dev container of the same name exists REUSES that container, and the dev file
+# publishes 3000, 3001, 8000, 50051, 5432 and 6379 straight to 0.0.0.0. The
+# result is a "production" stack serving the database and the app directly to
+# the internet, past nginx, while this file still says `expose`.
+#
+# Docker writes its own iptables rules ahead of ufw's, so a firewall would
+# report those ports closed while they were answering. A distinct project name
+# keeps the two sets of containers from ever meeting.
+name: shm-prod
+
 services:
   backend:
     build:
