@@ -1,0 +1,20 @@
+{
+  "name": "shm",
+  "private": true,
+  "description": "Structural health monitoring platform — Cloudglance Sensinglab Pvt Ltd. This file exists so the common commands work from the repository root instead of only from inside frontend/ or backend/; the real dependencies live in those packages.",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "dev:local": "npm --prefix frontend run dev:local",
+    "dev:api": "npm --prefix backend run dev",
+    "build": "npm --prefix frontend run build",
+    "test": "npm --prefix backend run test:run && npm --prefix frontend run test:run",
+    "test:api": "npm --prefix backend run test:run",
+    "test:web": "npm --prefix frontend run test:run",
+    "lint": "npm --prefix frontend run lint",
+    "migrate": "npm --prefix backend run prisma:migrate:prod",
+    "services": "docker compose up -d postgres redis python-shm",
+    "services:down": "docker compose down",
+    "prod": "docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build",
+    "prod:down": "docker compose -f docker-compose.prod.yml --env-file .env.prod down"
+  }
+}

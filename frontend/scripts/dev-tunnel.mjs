@@ -1,5 +1,15 @@
 /**
- * Start the dev server behind a Cloudflare tunnel, in one command.
+ * Start the WHOLE development stack in one command.
+ *
+ * `npm run dev` brings up, in order: the container services (Postgres, Redis,
+ * the analysis engine), the API, the Cloudflare tunnel, and Next — then prints
+ * what actually connected. Starting only the web app left the console loading
+ * against an API that was not running, which looks like a broken app rather
+ * than a missing step.
+ *
+ * The containers are left running on exit. They are detached infrastructure,
+ * slow to start and harmless to leave; `npm run services:down` stops them. The
+ * processes this script spawns are killed with it.
  *
  * The ordering is the whole point. A quick tunnel's hostname is only known once
  * cloudflared has connected, and Next's dev server must be told that hostname
@@ -12,11 +22,16 @@
  * from other machines on the network, which is most of the point of putting it
  * behind Cloudflare.
  */
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { createConnection } from "node:net";
 import { printStatus } from "./dev-status.mjs";
+
+/** Repository root: frontend/scripts/ -> frontend/ -> repo. */
+const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 const PORT = process.env.PORT || "3000";
 const CLOUDFLARED =
@@ -67,6 +82,68 @@ function shutdown(code = 0) {
   }, 1500);
 }
 for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => shutdown(0));
+
+/** Resolves once something is listening, or false when the wait runs out. */
+function waitForPort(port, host = "127.0.0.1", timeoutMs = 60_000) {
+  const deadline = Date.now() + timeoutMs;
+  return new Promise((done) => {
+    const attempt = () => {
+      const sock = createConnection({ port, host });
+      const retry = () => {
+        sock.destroy();
+        if (Date.now() > deadline) return done(false);
+        setTimeout(attempt, 500);
+      };
+      sock.once("connect", () => { sock.end(); done(true); });
+      sock.once("error", retry);
+      sock.setTimeout(1500, retry);
+    };
+    attempt();
+  });
+}
+
+// ── 1. Container services ───────────────────────────────────────────────────
+// Postgres, Redis and the analysis engine. `up -d` is idempotent: already
+// running is a no-op, so this costs nothing on the second run of the day.
+console.log("Starting services (postgres, redis, engine)…");
+const services = spawnSync(
+  "docker",
+  ["compose", "up", "-d", "postgres", "redis", "python-shm"],
+  { cwd: REPO, stdio: "inherit" },
+);
+if (services.status !== 0) {
+  console.error(
+    "\ndocker compose failed. Is the Docker daemon running?\n" +
+      "To start only the web app, without services or the API: " +
+      "npm run dev:local",
+  );
+  process.exit(1);
+}
+
+if (!(await waitForPort(5432))) {
+  console.error("Postgres did not accept connections within 60s.");
+  process.exit(1);
+}
+
+// ── 2. The API ──────────────────────────────────────────────────────────────
+console.log("Starting the API…");
+const backend = spawn("npm", ["--prefix", "backend", "run", "dev"], {
+  cwd: REPO,
+  stdio: "inherit",
+  detached: true,
+  env: {
+    ...process.env,
+    // The gRPC client defaults to the container's /proto mount, which does not
+    // exist when the API runs on the host.
+    SHM_ENGINE_PROTO_PATH:
+      process.env.SHM_ENGINE_PROTO_PATH ??
+      join(REPO, "proto", "shm", "engine", "v1", "engine.proto"),
+  },
+});
+children.push(backend);
+backend.on("exit", (code) => {
+  if (!shuttingDown) console.error(`the API exited (${code}).`);
+});
 
 console.log("Starting Cloudflare tunnel…");
 

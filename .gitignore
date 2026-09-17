@@ -62,3 +62,8 @@ python_shm_service/proto/engine_pb2_grpc.py
 
 # Production secrets: database password, Supabase service-role key, JWT secrets.
 .env.prod
+
+# TLS material for the production proxy. The private key must never be
+# committed; the certificate is regenerated per environment anyway.
+nginx/certs/*.pem
+nginx/certbot/
