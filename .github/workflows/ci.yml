@@ -1,6 +1,18 @@
 name: CI
 
-on: [push, pull_request]
+# Every pull request, and every push to main. A branch that is not yet a PR
+# does not burn minutes; the moment it is proposed for main, every gate runs.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A newer push to the same branch cancels the run in progress. Only the
+# latest state of a branch can be merged, so only its result matters.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   backend:
@@ -94,8 +106,20 @@ jobs:
           # silently exercises the unpartitioned path.
           PGPASSWORD=shm_pass psql -h localhost -U shm -d shm_ci \
             -c "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"
+          # Typecheck first: it is the fastest signal, and a red suite full of
+          # "cannot find name" is a typecheck failure reported one test at a
+          # time.
+          npx tsc --noEmit
           npx prisma migrate deploy
-          npm run prisma:seed || true
+          # The schema must be what the migrations produce. A developer who
+          # edits schema.prisma and forgets `migrate dev` gets a green local
+          # run — their client is generated from the schema — and a broken
+          # deploy, because production only ever runs the migrations.
+          npx prisma migrate diff \
+            --from-schema-datasource prisma/schema.prisma \
+            --to-schema-datamodel prisma/schema.prisma \
+            --exit-code
+          npm run prisma:seed
           npm run test:run
   frontend:
     runs-on: ubuntu-latest
@@ -114,7 +138,12 @@ jobs:
         run: |
           cd frontend
           npm ci
-          npm run build || true
+          npx tsc --noEmit
+          npm run lint
+          npm run test:run
+          # A failed build used to pass this job (`|| true`). It is the one
+          # check that says the image can be produced at all, so it fails.
+          npm run build
   python-service:
     runs-on: ubuntu-latest
     steps:
@@ -123,8 +152,39 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: "3.11"
-      - name: Install deps
+      - name: Install deps and run the engine's tests
         run: |
           cd python_shm_service
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          PROTO_DIR="$GITHUB_WORKSPACE/proto" APP_DIR="$PWD" ./generate_proto.sh
+          python -m unittest discover -s . -p "test_*.py" -v
+
+  # The production images must build from this commit. Nothing else here
+  # exercises the Dockerfiles, and a Dockerfile that no longer matches the
+  # tree — a renamed script, a moved proto — is found on the server otherwise.
+  docker-images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build every production image
+        run: |
+          # compose validates env_file paths before building; the real one is
+          # never in git.
+          touch .env.prod
+          docker compose -f docker-compose.prod.yml --env-file .env.prod build
+
+  # The single check branch protection requires. It fails if any job above
+  # failed or was cancelled, so adding a job means adding it to `needs` and
+  # nothing in the repository settings.
+  ci-ok:
+    needs: [backend, frontend, python-service, docker-images]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every gate passed
+        run: |
+          echo '${{ toJSON(needs) }}'
+          if echo '${{ toJSON(needs) }}' | grep -Eq '"result": "(failure|cancelled|skipped)"'; then
+            echo "A required job did not pass."; exit 1
+          fi

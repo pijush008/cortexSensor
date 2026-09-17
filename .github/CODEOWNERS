@@ -1,0 +1,15 @@
+# Who must review before a pull request can merge into main, once
+# "Require review from Code Owners" is on for the branch.
+#
+# One owner for everything to start with; narrow it as the team grows. The
+# second list is the set of paths where a mistake takes the site down rather
+# than a page, and is the last to be delegated.
+
+*                                   @pijush008
+
+/.github/                           @pijush008
+/nginx/                             @pijush008
+/docker-compose.prod.yml            @pijush008
+/backend/prisma/migrations/         @pijush008
+/backend/src/middleware/            @pijush008
+/backend/src/modules/auth/          @pijush008
