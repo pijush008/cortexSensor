@@ -270,6 +270,7 @@ function LocationTable({
                     <Button
                       size="sm"
                       variant="destructive"
+                      loading={remove.isPending && remove.variables === loc.id}
                       disabled={remove.isPending}
                       onClick={async () => {
                         await remove.mutateAsync(loc.id);
@@ -410,7 +411,7 @@ function AddLocationModal({
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" disabled={create.isPending}>
+          <Button type="submit" loading={create.isPending}>
             {create.isPending ? "Adding…" : "Add location"}
           </Button>
         </div>

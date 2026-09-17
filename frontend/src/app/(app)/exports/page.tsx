@@ -120,7 +120,7 @@ export default function ExportsPage() {
             <Button
               variant="secondary"
               className="w-full justify-start"
-              disabled={busy === "admin"}
+              loading={busy === "admin"}
               onClick={() =>
                 exportList("admin", "/download/list/admin/0", { userType: "admin" })
               }
@@ -131,7 +131,7 @@ export default function ExportsPage() {
             <Button
               variant="secondary"
               className="w-full justify-start"
-              disabled={busy === "contractor"}
+              loading={busy === "contractor"}
               onClick={() =>
                 exportList("contractor", "/download/list/contractor/0", {
                   userType: "contractor",
@@ -144,7 +144,7 @@ export default function ExportsPage() {
             <Button
               variant="secondary"
               className="w-full justify-start"
-              disabled={busy === "authority"}
+              loading={busy === "authority"}
               onClick={() =>
                 exportList("authority", "/download/list/authority/0", {
                   userType: "authority",
@@ -157,7 +157,7 @@ export default function ExportsPage() {
             <Button
               variant="secondary"
               className="w-full justify-start"
-              disabled={busy === "device"}
+              loading={busy === "device"}
               onClick={() => exportList("devices", "/download/device/0", {})}
             >
               <Download className="h-4 w-4" />
@@ -166,7 +166,7 @@ export default function ExportsPage() {
             <Button
               variant="secondary"
               className="w-full justify-start"
-              disabled={busy === "sensor"}
+              loading={busy === "sensor"}
               onClick={() => exportList("sensors", "/download/sensor/0", {})}
             >
               <Download className="h-4 w-4" />
@@ -175,7 +175,7 @@ export default function ExportsPage() {
             <Button
               variant="secondary"
               className="w-full justify-start"
-              disabled={busy === "projects"}
+              loading={busy === "projects"}
               onClick={() => exportList("projects", "/download/projects/0", {})}
             >
               <Download className="h-4 w-4" />
@@ -209,7 +209,8 @@ export default function ExportsPage() {
             />
             <Button
               className="flex-1"
-              disabled={!selectedUniqueId || busy === "csv"}
+              loading={busy === "csv"}
+              disabled={!selectedUniqueId}
               onClick={exportCsv}
             >
               <Download className="h-4 w-4" />
@@ -226,7 +227,8 @@ export default function ExportsPage() {
               />
               <Button
                 className="mt-3 w-full"
-                disabled={!selectedUniqueId || !file || busy === "import"}
+                loading={busy === "import"}
+                disabled={!selectedUniqueId || !file}
                 onClick={importCsv}
               >
                 <UploadCloud className="h-4 w-4" />

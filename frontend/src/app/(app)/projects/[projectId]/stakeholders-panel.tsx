@@ -345,6 +345,7 @@ export function StakeholdersPanel({
                   <Button
                     variant="ghost"
                     size="sm"
+                    loading={removeMutation.isPending && removeMutation.variables === role}
                     disabled={removeMutation.isPending}
                     onClick={() => removeMutation.mutate(role)}
                   >
@@ -387,7 +388,8 @@ export function StakeholdersPanel({
             />
             <Button
               type="submit"
-              disabled={!emailId || inviteMutation.isPending}
+              loading={inviteMutation.isPending}
+              disabled={!emailId}
             >
               <Send className="h-4 w-4" />
               {inviteMutation.isPending ? "Sending…" : "Invite"}
@@ -467,6 +469,7 @@ export function StakeholdersPanel({
                         variant="ghost"
                         size="sm"
                         aria-label="Send a new code"
+                        loading={resendMutation.isPending && resendMutation.variables === invitation.id}
                         disabled={resendMutation.isPending}
                         onClick={() => resendMutation.mutate(invitation.id)}
                       >
@@ -477,6 +480,7 @@ export function StakeholdersPanel({
                           variant="ghost"
                           size="sm"
                           aria-label="Revoke invitation"
+                          loading={revokeMutation.isPending && revokeMutation.variables === invitation.id}
                           disabled={revokeMutation.isPending}
                           onClick={() => revokeMutation.mutate(invitation.id)}
                         >
@@ -513,7 +517,8 @@ export function StakeholdersPanel({
                           />
                           <Button
                             type="submit"
-                            disabled={otp.length !== 6 || verifyMutation.isPending}
+                            loading={verifyMutation.isPending}
+                            disabled={otp.length !== 6}
                           >
                             {verifyMutation.isPending
                               ? "Checking…"
@@ -640,13 +645,8 @@ export function StakeholdersPanel({
                           <div className="flex gap-2">
                             <Button
                               type="submit"
-                              disabled={
-                                completeMutation.isPending ||
-                                !details.firstName ||
-                                !details.lastName ||
-                                !details.phoneNo ||
-                                details.password.length < MIN_PASSWORD
-                              }
+                              loading={completeMutation.isPending}
+                              disabled={!details.firstName || !details.lastName || !details.phoneNo || details.password.length < MIN_PASSWORD}
                             >
                               {completeMutation.isPending
                                 ? "Creating…"

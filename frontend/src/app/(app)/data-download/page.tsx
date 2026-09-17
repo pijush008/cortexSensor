@@ -124,7 +124,8 @@ export default function DataDownloadPage() {
   const [cloudDeviceId, setCloudDeviceId] = useState("all");
   const [cloudFrom, setCloudFrom] = useState("");
   const [cloudTo, setCloudTo] = useState("");
-  const [cloudBusy, setCloudBusy] = useState(false);
+  /** Which cloud export is being prepared, so only that button spins. */
+  const [cloudBusy, setCloudBusy] = useState<"sensorData" | "nodeData" | null>(null);
   const [cloudNotice, setCloudNotice] = useState<string | null>(null);
 
   const from = useMemo(
@@ -226,7 +227,7 @@ export default function DataDownloadPage() {
   ];
 
   const downloadCloud = async (kind: "sensorData" | "nodeData") => {
-    setCloudBusy(true);
+    setCloudBusy(kind);
     setCloudNotice(null);
     try {
       const body: Record<string, unknown> = {};
@@ -262,7 +263,7 @@ export default function DataDownloadPage() {
         `Download failed: ${(await extractErrorMessage(e.response?.data))}`,
       );
     } finally {
-      setCloudBusy(false);
+      setCloudBusy(null);
     }
   };
 
@@ -484,7 +485,8 @@ export default function DataDownloadPage() {
               <Button
                 className="w-full"
                 size="lg"
-                disabled={orderAsc.length === 0 || busy}
+                loading={busy}
+                disabled={orderAsc.length === 0}
                 onClick={exportExcel}
               >
                 <FileSpreadsheet className="h-4 w-4" />
@@ -561,19 +563,21 @@ export default function DataDownloadPage() {
             <div className="flex flex-wrap gap-3">
               <Button
                 variant="outline"
-                disabled={cloudBusy}
+                loading={cloudBusy === "sensorData"}
+                disabled={cloudBusy !== null}
                 onClick={() => downloadCloud("sensorData")}
               >
                 <FileSpreadsheet className="h-4 w-4" />
-                {cloudBusy ? "Preparing…" : "Sensor readings (CSV)"}
+                {cloudBusy === "sensorData" ? "Preparing…" : "Sensor readings (CSV)"}
               </Button>
               <Button
                 variant="outline"
-                disabled={cloudBusy}
+                loading={cloudBusy === "nodeData"}
+                disabled={cloudBusy !== null}
                 onClick={() => downloadCloud("nodeData")}
               >
                 <DownloadCloud className="h-4 w-4" />
-                {cloudBusy ? "Preparing…" : "Node health (CSV)"}
+                {cloudBusy === "nodeData" ? "Preparing…" : "Node health (CSV)"}
               </Button>
             </div>
             <p className="text-xs text-slate-500">

@@ -490,7 +490,7 @@ export default function DevicesPage() {
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={saveMutation.isPending}>
+            <Button type="submit" loading={saveMutation.isPending}>
               {saveMutation.isPending
                 ? "Saving…"
                 : editing

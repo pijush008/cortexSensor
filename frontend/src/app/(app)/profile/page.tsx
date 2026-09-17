@@ -269,7 +269,7 @@ export default function ProfilePage() {
                     </p>
                   )}
                 </div>
-                <Button type="submit" disabled={saveProfile.isPending}>
+                <Button type="submit" loading={saveProfile.isPending}>
                   <Save className="h-4 w-4" />
                   {saveProfile.isPending ? "Saving…" : "Save changes"}
                 </Button>
@@ -322,7 +322,7 @@ export default function ProfilePage() {
                 placeholder="••••••••"
                 required
               />
-              <Button type="submit" disabled={changePw.isPending}>
+              <Button type="submit" loading={changePw.isPending}>
                 {changePw.isPending ? "Updating…" : "Update Password"}
               </Button>
             </form>

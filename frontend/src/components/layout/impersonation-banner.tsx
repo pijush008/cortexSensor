@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, LogOut } from "lucide-react";
+import { Eye, Loader2, LogOut } from "lucide-react";
 import { useMe } from "@/hooks/use-me";
 import { useEndImpersonation } from "@/hooks/use-platform-user";
 
@@ -46,7 +46,11 @@ export function ImpersonationBanner() {
         disabled={end.isPending}
         className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-amber-950 px-2.5 py-1 text-[0.75rem] font-medium text-amber-50 transition-colors hover:bg-amber-900 disabled:opacity-60"
       >
-        <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
+        {end.isPending ? (
+          <Loader2 className="mo-spin h-3.5 w-3.5" aria-hidden="true" />
+        ) : (
+          <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
+        )}
         {end.isPending ? "Exiting…" : "Exit view-as"}
       </button>
     </div>

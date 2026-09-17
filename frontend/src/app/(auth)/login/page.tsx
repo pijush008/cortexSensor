@@ -6,7 +6,7 @@ import { Reveal } from "@/components/ui/reveal";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
 import { describeError, type DescribedError } from "@/lib/errors";
-import { Activity, Lock, Radio, ShieldCheck } from "lucide-react";
+import { Activity, Loader2, Lock, Radio, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -64,6 +64,9 @@ export default function LoginPage() {
   // Asked of the server rather than assumed, so the button never appears in a
   // deployment where it cannot work.
   const [googleAvailable, setGoogleAvailable] = useState(false);
+  // The Google button is a plain link, so nothing else marks the wait between
+  // the click and Google's page appearing.
+  const [googleRedirecting, setGoogleRedirecting] = useState(false);
   // Development builds show the control in a disabled state so it is visibly
   // present but unusable; production shows nothing at all.
   const showGoogleAsUnconfigured = process.env.NODE_ENV !== "production";
@@ -170,10 +173,12 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await verifyLoginOtp(otpUserId, otp);
+      // Still loading: the spinner runs until the dashboard replaces this page.
+      // Clearing it here re-enables the button for the half-second before the
+      // navigation lands, which looks like the sign-in silently did nothing.
       router.push("/dashboard");
     } catch (err) {
       setError(describeError(err, { secondFactorAttempt: true }));
-    } finally {
       setLoading(false);
     }
   };
@@ -188,8 +193,10 @@ export default function LoginPage() {
         // No session yet. The code decides whether one is issued.
         setOtpUserId(outcome.userId);
         setOtp("");
+        setLoading(false);
         return;
       }
+      // Loading stays on through the navigation; see handleOtp.
       router.push("/dashboard");
     } catch (err) {
       // Routed through describeError so the user sees "Too many attempts,
@@ -201,7 +208,6 @@ export default function LoginPage() {
       // password" instead of "Your session has expired" — advice that makes no
       // sense on the page you sign in from.
       setError(describeError(err, { credentialAttempt: true }));
-    } finally {
       setLoading(false);
     }
   };
@@ -397,7 +403,8 @@ export default function LoginPage() {
                   <Button
                     type="submit"
                     className="w-full"
-                    disabled={loading || otp.length < 6}
+                    loading={loading}
+                    disabled={otp.length < 6}
                   >
                     {loading ? "Verifying…" : "Verify and sign in"}
                   </Button>
@@ -434,7 +441,8 @@ export default function LoginPage() {
                   <Button
                     type="submit"
                     className="w-full"
-                    disabled={loading || otp.length < 6}
+                    loading={loading}
+                    disabled={otp.length < 6}
                   >
                     {loading ? "Verifying…" : "Verify and sign in"}
                   </Button>
@@ -504,10 +512,16 @@ export default function LoginPage() {
                        the browser to visit Google and come back with cookies. */
                     <a
                       href="/api/v1/auth/google"
-                      className="flex h-12 w-full items-center justify-center gap-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50"
+                      onClick={() => setGoogleRedirecting(true)}
+                      aria-busy={googleRedirecting || undefined}
+                      className="flex h-12 w-full items-center justify-center gap-2.5 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 aria-busy:pointer-events-none aria-busy:opacity-70"
                     >
-                      <GoogleMark />
-                      Continue with Google
+                      {googleRedirecting ? (
+                        <Loader2 className="mo-spin h-4 w-4" aria-hidden="true" />
+                      ) : (
+                        <GoogleMark />
+                      )}
+                      {googleRedirecting ? "Opening Google…" : "Continue with Google"}
                     </a>
                   ) : (
                     <div

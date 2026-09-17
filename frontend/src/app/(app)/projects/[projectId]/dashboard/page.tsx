@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   FolderKanban,
+  Loader2,
   Pause,
   Play,
   Square,
@@ -306,7 +307,11 @@ export default function ProjectDashboardPage() {
             disabled={!(notStarted || paused) || setStatus.isPending}
             onClick={() => setStatus.mutate("start")}
           >
-            <Play size={18} fill="currentColor" />
+            {setStatus.isPending && setStatus.variables === "start" ? (
+              <Loader2 size={18} className="mo-spin" aria-hidden="true" />
+            ) : (
+              <Play size={18} fill="currentColor" />
+            )}
           </button>
           <button
             type="button"
@@ -317,7 +322,11 @@ export default function ProjectDashboardPage() {
             onClick={() => setStatus.mutate("pause")}
           >
             {/* A pause icon for a pause action; this was a stop square. */}
-            <Pause size={16} fill="currentColor" />
+            {setStatus.isPending && setStatus.variables === "pause" ? (
+              <Loader2 size={16} className="mo-spin" aria-hidden="true" />
+            ) : (
+              <Pause size={16} fill="currentColor" />
+            )}
           </button>
           <button
             type="button"
@@ -338,7 +347,11 @@ export default function ProjectDashboardPage() {
               }
             }}
           >
-            <Square size={16} fill="currentColor" />
+            {setStatus.isPending && setStatus.variables === "end" ? (
+              <Loader2 size={16} className="mo-spin" aria-hidden="true" />
+            ) : (
+              <Square size={16} fill="currentColor" />
+            )}
           </button>
         </div>
       </header>
@@ -406,6 +419,9 @@ export default function ProjectDashboardPage() {
                       disabled={saveChannels.isPending}
                       onClick={() => saveChannels.mutate(drafts)}
                     >
+                      {saveChannels.isPending && (
+                        <Loader2 size={14} className="mo-spin" aria-hidden="true" />
+                      )}
                       {saveChannels.isPending ? "Saving…" : "Done"}
                     </button>
                   </>

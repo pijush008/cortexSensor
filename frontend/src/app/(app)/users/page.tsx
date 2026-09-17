@@ -311,7 +311,7 @@ export default function UsersPage() {
             <Button type="button" variant="secondary" onClick={() => setShowModal(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={addUser.isPending}>
+            <Button type="submit" loading={addUser.isPending}>
               {addUser.isPending ? "Adding…" : "Add User"}
             </Button>
           </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Mail, Trash2 } from "lucide-react";
+import { Loader2, Mail, Trash2 } from "lucide-react";
 
 import {
   useProjectEmails,
@@ -159,6 +159,7 @@ export function AlertRecipients({
             className={`${styles.pill} ${styles.pillDone}`}
             disabled={save.isPending}
           >
+            {save.isPending && <Loader2 size={14} className="mo-spin" aria-hidden="true" />}
             {save.isPending ? "Saving…" : "Add"}
           </button>
         </form>

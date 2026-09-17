@@ -151,9 +151,8 @@ export function DevicePanel({
             />
             <div className="flex gap-2">
               <Button
-                disabled={
-                  saveMutation.isPending || selected === (currentDeviceId ?? "")
-                }
+                loading={saveMutation.isPending}
+                disabled={selected === (currentDeviceId ?? "")}
                 onClick={() => saveMutation.mutate(selected || null)}
               >
                 <Save className="h-4 w-4" />
@@ -162,7 +161,7 @@ export function DevicePanel({
               {currentDeviceId && (
                 <Button
                   variant="secondary"
-                  disabled={saveMutation.isPending}
+                  loading={saveMutation.isPending}
                   onClick={() => {
                     setSelected("");
                     saveMutation.mutate(null);

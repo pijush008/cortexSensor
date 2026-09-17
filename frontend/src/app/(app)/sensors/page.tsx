@@ -629,7 +629,7 @@ export default function SensorsPage() {
             <Button type="button" variant="secondary" onClick={() => setShowModal(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={saveMutation.isPending}>
+            <Button type="submit" loading={saveMutation.isPending}>
               {saveMutation.isPending
                 ? "Saving…"
                 : editing
@@ -710,7 +710,7 @@ export default function SensorsPage() {
             <Button type="button" variant="secondary" onClick={() => setShowTypeModal(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={saveTypeMutation.isPending}>
+            <Button type="submit" loading={saveTypeMutation.isPending}>
               {saveTypeMutation.isPending ? "Saving…" : "Save Type"}
             </Button>
           </div>

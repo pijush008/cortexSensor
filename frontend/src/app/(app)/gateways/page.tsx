@@ -308,7 +308,7 @@ function RegisterGatewayModal({
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" disabled={create.isPending}>
+          <Button type="submit" loading={create.isPending}>
             {create.isPending ? "Registering…" : "Register gateway"}
           </Button>
         </div>

@@ -306,6 +306,7 @@ export default function SubscriptionPage() {
                       ? "bg-slate-100 text-slate-500 hover:bg-slate-200 cursor-default"
                       : "bg-shm-navy-800 text-white hover:bg-shm-navy-700"
                   }`}
+                  loading={switchMutation.isPending && switchMutation.variables === item.code}
                   disabled={isCurrent || switchMutation.isPending}
                   onClick={() => handleSwitch(item.code)}
                 >
