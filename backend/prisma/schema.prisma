@@ -160,6 +160,7 @@ model RolePermission {
   permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@id([roleId, permissionId])
+  @@index([permissionId])
   @@map("role_permissions")
 }
 
@@ -182,6 +183,7 @@ model Membership {
   @@unique([userId, tenantId])
   @@index([tenantId, status])
   @@index([userId])
+  @@index([roleId])
   @@map("memberships")
 }
 
@@ -314,6 +316,8 @@ model Device {
   @@index([tenantId])
   @@index([gatewayId])
   @@index([tenantId, lifecycle])
+  @@index([deviceType])
+  @@index([updatedBy])
   @@map("devices")
 }
 
@@ -1009,6 +1013,7 @@ model Alert {
   @@index([tenantId, status, severity])
   @@index([tenantId, detectedAt])
   @@index([sensorId, detectedAt])
+  @@index([ruleId])
   @@map("alerts")
 }
 
@@ -1098,6 +1103,7 @@ model AnalysisRun {
   @@index([tenantId, queuedAt])
   @@index([sensorId, queuedAt])
   @@index([status])
+  @@index([baselineId])
   @@map("analysis_runs")
 }
 
@@ -1307,6 +1313,8 @@ model FirebaseToken {
 
   user User @relation(fields: [userId], references: [id])
 
+  @@index([userId])
+
   @@map("firebase_tokens")
 }
 
@@ -1461,6 +1469,7 @@ model Subscription {
   invoices Invoice[]
 
   @@index([adminId])
+  @@index([planId])
   @@map("subscriptions")
 }
 
@@ -1607,5 +1616,7 @@ model ProjectInvitation {
   @@index([projectId, role, status])
   @@index([emailId])
   @@index([expiresAt])
+  @@index([invitedBy])
+  @@index([tenantId])
   @@map("project_invitations")
 }
