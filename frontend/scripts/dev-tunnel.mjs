@@ -22,7 +22,7 @@
  * from other machines on the network, which is most of the point of putting it
  * behind Cloudflare.
  */
-import { spawn, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -45,6 +45,9 @@ if (!existsSync(CLOUDFLARED)) {
   );
   process.exit(1);
 }
+
+/** The port the API's `npm run dev` binds; see backend/src/config. */
+const API_PORT = process.env.API_PORT || "3001";
 
 const children = [];
 let shuttingDown = false;
@@ -91,7 +94,7 @@ function waitForPort(port, host = "127.0.0.1", timeoutMs = 60_000) {
       const sock = createConnection({ port, host });
       const retry = () => {
         sock.destroy();
-        if (Date.now() > deadline) return done(false);
+        if (Date.now() >= deadline) return done(false);
         setTimeout(attempt, 500);
       };
       sock.once("connect", () => { sock.end(); done(true); });
@@ -100,6 +103,46 @@ function waitForPort(port, host = "127.0.0.1", timeoutMs = 60_000) {
     };
     attempt();
   });
+}
+
+// ── 0. Nothing else may already be on our ports ─────────────────────────────
+//
+// The usual way this fails: a previous `npm run dev` is still running in
+// another terminal. Without this check the second run gets a long way — the
+// containers come up, a NEW tunnel is created and announced — and only then
+// does Next die with EADDRINUSE. Worse, the banner in between lies: the port
+// check finds the OLD Next answering and probes the new tunnel before it is
+// routable, so it prints "fetch failed" against a tunnel that was never the
+// problem. Refuse up front, and say who is holding the port.
+//
+// The stale process is not killed here. It is not necessarily ours — port 3000
+// is every framework's default — and it is not this script's place to shoot
+// something another terminal is showing.
+for (const [port, what] of [[PORT, "Next"], [API_PORT, "the API"]]) {
+  if (await waitForPort(port, "127.0.0.1", 0)) {
+    console.error(
+      `Port ${port} is already in use, so ${what} cannot start.\n` +
+        `${holderOf(port)}` +
+        "Most likely a previous `npm run dev` is still running in another " +
+        "terminal — stop it there with Ctrl-C, or kill the process above, " +
+        "then run this again.",
+    );
+    process.exit(1);
+  }
+}
+
+/** Best-effort "who has this port" for the error message. Linux only; fine. */
+function holderOf(port) {
+  try {
+    const out = execFileSync("ss", ["-ltnpH", `sport = :${port}`], {
+      encoding: "utf8",
+      timeout: 2000,
+    });
+    const m = out.match(/users:\(\("([^"]+)",pid=(\d+)/);
+    return m ? `  held by: ${m[1]} (pid ${m[2]})\n` : "";
+  } catch {
+    return "";
+  }
 }
 
 // ── 1. Container services ───────────────────────────────────────────────────
@@ -157,7 +200,7 @@ children.push(tunnel);
 tunnel.on("exit", (code) => {
   if (!shuttingDown) {
     console.error(`cloudflared exited (${code}); stopping.`);
-    shutdown(code ?? 1);
+    shutdown(code || 1);
   }
 });
 
@@ -192,8 +235,10 @@ function onTunnelOutput(chunk) {
 
   next.on("exit", (code) => {
     if (!shuttingDown) {
+      // The npx wrapper reports 0 even when next-server died on EADDRINUSE,
+      // so an unplanned exit is a failure whatever the code says.
       console.error(`next exited (${code}); stopping the tunnel too.`);
-      shutdown(code ?? 1);
+      shutdown(code || 1);
     }
   });
 

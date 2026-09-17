@@ -21,9 +21,19 @@ const DIM = "\x1b[2m";
 const BOLD = "\x1b[1m";
 const RESET = "\x1b[0m";
 
-const OK = `${GREEN}●${RESET}`;
-const BAD = `${RED}●${RESET}`;
-const MEH = `${YELLOW}●${RESET}`;
+/**
+ * Status marks: a tick, a cross and a bang, each inside a circle.
+ *
+ * Those are Nerd Font glyphs (Font Awesome's check-circle, times-circle and
+ * exclamation-circle) in the Private Use Area, so they need a Nerd Font or
+ * FontAwesome in the terminal — which is what a p10k/Starship setup has. A
+ * terminal without one draws an empty box instead; SHM_STATUS_PLAIN=1 switches
+ * to the BMP characters every monospace font ships.
+ */
+const PLAIN = process.env.SHM_STATUS_PLAIN === "1";
+const OK = `${GREEN}${PLAIN ? "✔" : "\uf058"}${RESET}`;
+const BAD = `${RED}${PLAIN ? "✘" : "\uf057"}${RESET}`;
+const MEH = `${YELLOW}${PLAIN ? "!" : "\uf06a"}${RESET}`;
 
 /**
  * Next loads .env itself, but this runs before Next exists. Reading the two
@@ -48,6 +58,23 @@ async function probe(url, { timeout = 6000 } = {}) {
   } catch (err) {
     return { ok: false, error: err.name === "TimeoutError" ? "timeout" : err.message };
   }
+}
+
+/**
+ * A quick tunnel's hostname is handed out a few seconds BEFORE Cloudflare's
+ * edge will route it: in that window a request fails outright or gets a 530
+ * (error 1033, "tunnel not found"). Probing once at that moment reports a
+ * healthy tunnel as broken, so keep asking for a while before believing a
+ * failure. A success is believed immediately.
+ */
+async function probeSettled(url, { attempts = 8, delayMs = 1500 } = {}) {
+  let last;
+  for (let i = 0; i < attempts; i++) {
+    last = await probe(url);
+    if (last.ok) return last;
+    await new Promise((r) => setTimeout(r, delayMs));
+  }
+  return last;
 }
 
 /** Turns a host into the name a person would use for it. */
@@ -78,7 +105,7 @@ export async function printStatus({ url, port }) {
   const engineUrl = process.env.SHM_ENGINE_URL || "http://localhost:8000";
 
   const [tunnel, local, ready, engine] = await Promise.all([
-    probe(url),
+    probeSettled(url),
     probe(`http://127.0.0.1:${port}`),
     probe(`${apiOrigin}/ready`, { timeout: 8000 }),
     probe(`${engineUrl}/health`, { timeout: 4000 }),
