@@ -1222,7 +1222,14 @@ model Measurement {
   /// Declared explicitly because create_hypertable() also creates a `ts` index.
   /// Without it in the schema, every subsequent `prisma migrate diff` proposes
   /// dropping Timescale's own index.
-  @@index([ts])
+  ///
+  /// DESC, because that is the index create_hypertable() builds, and a fresh
+  /// Timescale database therefore has it DESC whatever a later CREATE INDEX IF
+  /// NOT EXISTS says. Declaring ASC made CI's drift check fail on every fresh
+  /// database while passing on older ones. Latest-first is also the order the
+  /// live views read in. The 20260917160000 migration brings every database
+  /// to this definition.
+  @@index([ts(sort: Desc)])
   @@index([sensorId, ts])
   @@index([tenantId, ts])
   @@index([structureId, ts])
