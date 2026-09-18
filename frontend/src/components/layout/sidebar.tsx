@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  FileInput,
   Building2,
   LayoutDashboard,
   ProjectorIcon as Projector,
@@ -49,6 +50,7 @@ const MENU_SECTION: Record<UserRole, { label: string; items: MenuItem[] }[]> = {
       label: "Fleet",
       items: [
         { href: "/gateways", label: "Gateways", icon: Server },
+        { href: "/gateways/ingestion", label: "Ingestion", icon: FileInput },
         { href: "/devices", label: "Devices", icon: Cpu },
         { href: "/sensors", label: "Sensors", icon: Gauge },
       ],
@@ -87,6 +89,7 @@ const MENU_SECTION: Record<UserRole, { label: string; items: MenuItem[] }[]> = {
       label: "Fleet",
       items: [
         { href: "/gateways", label: "Gateways", icon: Server },
+        { href: "/gateways/ingestion", label: "Ingestion", icon: FileInput },
         { href: "/devices", label: "Devices", icon: Cpu },
         { href: "/sensors", label: "Sensors", icon: Gauge },
       ],

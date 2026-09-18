@@ -92,6 +92,10 @@ export interface Project {
   deviceId: string | null;
   /** Resolved from the device row by the list endpoint; absent on some shapes. */
   deviceName?: string | null;
+  /** The Ackcio gateway this project owns, from the list endpoint. */
+  gatewayId?: number | null;
+  gatewayName?: string | null;
+  gatewayKey?: string | null;
   sensorId: string | null;
   createdAt: string;
   contractorId: number | null;
@@ -352,6 +356,11 @@ export interface Gateway {
   deviceCount: number;
   connectivity: GatewayConnectivity;
   secondsSinceLastSeen: number | null;
+  /** The project that owns this gateway, or null while it is available. */
+  projectName: string | null;
+  claimedAt: string | null;
+  /** Derived from the claim: whether a project could take this gateway. */
+  availability: "available" | "assigned" | "decommissioned";
   /** Whether a push URL has been issued. The token itself is never listed. */
   hasIngestToken: boolean;
   ingestTokenIssuedAt: string | null;
@@ -629,4 +638,38 @@ export interface AuditEntry {
 export interface AuditPage {
   items: AuditEntry[];
   nextCursor: number | null;
+}
+
+/** One file the FTP drop received, and what became of it. */
+export interface IngestionFile {
+  id: number;
+  tenantId: number | null;
+  gatewayId: number | null;
+  projectId: number | null;
+  gatewayKey: string | null;
+  nodeKey: string | null;
+  fileType: string;
+  fileName: string;
+  filePath: string;
+  sha256: string;
+  sizeBytes: number;
+  status: "received" | "processed" | "failed" | "unknown_gateway" | "duplicate";
+  rowsTotal: number;
+  rowsStored: number;
+  rowsDuplicate: number;
+  error: string | null;
+  receivedAt: string;
+  processedAt: string | null;
+}
+
+export interface IngestionFileList {
+  status_code: number;
+  message: string | null;
+  items: IngestionFile[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  /** Files from gateways nobody has registered. Platform operators only. */
+  unknownGatewayFiles: number;
 }

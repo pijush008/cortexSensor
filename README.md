@@ -168,12 +168,19 @@ the invitee visits.
   they hold no other project in that organization, created none, and are not
   its `ORGANIZATION_ADMIN`.
 
-**Devices.** A device is one physical cabinet, so it serves one live project at
-a time. `Device.deviceId` is the serial number and is unique. Choosing a device
-claims it (`isOngoing`) in the same transaction that creates the project;
-ending or deleting the project releases it. Only devices that are free and have
-sensors assigned are offered. A project's device can be changed only while the
-project is **Not Started**.
+**Gateways.** A project owns one Ackcio gateway, exclusively. `gateways.projectId`
+is unique in the database, so a second project cannot claim the same unit even
+if two people try at once: the claim is written in the same transaction as the
+project that makes it, and only free gateways are offered in the form. Ending or
+deleting the project releases the gateway. It can be swapped from the project
+page while the project is not collecting (Not Started or Paused), never while
+running. Every node behind the gateway, and every sensor on those nodes, is the
+project's data.
+
+**Devices.** The older arrangement, kept for projects that predate gateways: a
+device is one physical cabinet and serves one live project at a time. Choosing a
+device claims it (`isOngoing`) in the same transaction that creates the project;
+ending or deleting the project releases it.
 
 ---
 
@@ -219,7 +226,12 @@ PostgreSQL 15 with TimescaleDB, accessed through Prisma.
 - Migrations: `backend/prisma/migrations/` — apply with
   `npx prisma migrate deploy` (`migrate dev` needs a TTY and fails in the
   container).
-- `sensor_data` and `node_data` are hypertables.
+- `measurements` and `gateway_readings` are hypertables where TimescaleDB is
+  present (the local container), plain tables on Supabase.
+- Ackcio: `gateways` (one project each), `devices` are the nodes, `sensors`,
+  `gateway_readings` (every channel as sent), `measurements` (what charts and
+  alerts read), `node_data`, `node_network_data`, `gateway_heartbeats`, and
+  `ingestion_files` (the FTP ledger).
 - Seeds: `npm run prisma:seed`, plus `seed:demo-users` and `seed:demo-project`.
 
 The platform was migrated from a legacy MySQL system; that database remains the
@@ -336,6 +348,35 @@ Re-issuing the URL revokes the old one. Every push is acknowledged with 200
 once it parses, whatever is done with it, because the gateway retries anything
 else indefinitely; readings the server could not use are written to the log.
 
+**Over FTPS instead.** The gateway can also upload CSV files (the *ACKCIO Beam
+Gateway FTP Specification*). The VPS runs vsftpd with FTPS; the API container
+watches the drop directory and processes each file once:
+
+```
+Ackcio Gateway ──FTPS──► vsftpd ──► /srv/ftp/ackcio/incoming
+                                         │
+                       API container: FTP_INGEST_DIR=/ingest, scanned every 15 s
+                                         │
+                   parse SensorData_/NodeData_/NetworkData_/HeartbeatData_/ErrorSensorData_
+                                         │
+                       same ingest service as HTTP push ──► Supabase
+                                         │
+                   file moved to processed/<date>/, failed/ or unknown/
+```
+
+- Every file gets a row in `ingestion_files` with its outcome, row counts and
+  any error; the row's content hash makes a repeated upload a no-op, and rows
+  already stored by an earlier file (or an HTTP push) are skipped by the same
+  idempotency key.
+- A file from a gateway that is not registered is kept in `unknown/`, recorded
+  as *Unknown gateway*, and attached to nothing. The Ingestion page under
+  Gateways lists it with the gateway ID to register.
+- A file that cannot be parsed is kept in `failed/` with the reason.
+- The gateway writes local time. A header zone (`Date Time (UTC+08:00)`) is
+  honoured; otherwise `ACKCIO_CSV_UTC_OFFSET` is assumed.
+
+Set up the FTP server with `deploy/vsftpd/setup.sh`; see [Deployment](#deployment).
+
 What is stored: every channel of every push, as sent, in `gateway_readings`;
 the measurand channels also in `measurements`, with the gateway's `Reading` as
 the value and `RawReading` as the raw value, so alerts, the live stream and the
@@ -357,6 +398,37 @@ sensor, channel and timestamp.
    secrets rather than reusing development values.
 4. `npx prisma migrate deploy`, then seed roles and plans.
 5. Issue each device its own API key rather than sharing one fleet-wide.
+6. For Ackcio gateways uploading over FTPS, on the VPS as root:
+
+   ```bash
+   cd SHM
+   sudo ./deploy/vsftpd/setup.sh shm.example.com 203.0.113.10 'a-long-ftp-password'
+   ```
+
+   It installs vsftpd, creates the `ackcio` login jailed to
+   `/srv/ftp/ackcio`, reuses nginx's Let's Encrypt certificate for FTPS, opens
+   ports 21 and 40000–40100, and prints the settings to enter on the gateway.
+   `.env.prod` then needs `FTP_INGEST_DIR=/ingest` (the example file has it),
+   and the production compose file mounts the drop into the API container.
+
+### Checking each part works
+
+Run these from the `SHM` directory. The backend tests need the local Postgres
+and Redis containers: `docker compose up -d postgres redis`.
+
+| Part | Command | What passing means |
+|---|---|---|
+| Schema | `cd backend && npx prisma migrate deploy && npx prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --exit-code` | migrations applied, no drift |
+| Gateway ownership | `cd backend && npx vitest run test/project-gateway.test.ts` | one project per gateway, races refused, release on end |
+| HTTP push | `cd backend && npx vitest run test/ackcio-contract.test.ts test/ackcio-ingest.test.ts` | every spec payload stored, duplicates suppressed |
+| CSV parsing | `cd backend && npx vitest run test/ackcio-csv.test.ts` | every spec CSV example converts |
+| FTP drop | `cd backend && npx vitest run test/ftp-ingest.test.ts` | files stored, ledgered, moved; unknown gateways kept |
+| Everything | `cd backend && npx vitest run` | the whole suite |
+| Console | `cd frontend && npx tsc --noEmit && npx eslint src && npx next build` | typecheck, lint, production build |
+
+To try the drop by hand without vsftpd, point `FTP_INGEST_DIR` in `backend/.env`
+at any folder, start the API, copy a CSV into `<folder>/incoming/`, and watch
+the log line `FTP ingest: <file>: N stored`. Then open Gateways → Ingestion.
 
 ---
 

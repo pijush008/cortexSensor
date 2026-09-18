@@ -55,6 +55,24 @@ export const config = {
    * deployed hardware relies on the shared key.
    */
   allowLegacyIngestKey: process.env.ALLOW_LEGACY_INGEST_KEY !== "false",
+  /**
+   * FTP(S) drop for Ackcio CSV files.
+   *
+   * The directory vsftpd writes the gateway's uploads into, as this process
+   * sees it. Empty disables the watcher: the HTTP push endpoint needs no file
+   * system. Files are processed once they have sat unchanged for the settle
+   * time, so a half-uploaded file is never read.
+   */
+  ftpIngest: {
+    dir: process.env.FTP_INGEST_DIR || "",
+    intervalMs: Number(process.env.FTP_INGEST_INTERVAL_MS) || 15_000,
+    settleMs: Number(process.env.FTP_INGEST_SETTLE_MS) || 5_000,
+    /**
+     * The gateway writes LOCAL time with no zone unless the header carries
+     * one. This is the zone assumed when it does not, as "+05:30".
+     */
+    utcOffset: process.env.ACKCIO_CSV_UTC_OFFSET || "+05:30",
+  },
   /** The Python SHM engine (§74): spectral estimation lives out of process. */
   shmEngineUrl: process.env.SHM_ENGINE_URL || "http://localhost:8000",
   shmEngineGrpcUrl: process.env.SHM_ENGINE_GRPC_URL || "localhost:50051",

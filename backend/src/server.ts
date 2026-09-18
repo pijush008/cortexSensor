@@ -5,6 +5,7 @@ import { logger } from "./utils/logger";
 import { logStorageMode } from "./utils/object-storage";
 import { initEventBus } from "./modules/stream/event-bus";
 import { startAnalysisWorker } from "./modules/analysis/analysis.queue";
+import { startFtpIngest } from "./modules/ingestion/ingestion.service";
 
 async function main() {
   try {
@@ -18,6 +19,9 @@ async function main() {
     // Background analysis. In production this runs as its own `worker`
     // service; in development it runs here for convenience.
     startAnalysisWorker();
+
+    // The Ackcio FTP drop, when a directory is configured.
+    startFtpIngest();
 
     app.listen(config.port, () => {
       logger.info(`SHM API running on port ${config.port} [${config.nodeEnv}]`);

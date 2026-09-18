@@ -28,6 +28,7 @@ import structuresRoutes from "./modules/structures/structures.routes";
 import gatewaysRoutes from "./modules/gateways/gateways.routes";
 import streamRoutes from "./modules/stream/stream.routes";
 import ackcioIngestRoutes from "./modules/ackcio/ackcio.routes";
+import ingestionRoutes from "./modules/ingestion/ingestion.routes";
 import measurementsRoutes from "./modules/measurements/measurements.routes";
 import analysisRoutes from "./modules/analysis/analysis.routes";
 import alertsRoutes from "./modules/alerts/alerts.routes";
@@ -171,6 +172,7 @@ for (const base of API_MOUNTS) {
   app.use(base, meRoutes);
   app.use(base, platformRoutes);
   app.use(base, streamRoutes);
+  app.use(base, ingestionRoutes);
 }
 
 const deviceTypeHandler = async (req: express.Request, res: express.Response) => {

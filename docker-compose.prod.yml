@@ -48,6 +48,16 @@ services:
       # nothing at all.
       SHM_ENGINE_URL: "http://python-shm:8000"
       SHM_ENGINE_GRPC_URL: "python-shm:50051"
+      # The Ackcio FTP drop, as this container sees it (the bind mount below).
+      # Empty disables the watcher; the HTTP push endpoint needs no directory.
+      FTP_INGEST_DIR: "${FTP_INGEST_DIR:-/ingest}"
+    volumes:
+      # Where vsftpd writes the gateway's CSV uploads on the host
+      # (deploy/vsftpd/setup.sh creates it), mounted so the API can read
+      # incoming/ and move files to processed/, failed/ or unknown/. The
+      # container runs as uid 1000; setup.sh makes the directories writable by
+      # that group.
+      - "${FTP_DROP_DIR:-/srv/ftp/ackcio}:/ingest"
     depends_on:
       python-shm:
         condition: service_started
