@@ -84,7 +84,14 @@ export class RedisRateLimitStore implements Store {
         Math.floor((this.options?.windowMs ?? 60_000) / 1000),
       );
       const rkey = this.redisKey(key);
-      const totalHits = await redis.incr(rkey);
+
+      // One round trip, not two. This limiter runs on every request against a
+      // Redis that in production is a managed instance across the network, so
+      // each sequential command here is latency added to every API call. The
+      // count and the ttl read are independent, so they travel in one pipeline.
+      const replies = await redis.multi().incr(rkey).ttl(rkey).exec();
+      const totalHits = Number(replies?.[0]?.[1] ?? 0);
+      let ttl = Number(replies?.[1]?.[1] ?? -2);
 
       // The expiry is set whenever the key HAS none, not only when the counter
       // happens to be 1.
@@ -102,7 +109,6 @@ export class RedisRateLimitStore implements Store {
       // this read (the next request starts a fresh window). A POSITIVE ttl is
       // left alone: refreshing a live window on every request would slide it
       // forward indefinitely and it would never reset.
-      let ttl = await redis.ttl(rkey);
       if (ttl < 0) {
         await redis.expire(rkey, windowSecs);
         ttl = windowSecs;

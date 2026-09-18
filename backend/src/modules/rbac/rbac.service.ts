@@ -1,4 +1,4 @@
-import { MembershipStatus, RoleKey, TenantStatus } from "@prisma/client";
+import { MembershipStatus, Prisma, RoleKey, TenantStatus } from "@prisma/client";
 import prisma from "../../config/prisma";
 import { ROLE_GRANTS, type PermissionKey } from "./permission.catalog";
 
@@ -28,6 +28,45 @@ function grantsFor(role: RoleKey): Set<PermissionKey> {
 }
 
 /**
+ * Everything a request needs to know about its caller, in ONE query.
+ *
+ * The database is remote, so every query is a network round trip and
+ * sequential queries add up. Identifying the caller used to take five of
+ * them, spread over three middlewares that each looked the user up afresh:
+ * from a developer's machine that was several seconds per API call before the
+ * route had done anything. The memberships ride along with the user row here,
+ * and `authContextFromUser` turns the result into a context without touching
+ * the database again.
+ */
+export const SESSION_USER_SELECT = {
+  id: true,
+  userType: true,
+  parentId: true,
+  firstName: true,
+  lastName: true,
+  emailId: true,
+  status: true,
+  isDelete: true,
+  isPlatformAdmin: true,
+  memberships: {
+    select: {
+      id: true,
+      status: true,
+      tenantId: true,
+      role: { select: { key: true } },
+      tenant: { select: { status: true } },
+    },
+    orderBy: { id: "asc" as const },
+  },
+} satisfies Prisma.UserSelect;
+
+export type SessionUser = Prisma.UserGetPayload<{ select: typeof SESSION_USER_SELECT }>;
+
+export async function loadSessionUser(userId: number): Promise<SessionUser | null> {
+  return prisma.user.findUnique({ where: { id: userId }, select: SESSION_USER_SELECT });
+}
+
+/**
  * Builds the authorization context for a user.
  *
  * A suspended or closed tenant yields no tenant context, so a lapsed customer
@@ -35,11 +74,15 @@ function grantsFor(role: RoleKey): Set<PermissionKey> {
  * state itself.
  */
 export async function resolveAuthContext(userId: number): Promise<AuthContext> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, isPlatformAdmin: true },
-  });
+  return authContextFromUser(await loadSessionUser(userId), userId);
+}
 
+/**
+ * The context for an already-loaded session row. Pure: the one place the
+ * membership rules live, whether the row came from `loadSessionUser` or from
+ * the per-request cache the middlewares share.
+ */
+export function authContextFromUser(user: SessionUser | null, userId: number): AuthContext {
   if (!user) {
     return {
       userId,
@@ -64,15 +107,11 @@ export async function resolveAuthContext(userId: number): Promise<AuthContext> {
     };
   }
 
-  const membership = await prisma.membership.findFirst({
-    where: {
-      userId,
-      status: MembershipStatus.active,
-      tenant: { status: TenantStatus.active },
-    },
-    select: { tenantId: true, role: { select: { key: true } } },
-    orderBy: { id: "asc" },
-  });
+  // The first ACTIVE membership in an ACTIVE organization, in id order — the
+  // same row the previous query selected.
+  const membership = user.memberships.find(
+    (m) => m.status === MembershipStatus.active && m.tenant.status === TenantStatus.active,
+  );
 
   if (!membership) {
     // No ACTIVE membership. Two very different situations share this branch and
@@ -82,10 +121,7 @@ export async function resolveAuthContext(userId: number): Promise<AuthContext> {
     // or closed — keeps no permissions, exactly as before. Granting them the
     // directory would turn "your subscription ended" into "you may now browse
     // every other customer on the platform", which is the opposite of intended.
-    const belongsToSomeOrganization = await prisma.membership.findFirst({
-      where: { userId },
-      select: { id: true },
-    });
+    const belongsToSomeOrganization = user.memberships.length > 0;
     if (belongsToSomeOrganization) {
       return {
         userId,

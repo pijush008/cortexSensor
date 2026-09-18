@@ -9,7 +9,8 @@ import {
   IMPERSONATION_COOKIE,
   verifyImpersonationToken,
 } from "../modules/platform/impersonation.service";
-import { resolveAuthContext, type AuthContext } from "../modules/rbac/rbac.service";
+import { authContextFromUser, type AuthContext } from "../modules/rbac/rbac.service";
+import { getSessionUser } from "./session-cache";
 
 export interface AuthRequest extends Request {
   userId?: number;
@@ -101,19 +102,9 @@ export const authenticate = async (
     }
 
     if (req.userId) {
-      const user = await prisma.user.findUnique({
-        where: { id: req.userId },
-        select: {
-          id: true,
-          userType: true,
-          parentId: true,
-          firstName: true,
-          lastName: true,
-          emailId: true,
-          status: true,
-          isDelete: true,
-        },
-      });
+      // One query, shared with the directory-only guard that ran before this
+      // and carrying the memberships, so the context below needs no second.
+      const user = await getSessionUser(req, req.userId);
 
       if (!user) {
         throw new UnauthorizedError("User not found");
@@ -129,7 +120,7 @@ export const authenticate = async (
 
       // Authoritative tenant + permission context, resolved from membership.
       // Deliberately not taken from anything the client sent.
-      req.auth = await resolveAuthContext(user.id);
+      req.auth = authContextFromUser(user, user.id);
 
       req.user = {
         id: user.id,

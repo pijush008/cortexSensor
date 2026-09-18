@@ -109,3 +109,103 @@ describe("the Redis rate-limit store", () => {
     expect(second.totalHits).toBe(1);
   });
 });
+
+
+/**
+ * Round trips per increment.
+ *
+ * The limiter runs on EVERY request, against a Redis that in production is a
+ * managed instance over the network. Each command it sends sequentially is a
+ * full round trip added to every API call, so the count is part of the
+ * contract. Measured with a fake client that only counts, because the real
+ * one answers too fast locally for latency to show.
+ */
+describe("round trips per increment", () => {
+  interface FakeRedis {
+    roundTrips: number;
+    store: Map<string, { value: number; ttl: number }>;
+    incr(k: string): Promise<number>;
+    ttl(k: string): Promise<number>;
+    expire(k: string, s: number): Promise<number>;
+    get(k: string): Promise<string | null>;
+    del(k: string): Promise<number>;
+    multi(): { incr(k: string): unknown; ttl(k: string): unknown; exec(): Promise<Array<[Error | null, unknown]>> };
+  }
+
+  function fakeRedis(): FakeRedis {
+    const fake: FakeRedis = {
+      roundTrips: 0,
+      store: new Map(),
+      async incr(k) {
+        fake.roundTrips += 1;
+        const e = fake.store.get(k) ?? { value: 0, ttl: -1 };
+        e.value += 1;
+        fake.store.set(k, e);
+        return e.value;
+      },
+      async ttl(k) {
+        fake.roundTrips += 1;
+        return fake.store.get(k)?.ttl ?? -2;
+      },
+      async expire(k, s) {
+        fake.roundTrips += 1;
+        const e = fake.store.get(k);
+        if (!e) return 0;
+        e.ttl = s;
+        return 1;
+      },
+      async get(k) {
+        fake.roundTrips += 1;
+        const e = fake.store.get(k);
+        return e ? String(e.value) : null;
+      },
+      async del(k) {
+        fake.roundTrips += 1;
+        return fake.store.delete(k) ? 1 : 0;
+      },
+      multi() {
+        const queued: Array<() => Promise<unknown>> = [];
+        const chain = {
+          incr(k: string) {
+            queued.push(async () => {
+              const e = fake.store.get(k) ?? { value: 0, ttl: -1 };
+              e.value += 1;
+              fake.store.set(k, e);
+              return e.value;
+            });
+            return chain;
+          },
+          ttl(k: string) {
+            queued.push(async () => fake.store.get(k)?.ttl ?? -2);
+            return chain;
+          },
+          async exec() {
+            // One pipeline is one round trip, however many commands it carries.
+            fake.roundTrips += 1;
+            const out: Array<[Error | null, unknown]> = [];
+            for (const q of queued) out.push([null, await q()]);
+            return out;
+          },
+        };
+        return chain;
+      },
+    };
+    return fake;
+  }
+
+  test("a fresh window costs at most two round trips, an open one costs one", async () => {
+    const fake = fakeRedis();
+    const store = new RedisRateLimitStore("trips", fake as unknown as Redis);
+    store.init({ windowMs: 60_000 } as Options);
+
+    const first = await store.increment("client");
+    expect(first.totalHits).toBe(1);
+    // Count plus setting the window's expiry: the pipeline, then the repair.
+    expect(fake.roundTrips).toBeLessThanOrEqual(2);
+
+    fake.roundTrips = 0;
+    const second = await store.increment("client");
+    expect(second.totalHits).toBe(2);
+    expect(fake.roundTrips).toBe(1);
+  });
+});

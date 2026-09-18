@@ -1,10 +1,10 @@
-import prisma from "../config/prisma";
 import { AuthRequest } from "./auth";
 import { ForbiddenError } from "../utils/AppError";
 import { ACCESS_COOKIE } from "../utils/cookies";
 import { verifyAccessToken } from "../utils/jwt";
 import { IMPERSONATION_COOKIE, verifyImpersonationToken } from "../modules/platform/impersonation.service";
-import { resolveAuthContext } from "../modules/rbac/rbac.service";
+import { authContextFromUser } from "../modules/rbac/rbac.service";
+import { getSessionUser } from "./session-cache";
 
 /**
  * Confines an organization-less session to the project directory.
@@ -96,7 +96,9 @@ export const restrictDirectoryOnlySessions = async (
     }
     if (!userId) return next();
 
-    const ctx = await resolveAuthContext(userId);
+    // The same lookup `authenticate` will make next; loaded once and shared.
+    const user = await getSessionUser(req, userId);
+    const ctx = authContextFromUser(user, userId);
     if (ctx.isPlatformAdmin) return next();
     if (ctx.tenantId !== null) return next();
 
@@ -111,11 +113,7 @@ export const restrictDirectoryOnlySessions = async (
     // such an account would lock platform staff out of the platform, so the
     // elevated legacy roles are never treated as directory-only. An account an
     // administrator created deliberately is not a self-service sign-up.
-    const account = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { userType: true },
-    });
-    if (account?.userType !== "viewer") return next();
+    if (user?.userType !== "viewer") return next();
 
     const path = normalize(req.path);
     if (ALLOWED_ANY.some((p) => p.test(path))) return next();
