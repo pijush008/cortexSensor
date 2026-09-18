@@ -217,6 +217,9 @@ describe("Ackcio gateway push", () => {
       expect(device!.deviceName).toBe("VW-NODE-1");
       expect(device!.deviceTypeRecord.deviceType).toBe("BEAM-VW-S1");
       expect(device!.channelCount).toBe(3);
+      // Assigned to the admin who registered the gateway, so it appears in
+      // their Devices screen, which lists by assignedAdmin.
+      expect(device!.assignedAdmin).toBe(adminA.userId);
 
       const channels = await prisma.deviceChannel.findMany({
         where: { deviceId: String(device!.id) },
@@ -244,6 +247,18 @@ describe("Ackcio gateway push", () => {
       ]);
       expect(sensors.map((s) => s.unit)).toEqual(["µε", "C", "%"]);
       expect(sensors.every((s) => s.tenantId === adminA.tenantId)).toBe(true);
+      expect(sensors.every((s) => s.assignedAdmin === adminA.userId)).toBe(true);
+
+      // And the admin's own screens list them.
+      const deviceList = await request(app).get("/api/v1/device").set("Cookie", adminA.cookie);
+      expect(deviceList.status, JSON.stringify(deviceList.body)).toBe(200);
+      expect(
+        JSON.stringify(deviceList.body).includes("VW-NODE-1"),
+        "discovered device missing from the admin's device list",
+      ).toBe(true);
+      const sensorList = await request(app).get("/api/v1/sensor").set("Cookie", adminA.cookie);
+      expect(sensorList.status, JSON.stringify(sensorList.body)).toBe(200);
+      expect(JSON.stringify(sensorList.body)).toContain("SG2001 · Frequency");
 
       // The complete record.
       const readings = await prisma.gatewayReading.findMany({

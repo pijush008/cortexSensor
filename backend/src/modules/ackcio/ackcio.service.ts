@@ -45,6 +45,36 @@ export interface ResolvedGateway {
   gatewayKey: string;
 }
 
+/**
+ * Who a discovered device or sensor is assigned to.
+ *
+ * The Devices and Sensors screens list an organization admin's rows by
+ * `assignedAdmin`, so a row left unassigned exists in the database and on the
+ * gateway page but is invisible to the very administrator whose gateway
+ * produced it. The admin who registered the gateway is the natural owner;
+ * failing that (a gateway registered by a platform operator, or by someone
+ * who has since left), the organization's admin.
+ */
+async function ownerFor(gateway: ResolvedGateway): Promise<number | null> {
+  const row = await prisma.gateway.findUnique({
+    where: { id: gateway.id },
+    select: { createdBy: true },
+  });
+  if (row?.createdBy) {
+    const member = await prisma.membership.findFirst({
+      where: { userId: row.createdBy, tenantId: gateway.tenantId, status: "active" },
+      select: { userId: true },
+    });
+    if (member) return member.userId;
+  }
+  const orgAdmin = await prisma.membership.findFirst({
+    where: { tenantId: gateway.tenantId, status: "active", role: { key: "ORGANIZATION_ADMIN" } },
+    orderBy: { createdAt: "asc" },
+    select: { userId: true },
+  });
+  return orgAdmin?.userId ?? null;
+}
+
 export interface IngestSummary {
   type: string;
   /** Telemetries in the envelope. */
@@ -112,7 +142,14 @@ export function readingEventId(parts: {
 // ─── Discovery ───────────────────────────────────────────────────────────────
 
 type DeviceRow = Prisma.DeviceGetPayload<{
-  select: { id: true; tenantId: true; deviceName: true; assignSensor: true; channelCount: true };
+  select: {
+    id: true;
+    tenantId: true;
+    deviceName: true;
+    assignSensor: true;
+    channelCount: true;
+    assignedAdmin: true;
+  };
 }>;
 
 const DEVICE_SELECT = {
@@ -121,6 +158,7 @@ const DEVICE_SELECT = {
   deviceName: true,
   assignSensor: true,
   channelCount: true,
+  assignedAdmin: true,
 } as const;
 
 async function deviceTypeIdFor(name: string | undefined): Promise<number> {
@@ -153,6 +191,7 @@ async function resolveNode(
   nodeType: string | undefined,
   seenAt: Date,
   cache: Map<string, DeviceRow>,
+  owner: number | null,
 ): Promise<DeviceRow> {
   const cached = cache.get(nodeKey);
   if (cached) return cached;
@@ -203,6 +242,8 @@ async function resolveNode(
         deviceId: serial.slice(0, 255),
         deviceName: ((nodeName ?? "").trim() || nodeKey).slice(0, 255),
         deviceType: await deviceTypeIdFor(nodeType),
+        assignedAdmin: owner,
+        addedBy: owner ?? 0,
         channelCount: 0,
         deviceStatus: "active",
         lifecycle: "active",
@@ -221,7 +262,13 @@ async function resolveNode(
   } else {
     await prisma.device.update({
       where: { id: device.id },
-      data: { updateHeartBeat: seenAt, lifecycle: "active" },
+      data: {
+        updateHeartBeat: seenAt,
+        lifecycle: "active",
+        // A device discovered before an owner could be found is claimed the
+        // first time one can be; an existing assignment is never overridden.
+        assignedAdmin: device.assignedAdmin === null && owner !== null ? owner : undefined,
+      },
     });
   }
 
@@ -270,6 +317,7 @@ async function resolveChannelSensor(
   channelId: number,
   sensorIndex: number,
   seenAt: Date,
+  owner: number | null,
 ): Promise<number> {
   const channelNumber = channelNumberFor(sensorIndex, channelId);
 
@@ -297,6 +345,7 @@ async function resolveChannelSensor(
       tenantId: gateway.tenantId,
       sensorName,
       sensorTypeID: await sensorTypeIdFor(entry.typeName, unit),
+      assignedAdmin: owner,
       calibrationValue: "1",
       unit: unit.slice(0, 32),
       status: "one",
@@ -365,6 +414,7 @@ async function handleSensorData(
 ): Promise<void> {
   const receivedAt = new Date();
   const nodes = new Map<string, DeviceRow>();
+  const owner = await ownerFor(gateway);
   const readingRows: Prisma.GatewayReadingCreateManyInput[] = [];
   /** Measurement readings grouped by the device they belong to. */
   const perDevice = new Map<number, RawReading[]>();
@@ -387,7 +437,7 @@ async function handleSensorData(
     }
 
     const ts = epochToDate(t.Timestamp);
-    const device = await resolveNode(gateway, t.DeviceId, t.DeviceName, t.DeviceType, receivedAt, nodes);
+    const device = await resolveNode(gateway, t.DeviceId, t.DeviceName, t.DeviceType, receivedAt, nodes, owner);
     const sensorIndex = t.Sensor.SensorId ?? 0;
 
     if (!projectByDevice.has(device.id)) {
@@ -402,7 +452,7 @@ async function handleSensorData(
     for (let i = 0; i < t.Sensor.Channels.length; i++) {
       const channel = t.Sensor.Channels[i];
       const channelId = channel.ChannelId ?? i;
-      const sensorId = await resolveChannelSensor(gateway, device, t, channel, channelId, sensorIndex, ts);
+      const sensorId = await resolveChannelSensor(gateway, device, t, channel, channelId, sensorIndex, ts, owner);
       const eventId = readingEventId({
         gatewayKey: gateway.gatewayKey,
         nodeKey: t.DeviceId,
@@ -536,6 +586,7 @@ async function handleNodeData(
 ): Promise<void> {
   const receivedAt = new Date();
   const nodes = new Map<string, DeviceRow>();
+  const owner = await ownerFor(gateway);
   const rows: Prisma.NodeDataCreateManyInput[] = [];
 
   for (const item of items) {
@@ -551,7 +602,7 @@ async function handleNodeData(
       summary.notes.push(`node report for gateway ${t.GatewayDeviceId} skipped`);
       continue;
     }
-    await resolveNode(gateway, t.DeviceId, t.DeviceName, t.DeviceType, receivedAt, nodes);
+    await resolveNode(gateway, t.DeviceId, t.DeviceName, t.DeviceType, receivedAt, nodes, owner);
 
     // The node_data columns for environment are NOT NULL, and writing 0 for a
     // figure the node did not send would invent a reading. The spec says a
@@ -590,6 +641,7 @@ async function handleNetworkData(
 ): Promise<void> {
   const receivedAt = new Date();
   const nodes = new Map<string, DeviceRow>();
+  const owner = await ownerFor(gateway);
   const rows: Prisma.NodeNetworkDataCreateManyInput[] = [];
 
   for (const item of items) {
@@ -605,7 +657,7 @@ async function handleNetworkData(
       summary.notes.push(`link report for gateway ${t.GatewayDeviceId} skipped`);
       continue;
     }
-    const device = await resolveNode(gateway, t.DeviceId, t.DeviceName, t.DeviceType, receivedAt, nodes);
+    const device = await resolveNode(gateway, t.DeviceId, t.DeviceName, t.DeviceType, receivedAt, nodes, owner);
     rows.push({
       ts: epochToDate(t.Timestamp),
       tenantId: gateway.tenantId,
