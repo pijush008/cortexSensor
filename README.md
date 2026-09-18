@@ -85,6 +85,10 @@ Both go through the same validation, tenant scoping, calibration, channel
 gating and `eventId` de-duplication, which is why devices ingest through the
 API rather than writing to the database directly.
 
+Ackcio Beam gateways have their own endpoint, `POST /api/v1/ingest/ackcio/<token>`,
+which speaks the gateway's HTTP(S) API Push format directly. See
+[Ackcio gateways](#ackcio-gateways).
+
 An MQTT path existed previously, with a Mosquitto broker, gateway subscribers
 and ESP32 firmware that published to it. All of it was removed; new device
 code targets the two endpoints above directly.
@@ -308,6 +312,38 @@ code that replaces them is kept with the hardware project.
 
 Whatever sends the readings should buffer them locally, so that a dropped link
 backfills when it returns rather than losing the window.
+
+### Ackcio gateways
+
+An Ackcio Beam gateway pushes readings as JSON over HTTPS in the format of the
+*ACKCIO Beam Gateway API Specification*: one POST per sensor per sample, plus
+hourly node health, mesh link and gateway heartbeat payloads. The gateway
+authenticates by URL alone, so the secret is part of the address.
+
+**Bring-up.**
+
+1. Register the gateway in the console (Gateways → register) with the
+   `GatewayDeviceId` printed on the unit, e.g. `F01E`.
+2. Open the gateway and issue its **push URL**. It is shown once. Copy it into
+   the gateway's own dashboard under HTTP(S) API Push.
+3. That is all. Nodes and their sensors are created the first time they report,
+   named from the node name, sensor code and channel type configured on the
+   gateway, and appear on the gateway page and under Devices and Sensors.
+   Rename them there if you want; the mapping is kept on the device's channels
+   as `<SensorId>.<ChannelId>`.
+
+Re-issuing the URL revokes the old one. Every push is acknowledged with 200
+once it parses, whatever is done with it, because the gateway retries anything
+else indefinitely; readings the server could not use are written to the log.
+
+What is stored: every channel of every push, as sent, in `gateway_readings`;
+the measurand channels also in `measurements`, with the gateway's `Reading` as
+the value and `RawReading` as the raw value, so alerts, the live stream and the
+charts treat them like any other reading; node health in `node_data` (battery
+in millivolts), mesh links in `node_network_data`, heartbeats in
+`gateway_heartbeats`. A channel the gateway flagged as `error` is kept and
+carries `OUT_OF_RANGE`. Retried pushes are de-duplicated on gateway, node,
+sensor, channel and timestamp.
 
 ---
 

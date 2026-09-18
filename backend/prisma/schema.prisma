@@ -498,6 +498,16 @@ model Gateway {
   /// Store-and-forward depth reported by the edge buffer (§12).
   bufferedCount Int?
 
+  /// SHA-256 of the token embedded in this gateway's push URL.
+  ///
+  /// An Ackcio gateway authenticates by URL alone: its dashboard takes an
+  /// address to POST to and nothing else, so the secret has to travel in the
+  /// path. Only the hash is stored; the token is shown once, at issue, and
+  /// re-issuing replaces it, which is how a leaked URL is revoked.
+  ingestTokenHash       String?   @unique @db.VarChar(128)
+  ingestTokenIssuedAt   DateTime?
+  ingestTokenLastUsedAt DateTime?
+
   createdAt DateTime @default(now())
   createdBy Int?
   updatedAt DateTime @updatedAt
@@ -1261,7 +1271,12 @@ model SensorData {
 
 model NodeData {
   id              Int      @id @default(autoincrement())
+  /// Battery as a PERCENTAGE, which is what the ESP32 firmware reports.
   battery         Int?
+  /// Battery in MILLIVOLTS, which is what an Ackcio node reports. Kept in its
+  /// own column rather than squeezed into `battery`: 3888 mV shown as 3888 %
+  /// is the kind of wrong number this console must never draw.
+  batteryMillivolts Int?
   temperature     Float    @db.Real()
   humidity        Float    @db.Real()
   pressure        Float    @db.Real()
@@ -1274,6 +1289,128 @@ model NodeData {
   deviceUpdatedAt DateTime
 
   @@map("node_data")
+}
+
+// ─── GATEWAY TELEMETRY (Ackcio Beam) ─────────────────────────────────────────
+// The complete record of what an Ackcio gateway pushed, channel by channel.
+//
+// `measurements` holds the number the platform acts on. This holds EVERYTHING
+// the gateway said about that number — the sensor's code and group, the
+// channel type, the engineering reading AND the raw one, both unit strings,
+// and the gateway's own valid/error verdict — so nothing in the push is lost
+// and a reading on a chart can be traced back to the exact payload. Same key
+// shape as measurements so it can be partitioned the same way.
+
+model GatewayReading {
+  id BigInt   @default(autoincrement())
+  /// Node-reported capture time (Ackcio `Timestamp`), UTC.
+  ts DateTime @db.Timestamptz()
+
+  tenantId  Int
+  gatewayId Int
+  /// The platform Device row this node was resolved to.
+  deviceId  Int?
+  /// The platform Sensor row this channel was resolved to.
+  sensorId  Int?
+
+  /// Identifiers exactly as the gateway sent them.
+  gatewayKey  String  @db.VarChar(128)
+  nodeKey     String  @db.VarChar(64)
+  nodeName    String? @db.VarChar(255)
+  nodeType    String? @db.VarChar(64)
+  projectName String? @db.VarChar(255)
+
+  /// Ackcio `SensorId`: the sensor's position on the node or in a chain.
+  sensorIndex Int
+  code        String? @db.VarChar(255)
+  group       String? @db.VarChar(255)
+  sensorType  String? @db.VarChar(120)
+  address     String? @db.VarChar(64)
+
+  channelId      Int
+  channelType    String? @db.VarChar(64)
+  rawChannelType String? @db.VarChar(64)
+
+  /// `Reading`: after the formula configured on the gateway. Null when the
+  /// gateway sent something that is not a number.
+  reading    Float?  @db.DoublePrecision
+  /// `RawReading`: straight from the transducer.
+  rawReading Float?  @db.DoublePrecision
+  unit       String? @db.VarChar(64)
+  rawUnit    String? @db.VarChar(64)
+  /// The gateway's verdict: "valid", "error", or operator-defined text.
+  description String? @db.VarChar(255)
+  /// True when the payload type was ErrorSensorData.
+  isError Boolean @default(false)
+
+  /// Derived from gateway, node, sensor, channel and timestamp, so a retried
+  /// push (§7 of the spec) is stored once.
+  eventId    String   @db.VarChar(96)
+  ingestedAt DateTime @default(now()) @db.Timestamptz()
+
+  @@id([ts, id])
+  @@unique([eventId, ts])
+  /// Declared for the same reason as on `measurements`: create_hypertable()
+  /// builds this DESC index itself, and an undeclared index reads as drift.
+  @@index([ts(sort: Desc)])
+  @@index([gatewayId, ts(sort: Desc)])
+  @@index([deviceId, ts(sort: Desc)])
+  @@index([sensorId, ts(sort: Desc)])
+  @@index([tenantId, ts])
+  @@map("gateway_readings")
+}
+
+/// Ackcio NetworkData: one row per report of a node's mesh link.
+model NodeNetworkData {
+  id Int      @id @default(autoincrement())
+  ts DateTime @db.Timestamptz()
+
+  tenantId  Int
+  gatewayId Int
+  deviceId  Int?
+
+  gatewayKey String  @db.VarChar(128)
+  nodeKey    String  @db.VarChar(64)
+  /// The node or gateway this node routes through.
+  parentKey  String? @db.VarChar(64)
+  /// Link quality, percent.
+  etx        Int?
+  /// Signal strength, dBm.
+  rssi       Int?
+
+  ingestedAt DateTime @default(now()) @db.Timestamptz()
+
+  @@index([gatewayId, ts(sort: Desc)])
+  @@index([deviceId, ts(sort: Desc)])
+  @@map("node_network_data")
+}
+
+/// Ackcio HeartbeatData: the gateway's own health, hourly.
+model GatewayHeartbeat {
+  id Int      @id @default(autoincrement())
+  ts DateTime @db.Timestamptz()
+
+  tenantId   Int
+  gatewayId  Int
+  gatewayKey String @db.VarChar(128)
+
+  /// The free-text SD card summary, e.g. "11.4GB free / 14.5GB total ( 18.0% )".
+  disk           String? @db.VarChar(255)
+  diskUsed       Float?
+  diskSpace      Float?
+  powerInVolts   Float?
+  powerInCurrent Float?
+  temperature    Float?
+  humidity       Float?
+  pressure       Float?
+  /// Cumulative traffic this month, kB.
+  dataUsage      Float?
+  internetMode   String? @db.VarChar(32)
+
+  ingestedAt DateTime @default(now()) @db.Timestamptz()
+
+  @@index([gatewayId, ts(sort: Desc)])
+  @@map("gateway_heartbeats")
 }
 
 // ─── NOTIFICATIONS ───────────────────────────────────────────────────────────

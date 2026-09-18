@@ -98,6 +98,33 @@ function batteryTone(pct: number | null): "green" | "yellow" | "red" | "slate" {
   return "green";
 }
 
+/**
+ * An Ackcio node reports its battery in millivolts, not as a percentage. A
+ * two-cell lithium pack reads about 3.3 V empty and 4.2 V full; the bar is
+ * drawn on that span so the two kinds of node sit on one scale, and the label
+ * still says "3888 mV" because that is the figure the node actually sent.
+ */
+const MV_EMPTY = 3300;
+const MV_FULL = 4200;
+
+function batteryPercentOf(n: NodeData): number | null {
+  if (n.battery != null) return n.battery;
+  if (n.batteryMillivolts != null) {
+    return Math.round(
+      (Math.max(MV_EMPTY, Math.min(MV_FULL, n.batteryMillivolts)) - MV_EMPTY) /
+        (MV_FULL - MV_EMPTY) *
+        100,
+    );
+  }
+  return null;
+}
+
+function batteryLabelOf(n: NodeData): string {
+  if (n.battery != null) return `${n.battery}%`;
+  if (n.batteryMillivolts != null) return `${n.batteryMillivolts} mV`;
+  return "\u2014";
+}
+
 const BATTERY_BAR: Record<string, string> = {
   green: "var(--color-shm-green)",
   yellow: "var(--color-shm-yellow)",
@@ -311,7 +338,8 @@ export default function DashboardPage() {
                             {latestPerGateway(readings)
                               .slice(0, 6)
                               .map((n) => {
-                                const tone = batteryTone(n.battery);
+                                const pct = batteryPercentOf(n);
+                                const tone = batteryTone(pct);
                                 return (
                                   <li
                                     key={n.id}
@@ -333,7 +361,7 @@ export default function DashboardPage() {
                                         <div
                                           className="h-full rounded-full transition-all duration-700"
                                           style={{
-                                            width: `${Math.max(0, Math.min(100, n.battery ?? 0))}%`,
+                                            width: `${Math.max(0, Math.min(100, pct ?? 0))}%`,
                                             background: BATTERY_BAR[tone],
                                           }}
                                         />
@@ -344,7 +372,7 @@ export default function DashboardPage() {
                                         className="h-3.5 w-3.5"
                                         strokeWidth={1.75}
                                       />
-                                      {n.battery == null ? "—" : `${n.battery}%`}
+                                      {batteryLabelOf(n)}
                                     </span>
                                   </li>
                                 );

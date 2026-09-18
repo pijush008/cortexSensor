@@ -26,6 +26,22 @@ router.get(
   requirePermission("GATEWAY_VIEW"),
   controller.detail,
 );
+// What the gateway's nodes are reporting right now.
+router.get(
+  "/gateways/:id/telemetry",
+  authenticate,
+  requireTenant,
+  requirePermission("GATEWAY_VIEW"),
+  controller.telemetry,
+);
+// Minting the URL a gateway pushes to is a provisioning act.
+router.post(
+  "/gateways/:id/ingest-token",
+  authenticate,
+  requireTenant,
+  requirePermission("GATEWAY_PROVISION"),
+  controller.issueIngestToken,
+);
 router.patch(
   "/gateways/:id",
   authenticate,

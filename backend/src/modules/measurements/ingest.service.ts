@@ -3,7 +3,7 @@ import prisma from "../../config/prisma";
 import { logger } from "../../utils/logger";
 import { publishEvent } from "../stream/event-bus";
 import { evaluateReadings } from "../alerts/alerts.service";
-import { assessQuality, type QualityFlag } from "./quality";
+import { assessQuality } from "./quality";
 
 /**
  * Measurement ingestion.
@@ -30,9 +30,26 @@ export interface RawReading {
   ts: Date;
   /** Uncalibrated reading as sent by the device. */
   rawValue: number;
+  /**
+   * An engineering value the EDGE already computed, stored as `value` as-is
+   * instead of `calibration × rawValue`.
+   *
+   * An Ackcio gateway applies the formula its operator configured and sends
+   * both the result (`Reading`) and the transducer output (`RawReading`).
+   * Re-multiplying the raw figure here would apply a second, unrelated
+   * coefficient to a number that was already in microstrain. Omit for
+   * hardware that sends raw readings only.
+   */
+  value?: number | null;
   sequenceNumber?: bigint | null;
   /** Device-generated idempotency key. */
   eventId?: string | null;
+  /**
+   * Quality findings the sender established itself, merged with the ones
+   * assessed here. The gateway's "error" verdict on a channel becomes
+   * OUT_OF_RANGE on the stored row rather than a reason to discard it.
+   */
+  extraFlags?: readonly string[];
 }
 
 export interface IngestContext {
@@ -183,12 +200,15 @@ export async function ingestMeasurements(
     const sensorCtx = contexts.get(reading.sensorId);
     if (!sensorCtx) continue;
 
-    const calibrated = sensorCtx.calibrationValue * reading.rawValue;
+    const calibrated =
+      reading.value !== undefined && reading.value !== null
+        ? reading.value
+        : sensorCtx.calibrationValue * reading.rawValue;
     // A non-finite result is stored as a null value carrying NOT_FINITE.
     // Substituting 0 would fabricate a reading that never happened.
     const value = Number.isFinite(calibrated) ? calibrated : null;
 
-    const flags: QualityFlag[] = assessQuality({
+    const assessed: string[] = assessQuality({
       value: calibrated,
       rawValue: reading.rawValue,
       ts: reading.ts,
@@ -202,6 +222,9 @@ export async function ingestMeasurements(
       hasCalibration: sensorCtx.hasCalibration,
       calibrationValidUntil: sensorCtx.calibrationValidUntil,
     });
+    const flags: string[] = [
+      ...new Set([...assessed, ...(reading.extraFlags ?? [])]),
+    ];
 
     for (const flag of flags) {
       result.flagCounts[flag] = (result.flagCounts[flag] ?? 0) + 1;

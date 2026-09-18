@@ -1,7 +1,9 @@
 import { randomBytes } from "crypto";
 import { GatewayStatus, Prisma } from "@prisma/client";
 import prisma from "../../config/prisma";
+import { config } from "../../config";
 import { BadRequestError, NotFoundError } from "../../utils/AppError";
+import { hashIngestToken } from "../ackcio/ackcio.auth";
 import { tenantScope, type AuthContext } from "../rbac/rbac.service";
 import type {
   CreateGatewayInput,
@@ -74,9 +76,51 @@ function serialize(row: GatewayRow) {
     deviceCount: row._count.devices,
     connectivity: connectivity.state,
     secondsSinceLastSeen: connectivity.secondsSinceLastSeen,
+    // Whether a push URL has been issued, and when it last authenticated a
+    // push. The token itself is never in a response after the one that issued it.
+    hasIngestToken: row.ingestTokenHash !== null,
+    ingestTokenIssuedAt: row.ingestTokenIssuedAt,
+    ingestTokenLastUsedAt: row.ingestTokenLastUsedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
+}
+
+/** The address an Ackcio gateway is configured to POST to. */
+export function ingestUrlFor(token: string): string {
+  return `${config.appUrl.replace(/\/+$/, "")}/api/v1/ingest/ackcio/${token}`;
+}
+
+/**
+ * Issues the gateway's push URL, replacing any earlier one.
+ *
+ * The token is returned exactly once. Re-issuing is also revocation: the old
+ * hash is overwritten, so a URL that leaked from a gateway's configuration
+ * page stops working the moment a new one is minted, without touching any
+ * other gateway or any device credential.
+ */
+export async function issueIngestToken(ctx: AuthContext, id: number) {
+  const existing = await prisma.gateway.findFirst({
+    where: { id, ...tenantScope(ctx) },
+    select: { id: true, status: true },
+  });
+  if (!existing) throw new NotFoundError("Gateway not found");
+  if (existing.status === GatewayStatus.decommissioned) {
+    throw new BadRequestError("A decommissioned gateway cannot be issued a push URL");
+  }
+
+  const token = randomBytes(32).toString("base64url");
+  const issuedAt = new Date();
+  await prisma.gateway.update({
+    where: { id },
+    data: {
+      ingestTokenHash: hashIngestToken(token),
+      ingestTokenIssuedAt: issuedAt,
+      ingestTokenLastUsedAt: null,
+    },
+  });
+
+  return { token, url: ingestUrlFor(token), issuedAt };
 }
 
 export async function listGateways(ctx: AuthContext, query: ListGatewaysQuery) {

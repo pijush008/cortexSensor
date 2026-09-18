@@ -27,6 +27,7 @@ import subscriptionRoutes from "./modules/subscription/subscription.routes";
 import structuresRoutes from "./modules/structures/structures.routes";
 import gatewaysRoutes from "./modules/gateways/gateways.routes";
 import streamRoutes from "./modules/stream/stream.routes";
+import ackcioIngestRoutes from "./modules/ackcio/ackcio.routes";
 import measurementsRoutes from "./modules/measurements/measurements.routes";
 import analysisRoutes from "./modules/analysis/analysis.routes";
 import alertsRoutes from "./modules/alerts/alerts.routes";
@@ -86,6 +87,15 @@ app.use(healthRoutes);
 // Mounted here, still ahead of the rate limiter, for the same reason.
 app.use("/api", healthRoutes);
 app.use("/api/v1", healthRoutes);
+
+// Gateway ingest sits ahead of the global limiter for the same reason the
+// probes do: that budget is sized for a person at a browser, and a gateway
+// posting one request per sensor per sample would exhaust it in minutes and
+// then retry against the refusal for ever. The router carries its own, much
+// larger, limit and its own JSON parser.
+for (const base of ["/api/v1", "/api"]) {
+  app.use(base, ackcioIngestRoutes);
+}
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,

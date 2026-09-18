@@ -136,7 +136,10 @@ export interface ReportSensorData {
 
 export interface NodeData {
   id: number;
+  /** Percent, from the ESP32 firmware. Null for an Ackcio node. */
   battery: number | null;
+  /** Millivolts, from an Ackcio node. Null for the ESP32 firmware. */
+  batteryMillivolts: number | null;
   temperature: number;
   humidity: number;
   pressure: number;
@@ -349,8 +352,99 @@ export interface Gateway {
   deviceCount: number;
   connectivity: GatewayConnectivity;
   secondsSinceLastSeen: number | null;
+  /** Whether a push URL has been issued. The token itself is never listed. */
+  hasIngestToken: boolean;
+  ingestTokenIssuedAt: string | null;
+  ingestTokenLastUsedAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** The push URL, returned exactly once when it is issued. */
+export interface IssuedIngestToken {
+  token: string;
+  url: string;
+  issuedAt: string;
+}
+
+/** One channel of one sensor on a node, as the gateway last reported it. */
+export interface GatewayChannelSnapshot {
+  sensorIndex: number;
+  channelId: number;
+  channelNumber: string;
+  code: string | null;
+  group: string | null;
+  sensorType: string | null;
+  channelType: string | null;
+  address: string | null;
+  sensorId: number | null;
+  sensorName: string | null;
+  platformType: string | null;
+  reading: number | null;
+  rawReading: number | null;
+  unit: string | null;
+  rawUnit: string | null;
+  description: string | null;
+  isError: boolean;
+  ts: string;
+}
+
+export interface GatewayNodeSnapshot {
+  device: {
+    id: number;
+    nodeKey: string | null;
+    name: string;
+    type: string | null;
+    lifecycle: string;
+    lastSeenAt: string | null;
+  };
+  /** Null until the node has sent a health report. */
+  health: {
+    ts: string;
+    batteryMillivolts: number | null;
+    batteryPercent: number | null;
+    temperature: number;
+    humidity: number;
+    pressure: number;
+  } | null;
+  /** Null until the node has sent a link report. */
+  link: {
+    ts: string;
+    parentKey: string | null;
+    etx: number | null;
+    rssi: number | null;
+  } | null;
+  channels: GatewayChannelSnapshot[];
+}
+
+export interface GatewayTelemetry {
+  gateway: {
+    id: number;
+    name: string;
+    gatewayKey: string;
+    status: GatewayStatus;
+    connectivity: GatewayConnectivity;
+    secondsSinceLastSeen: number | null;
+    lastSeenAt: string | null;
+    hasIngestToken: boolean;
+    ingestTokenIssuedAt: string | null;
+    ingestTokenLastUsedAt: string | null;
+  };
+  /** Null until the gateway has sent a heartbeat. */
+  heartbeat: {
+    ts: string;
+    disk: string | null;
+    diskUsed: number | null;
+    diskSpace: number | null;
+    powerInVolts: number | null;
+    powerInCurrent: number | null;
+    temperature: number | null;
+    humidity: number | null;
+    pressure: number | null;
+    dataUsage: number | null;
+    internetMode: string | null;
+  } | null;
+  nodes: GatewayNodeSnapshot[];
 }
 
 export interface GatewayListResponse {

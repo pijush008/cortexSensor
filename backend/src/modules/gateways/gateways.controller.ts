@@ -5,6 +5,7 @@ import { auditLogger } from "../../utils/audit";
 import prisma from "../../config/prisma";
 import { tenantScope } from "../rbac/rbac.service";
 import * as service from "./gateways.service";
+import { getGatewayTelemetry } from "../ackcio/telemetry.service";
 import * as credentials from "../devices/device-credentials.service";
 import {
   createGatewaySchema,
@@ -53,6 +54,37 @@ export async function detail(req: AuthRequest, res: Response) {
   try {
     const data = await service.getGateway(ctxOf(req), Number(req.params.id));
     return res.status(200).json({ status_code: 200, message: null, data });
+  } catch (error) {
+    return fail(res, error);
+  }
+}
+
+export async function telemetry(req: AuthRequest, res: Response) {
+  try {
+    const data = await getGatewayTelemetry(ctxOf(req), Number(req.params.id));
+    return res.status(200).json({ status_code: 200, message: null, data });
+  } catch (error) {
+    return fail(res, error);
+  }
+}
+
+export async function issueIngestToken(req: AuthRequest, res: Response) {
+  try {
+    const ctx = ctxOf(req);
+    const id = Number(req.params.id);
+    const data = await service.issueIngestToken(ctx, id);
+    const { ipAddress, userAgent } = auditLogger.requestContext(req);
+    await auditLogger.audit({
+      userId: ctx.userId,
+      action: "update",
+      entity: "gateway",
+      entityId: id,
+      // The token is deliberately NOT in the audit row.
+      newValue: { ingestTokenIssuedAt: data.issuedAt },
+      ipAddress,
+      userAgent,
+    });
+    return res.status(201).json({ status_code: 201, message: null, data });
   } catch (error) {
     return fail(res, error);
   }
