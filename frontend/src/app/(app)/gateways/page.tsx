@@ -116,12 +116,13 @@ export default function GatewaysPage() {
       >
         {(data) => (
           <div className="overflow-x-auto rounded-xl border border-slate-200/90 bg-white">
-            <table className="w-full min-w-[880px] border-collapse text-sm">
+            <table className="w-full min-w-[1040px] border-collapse text-sm">
               <caption className="sr-only">Registered edge gateways</caption>
               <thead>
                 <tr className="border-b border-slate-200 text-left">
                   <Th>Gateway ID</Th>
                   <Th>Name</Th>
+                  <Th>Assignment</Th>
                   <Th>Hardware</Th>
                   <Th>Firmware</Th>
                   <Th className="text-right">Devices</Th>
@@ -152,6 +153,28 @@ export default function GatewaysPage() {
                       </Link>
                     </td>
                     <td className="px-4 py-3 text-slate-700">{g.name}</td>
+                    <td className="px-4 py-3">
+                      {/* Which project holds it, or that none does. "Available"
+                          is a fact about the claim, not a guess. */}
+                      {g.availability === "assigned" ? (
+                        <span className="inline-flex items-center gap-2">
+                          <StatusBadge label="Assigned" tone="blue" />
+                          {g.projectId !== null ? (
+                            <Link
+                              href={`/projects/${g.projectId}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-slate-700 underline-offset-2 hover:underline"
+                            >
+                              {g.projectName ?? `Project ${g.projectId}`}
+                            </Link>
+                          ) : null}
+                        </span>
+                      ) : g.availability === "decommissioned" ? (
+                        <StatusBadge label="Decommissioned" tone="slate" />
+                      ) : (
+                        <StatusBadge label="Available" tone="green" />
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-slate-500">
                       {g.hardwareModel ?? "—"}
                     </td>

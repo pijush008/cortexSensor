@@ -11,6 +11,12 @@ export const projectAddSchema = z.object({
   contractorId: z.string().optional().nullable(),
   authorityId: z.string().optional().nullable(),
   deviceId: z.string().optional().nullable(),
+  /**
+   * The Ackcio gateway this project will own. Optional, because a project can
+   * be set up before the hardware is on site; exclusive, because a gateway
+   * serves one project at a time and the database enforces it.
+   */
+  gatewayId: z.union([z.string(), z.number()]).optional().nullable(),
   sensorId: z.string().optional().nullable(),
   createdBy: z.string().optional().nullable(),
   /**
@@ -163,3 +169,10 @@ export const setProjectDeviceSchema = z.object({
 });
 
 export type SetProjectDeviceInput = z.infer<typeof setProjectDeviceSchema>;
+
+/** Attaching, swapping or detaching a project's gateway. `null` detaches. */
+export const setProjectGatewaySchema = z.object({
+  gatewayId: z.union([z.string(), z.number()]).nullable().optional(),
+});
+
+export type SetProjectGatewayInput = z.infer<typeof setProjectGatewaySchema>;

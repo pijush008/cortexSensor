@@ -11,7 +11,7 @@ import { Reveal } from "@/components/ui/reveal";
 import { Select } from "@/components/ui/select";
 import { StatCard } from "@/components/ui/stat-card";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
-import { unwrapPaginated, useProjects } from "@/hooks/use-data";
+import { useProjects } from "@/hooks/use-data";
 import { api, type ApiResponse } from "@/lib/api";
 import { describeError, type DescribedError } from "@/lib/errors";
 import { formatDate } from "@/lib/utils";
@@ -52,16 +52,18 @@ const EMPTY_FORM = {
   // person accepts it.
   contractorEmail: "",
   authorityEmail: "",
-  // The monitoring hardware. Optional: a project can be set up before its
-  // cabinet is on site, and a device can be attached later.
-  deviceId: "",
+  // The monitoring hardware: the Ackcio gateway this project will own.
+  // Optional, because a project can be set up before its gateway is on site
+  // and attached from the project page later.
+  gatewayId: "",
 };
 
-interface DeviceOption {
+interface GatewayOption {
   id: number;
-  deviceName: string;
-  /** The serial printed on the unit; what distinguishes two similar cabinets. */
-  deviceId: string | null;
+  name: string;
+  /** The GatewayDeviceId printed on the unit, e.g. "ba92". */
+  gatewayKey: string;
+  lastSeenAt: string | null;
 }
 
 interface InvitationOutcome {
@@ -124,17 +126,17 @@ export default function ProjectsPage() {
   const [inviteResults, setInviteResults] = useState<InvitationOutcome[]>([]);
 
 
-  // Devices this project could actually use: not already claimed by a live
-  // project, and with sensors assigned. The organization is settled by the
-  // server from the session — the creator's own, or the operator organization
-  // for a platform operator — so there is nothing for the client to pass.
-  const devicesQuery = useQuery({
-    queryKey: ["devices", "availableForProject"],
+  // Gateways this project could actually take: the organization's own, not
+  // held by any project. Only these are OFFERED; the server enforces the rule
+  // when the form is submitted, so a gateway claimed by someone else in the
+  // meantime is refused with a sentence rather than taken twice.
+  const gatewaysQuery = useQuery({
+    queryKey: ["gateways", "available"],
     queryFn: async () => {
-      const { data } = await api.get<ApiResponse<unknown>>("/device", {
-        params: { availableForProject: "1", limit: 100 },
+      const { data } = await api.get<{ items: GatewayOption[] }>("/gateways", {
+        params: { available: "1", limit: 100 },
       });
-      return unwrapPaginated<DeviceOption>(data.data);
+      return data.items ?? [];
     },
     enabled: showModal,
   });
@@ -550,33 +552,30 @@ export default function ProjectsPage() {
           </div>
 
           {(() => {
-            const devices = devicesQuery.data ?? [];
-            const label = (d: DeviceOption) =>
-              d.deviceId ? `${d.deviceName} · ${d.deviceId}` : d.deviceName;
-
+            const gateways = gatewaysQuery.data ?? [];
             return (
               <div>
                 <Select
-                  label="Device (optional)"
-                  value={form.deviceId}
-                  disabled={devices.length === 0}
+                  label="Gateway (optional)"
+                  value={form.gatewayId}
+                  disabled={gateways.length === 0}
                   onChange={(e) =>
-                    setForm({ ...form, deviceId: e.target.value })
+                    setForm({ ...form, gatewayId: e.target.value })
                   }
                   options={[
-                    { value: "", label: "No device yet" },
-                    ...devices.map((d) => ({
-                      value: String(d.id),
-                      label: label(d),
+                    { value: "", label: "No gateway yet" },
+                    ...gateways.map((g) => ({
+                      value: String(g.id),
+                      label: `${g.name} · ${g.gatewayKey}`,
                     })),
                   ]}
                 />
                 <p className="mt-1.5 text-[0.78125rem] text-slate-500">
-                  {devicesQuery.isLoading
-                    ? "Loading devices…"
-                    : devices.length === 0
-                      ? "No device is available. Only devices that are free and have sensors assigned can be used."
-                      : "A device serves one running project at a time, and is released when the project ends."}
+                  {gatewaysQuery.isLoading
+                    ? "Loading gateways…"
+                    : gateways.length === 0
+                      ? "No gateway is available. Register one under Gateways, or end the project that holds it."
+                      : "A gateway serves one project at a time, and is released when the project ends."}
                 </p>
               </div>
             );

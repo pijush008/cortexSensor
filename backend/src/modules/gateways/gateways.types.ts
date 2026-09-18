@@ -49,6 +49,8 @@ export const updateGatewaySchema = createGatewaySchema
 export const listGatewaysQuerySchema = z.object({
   status: z.enum(GATEWAY_STATUSES).optional(),
   projectId: z.string().optional(),
+  /** "1": only gateways no project holds, and that are not decommissioned. */
+  available: z.string().optional(),
   search: z.string().trim().max(120).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(50),

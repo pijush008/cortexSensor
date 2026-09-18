@@ -15,6 +15,8 @@ import { useIsViewer } from "@/hooks/use-role";
 import { formatDate, formatDateTime } from "@/lib/format-detail";
 import type { Project } from "@/types";
 import { DevicePanel } from "./device-panel";
+import { GatewayPanel } from "./gateway-panel";
+import { ProjectTelemetry } from "./project-telemetry";
 import { StakeholdersPanel } from "./stakeholders-panel";
 
 /** Status values the API stores, mapped to something a person reads. */
@@ -144,6 +146,12 @@ export default function ProjectDetailPage() {
                     value: personName(p.authorityFirstName, p.authorityLastName),
                   },
                   {
+                    label: "Gateway",
+                    value: p.gatewayName
+                      ? `${p.gatewayName}${p.gatewayKey ? ` · ${p.gatewayKey}` : ""}`
+                      : null,
+                  },
+                  {
                     label: "Device",
                     // The NAME, not Project.deviceId — which holds the device's
                     // row id and rendered as a bare integer. It read as "—"
@@ -156,6 +164,16 @@ export default function ProjectDetailPage() {
                 ]}
               />
             </Card>
+            {p.gatewayId ? <ProjectTelemetry gatewayId={p.gatewayId} /> : null}
+            {!isViewer && (
+            <GatewayPanel
+              projectId={p.projectId ?? p.id}
+              currentGatewayId={p.gatewayId ?? null}
+              currentGatewayName={p.gatewayName ?? null}
+              currentGatewayKey={p.gatewayKey ?? null}
+              status={p.status}
+            />
+            )}
             {!isViewer && (
             <DevicePanel
               projectId={p.projectId ?? p.id}

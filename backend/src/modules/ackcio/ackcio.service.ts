@@ -441,10 +441,17 @@ async function handleSensorData(
     const sensorIndex = t.Sensor.SensorId ?? 0;
 
     if (!projectByDevice.has(device.id)) {
-      const project = await prisma.project.findFirst({
-        where: { deviceId: String(device.id), isDelete: false, status: "start" },
-        select: { id: true },
-      });
+      // The project that owns the GATEWAY, when it is collecting. A project
+      // that claimed a device directly, the older arrangement, still counts.
+      const project =
+        (await prisma.project.findFirst({
+          where: { gateway: { id: gateway.id }, isDelete: false, status: "start" },
+          select: { id: true },
+        })) ??
+        (await prisma.project.findFirst({
+          where: { deviceId: String(device.id), isDelete: false, status: "start" },
+          select: { id: true },
+        }));
       projectByDevice.set(device.id, project?.id ?? null);
     }
     const projectId = projectByDevice.get(device.id) ?? null;

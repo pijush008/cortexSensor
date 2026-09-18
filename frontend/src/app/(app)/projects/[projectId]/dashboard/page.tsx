@@ -520,6 +520,9 @@ export default function ProjectDashboardPage() {
         ) : (
           shown.map((ch, i) => {
             const sensor = sensorFor(ch);
+            // Which node this channel is on, when the project charts a whole
+            // gateway; two nodes both have a channel 0.0.
+            const node = (d.gatewayNodes ?? []).find((n) => n.deviceId === ch.deviceId);
             // The unit is a property of the sensor TYPE (uS for a load cell,
             // mm for an LVDT), not of the individual sensor row.
             const unit =
@@ -529,7 +532,7 @@ export default function ProjectDashboardPage() {
               <ChannelCard
                 key={ch.id}
                 index={i}
-                channelNumber={ch.channelNumber}
+                channelNumber={node ? `${node.name} ${ch.channelNumber}` : ch.channelNumber}
                 sensorId={ch.assignSensor}
                 sensorName={ch.channelName ?? sensor?.sensorName ?? "Sensor"}
                 unit={unit}

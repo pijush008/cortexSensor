@@ -226,6 +226,7 @@ export async function createProject(input: ProjectAddInput, tenantId: number) {
     contractorId,
     authorityId,
     deviceId,
+    gatewayId,
     createdBy,
   } = input;
 
@@ -287,6 +288,30 @@ export async function createProject(input: ProjectAddInput, tenantId: number) {
       }
     }
 
+    // The gateway must be this organization's and free. Read here so the
+    // refusal is a sentence; the CLAIM below is what actually decides, inside
+    // the transaction, so two simultaneous creations cannot both pass this
+    // check and both take it.
+    const gatewayRowId = gatewayId === undefined || gatewayId === null || gatewayId === ""
+      ? null
+      : Number(gatewayId);
+    if (gatewayRowId !== null) {
+      if (!Number.isInteger(gatewayRowId)) throw new BadRequestError("Invalid gateway");
+      const gateway = await prisma.gateway.findFirst({
+        where: { id: gatewayRowId, tenantId },
+        select: { projectId: true, status: true },
+      });
+      // Not found and not yours are the same answer, so a caller cannot probe
+      // another organization's gateway ids.
+      if (!gateway) throw new NotFoundError("Gateway not found");
+      if (gateway.status === "decommissioned") {
+        throw new BadRequestError("This gateway is decommissioned");
+      }
+      if (gateway.projectId !== null) {
+        throw new BadRequestError("This gateway is already assigned to a project");
+      }
+    }
+
     let imagePath: string | null = null;
     if (projectLogo) {
       imagePath = await saveBase64Image(projectLogo, "project_logo", "uploads/project_logo");
@@ -343,6 +368,21 @@ export async function createProject(input: ProjectAddInput, tenantId: number) {
           where: { id: Number(deviceId) },
           data: { isOngoing: true },
         });
+      }
+
+      // The gateway claim. `projectId: null` in the WHERE is the atomic test:
+      // if another creation claimed it between the check above and now, this
+      // updates nothing, and the whole transaction — project included — is
+      // rolled back. The unique index on projectId is the last line behind
+      // that.
+      if (gatewayRowId !== null) {
+        const claimed = await tx.gateway.updateMany({
+          where: { id: gatewayRowId, tenantId, projectId: null },
+          data: { projectId: created.id, claimedAt: new Date() },
+        });
+        if (claimed.count !== 1) {
+          throw new BadRequestError("This gateway is already assigned to a project");
+        }
       }
 
       return created;
@@ -681,6 +721,7 @@ export async function getProjectList(adminId: string, query: ProjectListQuery) {
   let projects = await prisma.project.findMany({
     where: where as never,
     include: {
+      gateway: { select: { id: true, name: true, gatewayKey: true } },
       creator: {
         select: { id: true, firstName: true, lastName: true },
       },
@@ -762,6 +803,9 @@ export async function getProjectList(adminId: string, query: ProjectListQuery) {
       endDate: p.endDate,
       deviceId: p.deviceId,
       deviceName,
+      gatewayId: p.gateway?.id ?? null,
+      gatewayName: p.gateway?.name ?? null,
+      gatewayKey: p.gateway?.gatewayKey ?? null,
       dashImage: formatImageUrl(p.dashImage),
       dashImage2: formatImageUrl(p.dashImage2),
       status: p.status,
@@ -866,6 +910,10 @@ export async function projectStart(projectId: string, query: ProjectStartQuery) 
 
   await sendEmailStartEnd(projectId, statusType);
 
+  if (statusType === "end") {
+    await releaseGateway(Number(projectId));
+  }
+
   if (statusType === "end" && project.deviceId) {
     const deviceData = await getDeviceData(project.deviceId);
 
@@ -910,6 +958,8 @@ export async function deleteProjectById(projectId: string) {
     });
   }
 
+  await releaseGateway(Number(projectId));
+
   await prisma.project.update({
     where: { id: Number(projectId) },
     data: {
@@ -920,6 +970,18 @@ export async function deleteProjectById(projectId: string) {
   });
 
   return { status_code: 200, message: "Success" };
+}
+
+/**
+ * Frees whatever gateway a project holds. Idempotent: a project with no
+ * gateway releases nothing. The project keeps its own record of readings;
+ * only the claim is undone.
+ */
+export async function releaseGateway(projectId: number): Promise<void> {
+  await prisma.gateway.updateMany({
+    where: { projectId },
+    data: { projectId: null, claimedAt: null },
+  });
 }
 
 export async function projectOffsetById(projectId: string, input: ProjectOffsetInput) {
@@ -988,6 +1050,7 @@ export async function dashboardData(uniqueId: string) {
       // registration, so an admin should not have to upload the same image
       // twice for it to appear beside their own project.
       tenant: { select: { logoPath: true } },
+      gateway: { select: { id: true, name: true, gatewayKey: true, lastSeenAt: true } },
     },
   });
 
@@ -1001,11 +1064,34 @@ export async function dashboardData(uniqueId: string) {
       })
     : null;
 
-  const channels = device
-    ? await prisma.deviceChannel.findMany({
-        where: { deviceId: String(device.id) },
+  // The channels this dashboard charts. A project that owns a GATEWAY charts
+  // every channel of every node behind it — that is what its sensor data is —
+  // and a project that claimed a single device (the older arrangement) charts
+  // that device's channels, exactly as before.
+  const gatewayNodes = project.gateway
+    ? await prisma.device.findMany({
+        where: { gatewayId: project.gateway.id, isDelete: "false_" },
+        select: { id: true, deviceName: true, deviceId: true, channelCount: true, updateHeartBeat: true, assignSensor: true },
+        orderBy: { deviceName: "asc" },
       })
     : [];
+
+  const channels = project.gateway
+    ? (
+        await prisma.deviceChannel.findMany({
+          where: { deviceId: { in: gatewayNodes.map((n) => String(n.id)) } },
+        })
+      ).sort((a, b) => {
+        // Node by node, then channel by channel, so the cards group by node.
+        const na = gatewayNodes.findIndex((n) => String(n.id) === a.deviceId);
+        const nb = gatewayNodes.findIndex((n) => String(n.id) === b.deviceId);
+        return na - nb || Number(a.channelNumber) - Number(b.channelNumber);
+      })
+    : device
+      ? await prisma.deviceChannel.findMany({
+          where: { deviceId: String(device.id) },
+        })
+      : [];
 
   const enrichedChannels = channels.map((ch) => ({
     ...ch,
@@ -1025,7 +1111,14 @@ export async function dashboardData(uniqueId: string) {
     projectStatus: project.status,
     projectUniqueID: project.projectUniqueID,
     csvData: project.csvData,
-    channelCount: device?.channelCount ?? 0,
+    channelCount: project.gateway
+      ? gatewayNodes.reduce((sum, n) => sum + n.channelCount, 0)
+      : (device?.channelCount ?? 0),
+    gatewayId: project.gateway?.id ?? null,
+    gatewayName: project.gateway?.name ?? null,
+    gatewayKey: project.gateway?.gatewayKey ?? null,
+    /** The nodes behind the gateway, so a channel's card can say which node it is on. */
+    gatewayNodes: gatewayNodes.map((n) => ({ id: n.id, deviceId: String(n.id), nodeKey: n.deviceId, name: n.deviceName })),
     dashImage: formatImageUrl(project.dashImage),
     dashImage2: formatImageUrl(project.dashImage2),
     liveVideoUrl: project.liveVideoUrl,
@@ -1043,22 +1136,24 @@ export async function dashboardData(uniqueId: string) {
     adminImg:
       partyEmblem(project.creator) ?? formatImageUrl(project.tenant?.logoPath),
     superAdminImage: partyEmblem(superAdmin),
-    sensorList: device?.assignSensor ?? null,
+    sensorList: project.gateway
+      ? JSON.stringify(gatewayNodes.flatMap((n) => { try { return JSON.parse(n.assignSensor ?? "[]") as number[]; } catch { return []; } }))
+      : (device?.assignSensor ?? null),
     deviceId: project.deviceId,
-    gatewayDeviceId: device?.gatewayDeviceId ?? null,
+    gatewayDeviceId: project.gateway?.gatewayKey ?? device?.gatewayDeviceId ?? null,
     dId: device?.deviceId ?? null,
     adminFirstName: project.creator?.firstName ?? null,
     adminLastName: project.creator?.lastName ?? null,
     contractorFirstName: project.contractor?.firstName ?? null,
     contractorLastName: project.contractor?.lastName ?? null,
-    deviceName: device?.deviceName ?? null,
+    deviceName: project.gateway ? project.gateway.name : (device?.deviceName ?? null),
     authorityFirstName: project.authority?.firstName ?? null,
     authorityLastName: project.authority?.lastName ?? null,
     startDate: project.startDate,
     actualStartDate: project.actualStartDate,
     projectLocation: project.projectLocation,
     endDate: project.endDate,
-    updateHeartBeat: device?.updateHeartBeat ?? null,
+    updateHeartBeat: project.gateway ? project.gateway.lastSeenAt : (device?.updateHeartBeat ?? null),
     deviceChannels: enrichedChannels,
   };
 
@@ -1410,6 +1505,7 @@ export async function projectAnalysis() {
 
   if (toEndProjects.length > 0) {
     for (const project of toEndProjects) {
+      await releaseGateway(project.id);
       if (project.deviceId) {
         const deviceData = await getDeviceData(project.deviceId);
 
@@ -1651,6 +1747,94 @@ export async function projectDeviceOptions(projectId: number) {
   });
 
   return devices;
+}
+
+/** Gateways this project could take: the organization's own, and free. */
+export async function projectGatewayOptions(projectId: number) {
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, isDelete: false },
+    select: { tenantId: true },
+  });
+  if (!project) throw new NotFoundError("Project not found");
+
+  return prisma.gateway.findMany({
+    where: {
+      tenantId: project.tenantId,
+      projectId: null,
+      status: { not: "decommissioned" },
+    },
+    select: { id: true, name: true, gatewayKey: true, status: true, lastSeenAt: true },
+    orderBy: { name: "asc" },
+  });
+}
+
+export interface SetProjectGatewayResult {
+  projectId: number;
+  gatewayId: number | null;
+  releasedGatewayId: number | null;
+}
+
+/**
+ * Attach, swap or detach a project's gateway.
+ *
+ * Only while the project is not collecting — not started, or paused — for
+ * the same reason as its device: readings from two gateways stitched into one
+ * running project's series, with no record of the join, would be a lie on a
+ * chart. Release and claim happen in one transaction so no moment exists in
+ * which the project holds nothing while the new gateway is already taken.
+ */
+export async function setProjectGateway(
+  projectId: number,
+  gatewayId: number | null,
+): Promise<SetProjectGatewayResult> {
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, isDelete: false },
+    select: { id: true, status: true, tenantId: true, gateway: { select: { id: true } } },
+  });
+  if (!project) throw new NotFoundError("Project not found");
+
+  if (project.status !== "not_start" && project.status !== "pause") {
+    throw new BadRequestError(
+      "A project's gateway can only be changed while it is not collecting — before it starts, or while paused",
+    );
+  }
+
+  const current = project.gateway?.id ?? null;
+  if (gatewayId === current) {
+    return { projectId, gatewayId: current, releasedGatewayId: null };
+  }
+
+  if (gatewayId !== null) {
+    const next = await prisma.gateway.findFirst({
+      where: { id: gatewayId, tenantId: project.tenantId },
+      select: { projectId: true, status: true },
+    });
+    if (!next) throw new NotFoundError("Gateway not found");
+    if (next.status === "decommissioned") throw new BadRequestError("This gateway is decommissioned");
+    if (next.projectId !== null && next.projectId !== projectId) {
+      throw new BadRequestError("This gateway is already assigned to a project");
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (current !== null) {
+      await tx.gateway.update({
+        where: { id: current },
+        data: { projectId: null, claimedAt: null },
+      });
+    }
+    if (gatewayId !== null) {
+      const claimed = await tx.gateway.updateMany({
+        where: { id: gatewayId, tenantId: project.tenantId, projectId: null },
+        data: { projectId, claimedAt: new Date() },
+      });
+      if (claimed.count !== 1) {
+        throw new BadRequestError("This gateway is already assigned to a project");
+      }
+    }
+  });
+
+  return { projectId, gatewayId, releasedGatewayId: current };
 }
 
 export interface SetProjectDeviceResult {

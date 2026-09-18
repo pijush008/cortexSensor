@@ -78,6 +78,18 @@ router.put(
   requirePermission("MANAGE_PROJECTS"),
   projectsController.setProjectDeviceHandler,
 );
+router.put(
+  "/project/:projectId/gateway",
+  authenticate,
+  requirePermission("MANAGE_PROJECTS"),
+  projectsController.setProjectGatewayHandler,
+);
+router.get(
+  "/project/:projectId/gateway-options",
+  authenticate,
+  requirePermission("VIEW_PROJECTS"),
+  projectsController.projectGatewayOptionsHandler,
+);
 router.get(
   "/project/:projectId/device-options",
   authenticate,

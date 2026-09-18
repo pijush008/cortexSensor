@@ -23,6 +23,7 @@ import {
   channelUpdateSchema,
   projectSetupSchema,
   setProjectDeviceSchema,
+  setProjectGatewaySchema,
 } from "./projects.types";
 
 function handleControllerError(res: Response, error: unknown) {
@@ -458,6 +459,50 @@ export async function projectDeviceOptionsHandler(
     await assertProjectAccess(projectId, req.user);
     const data = await projectsService.projectDeviceOptions(projectId);
     return res.status(200).json({ status_code: 200, message: "Success", data });
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+}
+
+export async function projectGatewayOptionsHandler(req: AuthRequest, res: Response) {
+  try {
+    const projectId = Number(req.params.projectId);
+    await assertProjectAccess(projectId, req.user);
+    const data = await projectsService.projectGatewayOptions(projectId);
+    return res.status(200).json({ status_code: 200, message: null, data });
+  } catch (error) {
+    return handleControllerError(res, error);
+  }
+}
+
+export async function setProjectGatewayHandler(req: AuthRequest, res: Response) {
+  try {
+    const parsed = setProjectGatewaySchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({
+        status_code: 400,
+        message: parsed.error.errors[0].message.replace(/"/g, ""),
+      });
+    }
+    const projectId = Number(req.params.projectId);
+    await assertProjectAccess(projectId, req.user);
+    const raw = parsed.data.gatewayId;
+    const gatewayId = raw === undefined || raw === null || raw === "" ? null : Number(raw);
+    if (gatewayId !== null && !Number.isInteger(gatewayId)) {
+      return res.status(400).json({ status_code: 400, message: "Invalid gateway" });
+    }
+    const data = await projectsService.setProjectGateway(projectId, gatewayId);
+    const { ipAddress, userAgent } = auditLogger.requestContext(req);
+    await auditLogger.audit({
+      userId: req.user?.id,
+      action: "update",
+      entity: "project",
+      entityId: projectId,
+      newValue: { gatewayId: data.gatewayId, releasedGatewayId: data.releasedGatewayId },
+      ipAddress,
+      userAgent,
+    });
+    return res.status(200).json({ status_code: 200, message: "success", data });
   } catch (error) {
     return handleControllerError(res, error);
   }

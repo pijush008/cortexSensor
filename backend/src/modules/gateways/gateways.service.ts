@@ -52,8 +52,13 @@ export function connectivityOf(lastSeenAt: Date | null): {
 }
 
 type GatewayRow = Prisma.GatewayGetPayload<{
-  include: { _count: { select: { devices: true } } };
+  include: { _count: { select: { devices: true } }; project: { select: { id: true; projectName: true } } };
 }>;
+
+const GATEWAY_INCLUDE = {
+  _count: { select: { devices: true } },
+  project: { select: { id: true, projectName: true } },
+} as const;
 
 function serialize(row: GatewayRow) {
   const connectivity = connectivityOf(row.lastSeenAt);
@@ -67,6 +72,18 @@ function serialize(row: GatewayRow) {
     firmwareVersion: row.firmwareVersion,
     hardwareModel: row.hardwareModel,
     projectId: row.projectId,
+    projectName: row.project?.projectName ?? null,
+    /**
+     * Whether a project could take this gateway. Derived from the claim, not
+     * stored: "assigned" is exactly "some project's projectId is here".
+     */
+    availability:
+      row.status === GatewayStatus.decommissioned
+        ? "decommissioned"
+        : row.projectId !== null
+          ? "assigned"
+          : "available",
+    claimedAt: row.claimedAt,
     structureId: row.structureId,
     locationId: row.locationId,
     lastSeenAt: row.lastSeenAt,
@@ -127,6 +144,10 @@ export async function listGateways(ctx: AuthContext, query: ListGatewaysQuery) {
   const where: Prisma.GatewayWhereInput = { ...tenantScope(ctx) };
   if (query.status) where.status = query.status;
   if (query.projectId) where.projectId = Number(query.projectId);
+  if (query.available === "1") {
+    where.projectId = null;
+    where.status = { not: GatewayStatus.decommissioned };
+  }
   if (query.search) {
     where.OR = [
       { name: { contains: query.search, mode: "insensitive" } },
@@ -138,7 +159,7 @@ export async function listGateways(ctx: AuthContext, query: ListGatewaysQuery) {
     prisma.gateway.count({ where }),
     prisma.gateway.findMany({
       where,
-      include: { _count: { select: { devices: true } } },
+      include: GATEWAY_INCLUDE,
       orderBy: [{ name: "asc" }],
       skip: (query.page - 1) * query.limit,
       take: query.limit,
@@ -157,7 +178,7 @@ export async function listGateways(ctx: AuthContext, query: ListGatewaysQuery) {
 export async function getGateway(ctx: AuthContext, id: number) {
   const row = await prisma.gateway.findFirst({
     where: { id, ...tenantScope(ctx) },
-    include: { _count: { select: { devices: true } } },
+    include: GATEWAY_INCLUDE,
   });
   if (!row) throw new NotFoundError("Gateway not found");
   return serialize(row);
@@ -204,7 +225,7 @@ export async function createGateway(ctx: AuthContext, input: CreateGatewayInput)
       status: GatewayStatus.provisioning,
       createdBy: ctx.userId,
     },
-    include: { _count: { select: { devices: true } } },
+    include: GATEWAY_INCLUDE,
   });
 
   // Adopt devices already reporting under this gateway identifier. Existing
@@ -224,7 +245,7 @@ export async function createGateway(ctx: AuthContext, input: CreateGatewayInput)
   if (adopted.count > 0) {
     const refreshed = await prisma.gateway.findUniqueOrThrow({
       where: { id: row.id },
-      include: { _count: { select: { devices: true } } },
+      include: GATEWAY_INCLUDE,
     });
     return serialize(refreshed);
   }
@@ -255,7 +276,7 @@ export async function updateGateway(
       structureId: input.structureId,
       locationId: input.locationId,
     },
-    include: { _count: { select: { devices: true } } },
+    include: GATEWAY_INCLUDE,
   });
 
   return serialize(row);

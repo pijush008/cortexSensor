@@ -432,6 +432,8 @@ model Project {
   sensorData    SensorData[]
   structures    Structure[]
   invitations   ProjectInvitation[]
+  /// The Ackcio gateway this project owns, exclusively, while it runs.
+  gateway       Gateway?            @relation("ProjectGateway")
 
   @@index([tenantId])
   @@index([tenantId, status])
@@ -481,9 +483,17 @@ model Gateway {
   name        String  @db.VarChar(160)
   description String? @db.Text
 
+  /// The ONE project this gateway serves, or null while it is available.
+  ///
+  /// Unique, so the database itself refuses a second project claiming the
+  /// same gateway; Postgres lets any number of rows carry NULL under a unique
+  /// index, so free gateways do not collide with each other. The claim is
+  /// written in the same transaction as the project that makes it, and
+  /// released when that project ends or is deleted.
+  projectId   Int?      @unique
+  claimedAt   DateTime?
   /// Optional placement. A gateway is often mounted on the structure it serves,
   /// but may sit in a cabinet covering several.
-  projectId   Int?
   structureId Int?
   locationId  Int?
 
@@ -513,6 +523,7 @@ model Gateway {
   updatedAt DateTime @updatedAt
 
   tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project Project? @relation("ProjectGateway", fields: [projectId], references: [id])
   devices Device[]
 
   @@index([tenantId])
@@ -1383,6 +1394,66 @@ model NodeNetworkData {
   @@index([gatewayId, ts(sort: Desc)])
   @@index([deviceId, ts(sort: Desc)])
   @@map("node_network_data")
+}
+
+/// What happened to a file the gateway uploaded over FTP(S).
+enum IngestionFileStatus {
+  /// Seen on disk, not yet handled.
+  received
+  /// Every row stored (or recognised as already stored).
+  processed
+  /// Could not be parsed or stored; the file is kept for inspection.
+  failed
+  /// Named for a gateway nobody has registered. Kept, never assigned.
+  unknown_gateway
+  /// Same content as a file already processed; skipped.
+  duplicate
+}
+
+/// One row per file the FTP drop received — the ingestion ledger.
+///
+/// This is how a file is processed exactly once (the content hash is unique),
+/// how a failed file is found again with its error, and how an unregistered
+/// gateway's uploads are surfaced to an administrator instead of quietly
+/// attached to somebody's project.
+model IngestionFile {
+  id Int @id @default(autoincrement())
+
+  /// Null for a file from an unknown gateway: it belongs to nobody yet.
+  tenantId  Int?
+  gatewayId Int?
+  projectId Int?
+
+  /// Parsed from the file name, as the gateway wrote it.
+  gatewayKey String? @db.VarChar(128)
+  nodeKey    String? @db.VarChar(64)
+  /// SensorData, NodeData, NetworkData, HeartbeatData or ErrorSensorData.
+  fileType   String  @db.VarChar(32)
+
+  fileName String @db.VarChar(512)
+  /// Where the file now lives: the processed or failed directory.
+  filePath String @db.VarChar(1024)
+  /// SHA-256 of the content. Unique: the same upload twice is stored once.
+  sha256    String @unique @db.VarChar(64)
+  sizeBytes Int
+
+  status IngestionFileStatus @default(received)
+  /// Data rows in the file, excluding the header.
+  rowsTotal     Int @default(0)
+  /// Rows that produced new readings.
+  rowsStored    Int @default(0)
+  /// Rows already stored by an earlier file or push.
+  rowsDuplicate Int @default(0)
+  /// Why processing failed, for the administrator.
+  error         String? @db.Text
+
+  receivedAt  DateTime  @default(now()) @db.Timestamptz()
+  processedAt DateTime? @db.Timestamptz()
+
+  @@index([status, receivedAt(sort: Desc)])
+  @@index([tenantId, receivedAt(sort: Desc)])
+  @@index([gatewayKey, receivedAt(sort: Desc)])
+  @@map("ingestion_files")
 }
 
 /// Ackcio HeartbeatData: the gateway's own health, hourly.

@@ -48,6 +48,11 @@ export interface ProjectDashboard {
   deviceId: string | null;
   gatewayDeviceId: string | null;
   deviceName: string | null;
+  /** Set when the project owns a gateway; the channels then span its nodes. */
+  gatewayId?: number | null;
+  gatewayName?: string | null;
+  gatewayKey?: string | null;
+  gatewayNodes?: Array<{ id: number; deviceId: string; nodeKey: string | null; name: string }>;
   projectLocation: string;
   /** Null when the device has never checked in. */
   updateHeartBeat: string | null;
